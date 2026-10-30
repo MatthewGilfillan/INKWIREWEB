@@ -55,7 +55,7 @@ Open `studio.html?role=parent`. The sidebar contains Overview, Weekly plan, Prog
 
 - **Sample journey** shows a fictional learner with four example lesson reviews and an explicitly illustrative 12-week schedule.
 - **Saved demo work** uses Alex Lee’s reading status, quiz submissions, edited lesson plans, and assessments from the existing demo workspaces in this browser. No existing work is overwritten by sample data.
-- The weekly plan covers all 24 lessons with goals, preparation reading, and follow-up assignments. The time-zone selector converts the sample session times. Saved demo work has no confirmed schedule or Zoom link.
+- The weekly plan covers all 24 lessons with goals, preparation reading, and follow-up assignments. The time-zone selector defaults to Beijing / Shanghai (Asia/Shanghai, UTC+8) and converts the sample session times. Saved demo work has no confirmed schedule or Zoom link.
 - Homework and attendance summaries use only recorded, applicable observations. Missing observations remain “Not recorded.”
 - Read markers persist separately in this browser, and changed family-visible feedback becomes unread again. Read markers are not sent to the teacher.
 - Contact opens an email draft to `matthew@inkwire.online`, optionally with lesson context. It does not send email from the site.

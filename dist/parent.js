@@ -10,7 +10,8 @@ const FAMILY_SAMPLE = {
 };
 let parentSource = null;
 let parentWeek = 3;
-let parentTimezone = 'Asia/Bangkok';
+const FAMILY_TIMEZONES = {'Asia/Shanghai':'Beijing / Shanghai','Asia/Bangkok':'Bangkok','UTC':'UTC'};
+let parentTimezone = 'Asia/Shanghai';
 let parentFeedbackWeek = 'all';
 let parentContactLesson = 0;
 let parentRead = {};
@@ -69,7 +70,7 @@ function familyChip(value) {
 function familyTop(title,description) {
   familyModel();
   return '<div class="family-heading"><div><div class="eyebrow">A PARTNERSHIP IN LEARNING</div><h1>'+title+'</h1><p>'+description+'</p></div><div class="family-learner"><span class="avatar">AL</span><div><b>Alex Lee</b><small>Literature & the World</small></div></div></div>'+
-    '<div class="family-preview"><p><strong>Parent portal preview</strong> · Fictional learner. '+(parentSource==='sample'?'Sample journey and illustrative schedule.':'Reading, quizzes, and assessments saved in this browser.')+'</p><div class="family-controls"><label>View<select id="family-source"><option value="sample" '+(parentSource==='sample'?'selected':'')+'>Sample journey</option><option value="saved" '+(parentSource==='saved'?'selected':'')+'>Saved demo work</option></select></label><label>Time zone<select id="family-timezone">'+['Asia/Bangkok','Asia/Shanghai','UTC'].map(zone=>'<option '+(zone===parentTimezone?'selected':'')+'>'+zone+'</option>').join('')+'</select></label></div></div>';
+    '<div class="family-preview"><p><strong>Parent portal preview</strong> · Fictional learner. '+(parentSource==='sample'?'Sample journey and illustrative schedule.':'Reading, quizzes, and assessments saved in this browser.')+'</p><div class="family-controls"><label>View<select id="family-source"><option value="sample" '+(parentSource==='sample'?'selected':'')+'>Sample journey</option><option value="saved" '+(parentSource==='saved'?'selected':'')+'>Saved demo work</option></select></label><label>Time zone<select id="family-timezone">'+Object.entries(FAMILY_TIMEZONES).map(([zone,label])=>'<option value="'+zone+'" '+(zone===parentTimezone?'selected':'')+'>'+label+'</option>').join('')+'</select></label></div></div>';
 }
 function familyWeekSelect() {
   return '<label class="family-week-select">Week<select id="family-week">'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'" '+(parentWeek===i+1?'selected':'')+'>Week '+(i+1)+'</option>').join('')+'</select></label>';
@@ -97,7 +98,7 @@ function familyPrepCard(lesson) {
   return '<section class="card"><div class="cardtop"><h2>Ready for the conversation?</h2><span class="family-chip neutral">Lesson '+lesson+'</span></div><div class="family-check-row"><span class="family-check '+(p.reading?'ready':'')+'">'+(p.reading?'✓':'1')+'</span><div><b>Reading before class</b><p>'+esc(reading)+'</p><small>'+readingLabel+(p.reading?' · student-reported':'')+'</small></div></div><div class="family-check-row"><span class="family-check '+(p.quiz?'ready':'')+'">'+(p.quiz?'✓':'2')+'</span><div><b>Preparation quiz</b><p>'+(p.quiz?'Submitted'+(Number.isFinite(p.quiz.score)?' · '+p.quiz.score+'/4':'')+'. Completion is the entry ticket.':'A short reading check before the lesson.')+'</p><small>'+(p.quiz?'Ready for discussion':parentSource==='saved'&&lesson!==1?'Quiz not configured for this lesson':'Awaiting submission')+'</small></div></div><p class="family-footnote">Parents can check preparation here; students complete their reading and quiz in their own workspace.</p></section>';
 }
 function familyLessonCard(lesson) {
-  return '<section class="card family-meeting"><div class="eyebrow">'+(parentSource==='sample'?'ILLUSTRATIVE LIVE LESSON':'LIVE LESSON')+'</div><h2>'+ (parentSource==='sample'?familyDate(lesson):'Schedule to be confirmed')+'</h2>'+(parentSource==='sample'?'<div class="family-time">'+familyTime(lesson)+'</div><p class="muted">90 minutes · '+parentTimezone+'</p>':'<p class="muted">Your confirmed date and time will appear here once the program is scheduled.</p>')+'<p>'+esc(plan(lesson).title)+'</p><button class="btn wide" disabled>Zoom link not set</button><p class="family-footnote">Your child’s individual lesson link will appear here.</p></section>';
+  return '<section class="card family-meeting"><div class="eyebrow">'+(parentSource==='sample'?'ILLUSTRATIVE LIVE LESSON':'LIVE LESSON')+'</div><h2>'+ (parentSource==='sample'?familyDate(lesson):'Schedule to be confirmed')+'</h2>'+(parentSource==='sample'?'<div class="family-time">'+familyTime(lesson)+'</div><p class="muted">90 minutes · '+FAMILY_TIMEZONES[parentTimezone]+'</p>':'<p class="muted">Your confirmed date and time will appear here once the program is scheduled.</p>')+'<p>'+esc(plan(lesson).title)+'</p><button class="btn wide" disabled>Zoom link not set</button><p class="family-footnote">Your child’s individual lesson link will appear here.</p></section>';
 }
 function parentDashboard() {
   const m=familyModel(), latest=m.records[0],stats=m.metrics;
@@ -111,7 +112,7 @@ function parentWeekPlan() {
   const m=familyModel();
   return familyTop('A plan you can follow.','See what’s coming, what to read, and what each lesson is working toward.')+
     '<section class="card family-plan-navigation"><div class="cardtop"><h2>Your 12-week course</h2>'+familyWeekSelect()+'</div>'+familyWeekStrip(m.records)+'</section>'+
-    '<div class="family-section-title"><div><span class="eyebrow">WEEK '+String(parentWeek).padStart(2,'0')+'</span><h2>Two lessons. A shared direction.</h2></div><span class="family-chip neutral">'+(parentSource==='sample'?'Sample schedule · '+parentTimezone:'Schedule not configured')+'</span></div>'+
+    '<div class="family-section-title"><div><span class="eyebrow">WEEK '+String(parentWeek).padStart(2,'0')+'</span><h2>Two lessons. A shared direction.</h2></div><span class="family-chip neutral">'+(parentSource==='sample'?'Sample schedule · '+FAMILY_TIMEZONES[parentTimezone]:'Schedule not configured')+'</span></div>'+
     '<div class="family-lesson-grid">'+[m.firstLesson,m.firstLesson+1].map(lesson=>{
       const p=plan(lesson),r=m.records.find(r=>r.lesson===lesson),prep=familyPreparation(parentSource,lesson,state);
       return '<article class="card family-plan-lesson"><div class="cardtop"><span class="eyebrow">LESSON '+((lesson-1)%2+1)+' <span class="muted">/ '+lesson+' OF 24</span></span>'+familyChip(r?'Reviewed':'Planned')+'</div><h2>'+esc(p.title)+'</h2><p class="family-lesson-time">'+(parentSource==='sample'?familyDate(lesson)+' · '+familyTime(lesson)+' · 90 min':'Date and time to be confirmed')+'</p><div class="family-plan-block"><span class="eyebrow">LEARNING GOAL</span><p>'+esc(p.goal)+'</p></div><div class="family-plan-block"><span class="eyebrow">READ BEFORE THIS LESSON</span><p>'+esc(lesson===1?'Read Act 2 through Gerald’s departure.':plan(lesson-1).reading)+'</p></div><div class="family-plan-block"><span class="eyebrow">AFTER THIS LESSON</span><p>'+esc(p.reading)+'</p><small>'+(lesson===24?'Final reflection · no new chapter reading.':'Due before the following lesson.')+'</small></div><div class="family-lesson-footer"><span>'+familyChip(prep.quiz?'Quiz submitted':parentSource==='saved'&&lesson!==1?'Quiz not configured':'Quiz pending')+'</span><button type="button" class="link text-button" data-family-contact="'+lesson+'">Ask a question ↗</button></div></article>';
