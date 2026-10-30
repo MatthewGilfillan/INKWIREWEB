@@ -26,3 +26,42 @@ dialog{max-width:510px;width:calc(100% - 35px);border:1px solid #dbe1ec;border-r
 @media(max-width:900px){.site-header{gap:12px}.site-header .brand{width:135px}.site-header .header-cta{padding:10px 13px;gap:14px;font-size:10px}.site-header .menu-toggle{width:28px;padding:0}}
 
 @media(max-width:600px){.form-row{grid-template-columns:1fr}}
+
+.header-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.header-signin{background:var(--aqua);border-color:var(--aqua);color:var(--navy)}
+.header-signin:hover{background:#a2dad5;border-color:#a2dad5}
+@media(max-width:900px){.header-actions{margin-left:auto}.site-header .header-cta{margin-left:0}.header-signin{padding:10px 16px!important;font-size:10px!important}}
+@media(max-width:520px){.site-header{display:grid;grid-template-columns:1fr auto;gap:14px}.site-header .brand{grid-column:1;grid-row:1}.site-header .menu-toggle{grid-column:2;grid-row:1}.header-actions{grid-column:1/-1;width:100%;margin:0}.header-actions .button{flex:1;min-height:42px}.site-header nav{grid-column:1/-1}}
+
+.teacher-photo{margin:0;width:100%;max-width:340px;background:var(--navy);border-radius:10px;overflow:hidden;box-shadow:0 10px 30px #1b2b4b12}
+.teacher-photo-frame{aspect-ratio:1;overflow:hidden;background:#dcddeb}
+.teacher-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 45%;transform:scale(1.08)}
+.teacher-photo figcaption{padding:19px 22px;color:#fff}
+.teacher-photo figcaption strong{display:block;font:21px Georgia,serif}
+.teacher-photo figcaption span{display:block;margin-top:7px;color:var(--aqua);font-size:8px;letter-spacing:2px}
+@media(max-width:900px){.teacher-photo{width:min(320px,100%);margin-inline:auto}}
+
+/* Account flow preview. Inputs stay disabled until real authentication is connected. */
+#signin-dialog{max-height:calc(100dvh - 32px);overflow-y:auto}
+.auth-preview-note{font-size:10px;color:#53617f;background:#efedf8;border-radius:5px;padding:9px 12px;margin:18px 0}
+.auth-form{margin-top:22px}.auth-form fieldset{border:0;padding:0;margin:0;min-width:0}
+.auth-form input:disabled{opacity:1;color:var(--ink);background:#f6f7fa;cursor:not-allowed}
+.auth-form input:disabled::placeholder{color:#69758b;opacity:1}
+.auth-submit{background:var(--aqua);border-color:var(--aqua);color:var(--navy)}
+.auth-submit:disabled{opacity:.8;cursor:not-allowed;transform:none}
+.auth-switch{font-size:11px;text-align:center;margin:22px 0}
+.auth-switch button{background:none;border:0;padding:0;color:var(--ink);font-size:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.auth-explanation{font-size:12px;color:var(--muted);line-height:1.7}
+.auth-preview-link{font-size:11px;margin-top:4px}
+.auth-envelope{display:grid;place-items:center;width:52px;height:52px;margin-top:25px;background:#dff1ef;border-radius:50%;font-size:27px;color:#28595c}
+.auth-example{font-size:11px;background:#efedf8;border-radius:5px;padding:13px 15px;margin-block:20px;color:#53617f}
+.dashboard-previews{border-top:1px solid var(--line);padding-top:18px;margin-top:25px}
+.dashboard-previews summary{font-size:11px;font-weight:600;cursor:pointer}
+.dashboard-previews .preview-notice{border:0;padding:0}
+@media(max-width:520px){#signin-dialog{padding:28px 24px}#signin-dialog h2{font-size:32px}.auth-preview-note{font-size:10px}}
+
+.teacher-photo-frame{position:relative}
+.teacher-photo .teacher-fallback{position:absolute;inset:0;object-fit:contain;transform:none}
+.teacher-photo .teacher-portrait{position:relative}
+
+.teacher-photo .teacher-portrait[hidden]{display:none}

@@ -8,7 +8,8 @@ Serve the dist directory with any static server, for example:
 
 ## Included
 - Responsive landing page with Ink Wire branding, supplied photography, program information, teacher introduction, FAQs, and an email-enquiry draft form
-- Sign-in entry with separate student, teacher, and parent dashboard previews
+- Simple email/password sign-in and account-creation design previews, plus the email-activation screen
+- Separate student, teacher, and parent dashboard previews
 - Responsive student dashboard and 12-week / 24-lesson editable course timeline
 - An Inspector Calls / Lord of the Flies curriculum and Lesson 1 preparation quiz with scoring, explanations, retries, and a discussion question
 - Weekly notebooks with four sections and browser-local autosave
@@ -35,3 +36,15 @@ Store private teacher notes on the server with teacher-only access. Add export/b
 Public GitHub source: https://github.com/MatthewGilfillan/INKWIREWEB
 Sites hosting uses a separate managed source remote. Keep the GitHub source and deployment source synchronized for future edits.
 
+
+## Agreed account flow
+1. Create account with email and password only.
+2. Send a verification email containing an expiring, single-use activation link.
+3. Require email verification before granting dashboard access.
+4. Returning users sign in with email and password. Route them by their server-assigned role; users must not be able to grant themselves teacher access.
+5. Provide resend-verification and password-reset links in the connected service.
+
+The current UI is a design preview: email/password fields and submit buttons are disabled, and the activation screen explicitly states that nothing has been sent. No credentials are collected, stored, or transmitted. The dashboard preview links remain demo navigation. Production account creation, verification email delivery, password reset, sessions, and server-enforced access require a connected authentication service and compatible hosting; none is configured in this static Sites preview.
+
+## Optional teacher portrait
+The supplied personal photo is held in the private Site source and deployment only. The public GitHub repository excludes `dist/assets/matthew-gilfillan.png`; the teacher card displays the existing Ink Wire logo if that optional asset is absent.
