@@ -7,9 +7,15 @@
     "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
+    "@liveblocks/client": "3.24.5",
+    "@liveblocks/yjs": "3.24.5",
     "@tiptap/core": "3.31.3",
+    "@tiptap/extension-collaboration": "3.31.3",
+    "@tiptap/extension-collaboration-caret": "3.31.3",
     "@tiptap/pm": "3.31.3",
-    "@tiptap/starter-kit": "3.31.3"
+    "@tiptap/starter-kit": "3.31.3",
+    "@tiptap/y-tiptap": "3.0.7",
+    "yjs": "13.6.27"
   },
   "devDependencies": {
     "esbuild": "0.25.12"

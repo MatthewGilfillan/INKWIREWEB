@@ -12,7 +12,7 @@ Serve the dist directory with any static server, for example:
 - Separate student, teacher, and parent dashboard previews
 - Responsive student dashboard and 12-week / 24-lesson editable course timeline
 - An Inspector Calls / Lord of the Flies curriculum and Lesson 1 preparation quiz with scoring, explanations, retries, and a discussion question
-- Weekly notebooks with four sections and browser-local autosave
+- Weekly notebooks with four sections, browser-local autosave, and an opt-in Liveblocks shared development demo
 - Teacher assessment forms for three fictional students, organized by week
 - Student feedback showing success and next-step notes
 - Parent portal with weekly plans, preparation readiness, attendance/homework summaries, filterable lesson feedback, read markers, and email drafts
@@ -21,11 +21,11 @@ Serve the dist directory with any static server, for example:
 
 ## Scope and data
 This is a workflow prototype, not a production student information system.
-All records are fictional and stored only in localStorage on the current browser.
+All records are fictional. Assessments, preparation, and Browser notes use localStorage. Opt-in Shared demo notebook text is sent to and stored by the connected Liveblocks development project.
 Student/teacher/parent navigation is a demo switch, not authorization. Secure sign-in and automatic account-role routing are not connected.
 The enquiry form opens a draft in the visitor's email app; it does not submit or send messages from the site.
 No real student information, secrets, or meeting links belong in this repository.
-The notebook uses Tiptap rich text with browser-local persistence. Liveblocks collaboration is not connected yet.
+The notebook uses Tiptap rich text. Browser notes remain local; the separate Shared demo connects student and teacher editing through Liveblocks.
 The sample schedule is illustrative and does not send reminders or enforce quiz release windows.
 The reading plan is editable sample content, not a finalized teaching unit.
 
@@ -86,6 +86,12 @@ Run `node --test tests/*.test.cjs` for preparation isolation, legacy compatibili
 ## Notebook editor and Liveblocks
 Run `npm ci` and `npm run build` to rebuild the self-contained Tiptap bundle from `src/notebook-editor.js`. The committed bundle runs without a third-party CDN. Existing plain-text notes are converted to document nodes without interpreting HTML. Rich-text JSON is saved alongside a text mirror for counts and plain-text downloads.
 
-Tiptap + Liveblocks is the agreed live notebook architecture: https://liveblocks.io/docs/products/sync/text-editing/tiptap. This release implements Tiptap only. It does not claim cross-device sync, simultaneous editing, cloud backup, comments, or version history. Multiple tabs editing the same page are not a collaborative session.
+Tiptap + Liveblocks is the agreed live notebook architecture: https://liveblocks.io/docs/products/sync/text-editing/tiptap. The **Shared demo** mode now uses `@liveblocks/client`, `@liveblocks/yjs`, and Tiptap Collaboration/CollaborationCaret. It supports simultaneous rich-text edits, remote cursors, participant counts, and explicit saving/connection states. The Yjs provider owns undo/redo in this mode; StarterKit history is disabled.
 
-Connect Liveblocks only after authenticated accounts and enrollment authorization exist. Use a stable room per enrollment/lesson, separate document fields for Discussion/Writing/Reflection/Homework, and server-issued room access restricted to the assigned learner and teacher. Keep private teacher assessments outside shared documents. Add the Liveblocks collaboration extension and disable StarterKit's local undo/redo when collaboration owns history. Migrate local drafts once into authorized rooms; do not initialize the cloud document repeatedly on page mounts. Configure secrets server-side, never in this repository. Test access isolation and concurrent edits before using real student work.
+Open either notebook and select **Shared demo**, then **Open teacher/student view** to open the same lesson and section. Each fictional enrollment lesson has a stable room, with separate Yjs fields for Discussion, Writing, Reflection, and Homework. The four sections share lesson presence. The configuration accepts only the fictional Alex Lee demo; room naming is not an access-control mechanism. Shared pages start empty and never import local notes, assessments, or transcripts. Switching back to Browser notes preserves the existing local rich-text documents. Shared downloads contain the current page only; local notebook exports contain local pages only. Shared work does not feed the browser-local dashboard note count.
+
+`src/liveblocks-config.mjs` contains the supplied **public development key**, intended for client use. It is not a secret. Anyone with this public project key can access development rooms; the private Site gate does not secure those rooms against direct API access. Use fictional practice text only. Do not use this mode for real student records. Configure the Liveblocks project's allowed domains for the intended preview/deployed hosts if domain restrictions are enabled. No secret key belongs in the client or this repository.
+
+Editing waits for the shared document to load and pauses when disconnected. Liveblocks warns on closing the tab with unsynchronized changes, and internal navigation waits for pending changes. Keep the page open during reconnecting; download the current page if needed. Offline editing/recovery after forcibly closing the tab is not supported. Destroying an editor removes listeners and leaves its room using the provider's documented lifecycle.
+
+Before using with real students: connect verified accounts, replace `publicApiKey` with a server authentication endpoint, validate assigned learner/teacher enrollment on the server, and enforce room permissions. Restrict linked parents to intended reports or read-only content. Keep private teacher notes outside shared documents. Migrate local drafts only after authorization, with a one-time migration marker. Test unauthorized access, concurrent edits, reconnection and durable storage. Comments, version history, account authentication, and parent notebook access are not implemented.
