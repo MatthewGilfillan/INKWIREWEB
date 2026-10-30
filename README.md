@@ -15,7 +15,8 @@ Serve the dist directory with any static server, for example:
 - Weekly notebooks with four sections and browser-local autosave
 - Teacher assessment forms for three fictional students, organized by week
 - Student feedback showing success and next-step notes
-- Parent overview of preparation, reading, and teacher feedback, excluding private teacher notes from the displayed report
+- Parent portal with weekly plans, preparation readiness, attendance/homework summaries, filterable lesson feedback, read markers, and email drafts
+- Parent reports include attitude and effort/focus observations; teacher-only notes are omitted from the displayed report
 - Placeholder for an individually assigned Zoom link
 
 ## Scope and data
@@ -48,3 +49,19 @@ The current UI is a design preview: email/password fields and submit buttons are
 
 ## Optional teacher portrait
 The supplied personal photo is held in the private Site source and deployment only. The public GitHub repository excludes `dist/assets/matthew-gilfillan.png`; the teacher card displays the existing Ink Wire logo if that optional asset is absent.
+
+## Parent portal
+Open `studio.html?role=parent`. The sidebar contains Overview, Weekly plan, Progress & feedback, and Contact Matthew.
+
+- **Sample journey** shows a fictional learner with four example lesson reviews and an explicitly illustrative 12-week schedule.
+- **Saved demo work** uses Alex Lee’s reading status, quiz submissions, edited lesson plans, and assessments from the existing demo workspaces in this browser. No existing work is overwritten by sample data.
+- The weekly plan covers all 24 lessons with goals, preparation reading, and follow-up assignments. The time-zone selector converts the sample session times. Saved demo work has no confirmed schedule or Zoom link.
+- Homework and attendance summaries use only recorded, applicable observations. Missing observations remain “Not recorded.”
+- Read markers persist separately in this browser, and changed family-visible feedback becomes unread again. Read markers are not sent to the teacher.
+- Contact opens an email draft to `matthew@inkwire.online`, optionally with lesson context. It does not send email from the site.
+- The teacher form now records attendance and attitude alongside the existing homework, preparation, participation, effort/focus, and learning-goal observations. Open parent tabs reflect saved demo changes.
+
+Parent-facing records use an explicit field list excluding private teacher notes and other learners. This is display filtering in a static prototype, **not a security boundary**: the browser-local demo storage is not suitable for real student records. Production requires server-enforced guardian/student relationships and separate teacher-only storage before the portal is used with families.
+
+### Checks
+Run `node --test tests/parent.test.cjs` for parent record projection, privacy omissions, progress denominators, preparation isolation, read-marker invalidation, sample/saved separation, and sample time-zone conversion.
