@@ -50,3 +50,14 @@ test('sample dates stay consistent across week boundaries and time zones',()=>{
   vm.runInContext("parentTimezone='Asia/Bangkok'",context);
   assert.equal(context.familyTime(1),'5:00 PM');
 });
+test('student reading updates flow into the correct parent lesson and override legacy values',()=>{
+ const data={read:true,preparation:{'Alex Lee|1':{reading:false},'Alex Lee|7':{reading:true},'Jamie Chen|8':{reading:true}}};
+ assert.equal(context.familyPreparation('saved',1,data).reading,false);
+ assert.equal(context.familyPreparation('saved',7,data).reading,true);
+ assert.equal(context.familyPreparation('saved',8,data).reading,null);
+});
+test('reviewed recaps are projected without private teacher notes',()=>{
+ const r=context.familyRecords({'Alex Lee|2':{summary:'We explored responsibility.',private:'Do not share.'}});
+ assert.equal(r[0].summary,'We explored responsibility.');
+ assert.equal(r[0].private,undefined);
+});

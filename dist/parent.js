@@ -1,6 +1,6 @@
 // Parent-facing projections use an explicit field list. This is presentation filtering,
 // not access control: production roles and private notes must be enforced on a server.
-const FAMILY_FIELDS = ['attendance','homework','preparation','attitude','participation','focus','learning','success','next'];
+const FAMILY_FIELDS = ['attendance','homework','preparation','attitude','participation','focus','learning','summary','success','next'];
 const FAMILY_LABELS = {attendance:'Attendance',homework:'Homework',preparation:'Preparation',attitude:'Attitude',participation:'Participation',focus:'Effort & focus',learning:'Learning goals'};
 const FAMILY_SAMPLE = {
   1:{attendance:'Present',homework:'Complete',preparation:'Ready',attitude:'Engaged',participation:'Contributes constructively',focus:'Sustained',learning:'Developing',success:'You noticed how Sheila’s response changes as she learns more about Gerald. You supported your interpretation with a well-chosen quotation.',next:'After each quotation, explain what the reader learns about the character.'},
@@ -40,7 +40,8 @@ function familyMetrics(records) {
 }
 function familyPreparation(source, lesson, data) {
   if(source==='sample') return {reading:lesson<=5 ? true : null, quiz:lesson<=4 ? {score:lesson===2?3:4} : null};
-  return {reading:lesson===1 ? !!data.read : null, quiz:data.quizzes?.['Alex Lee|'+lesson] || null};
+  const reading=data.preparation?.['Alex Lee|'+lesson]?.reading;
+  return {reading:typeof reading==='boolean'?reading:lesson===1 ? !!data.read : null, quiz:data.quizzes?.['Alex Lee|'+lesson] || null};
 }
 function familySampleDate(lesson) {
   const weekIndex = Math.floor((lesson-1)/2);
@@ -55,7 +56,7 @@ function familyTime(lesson) {
 function familyModel() {
   const saved = familyRecords(state.assessments);
   if(!parentSource) {
-    parentSource = saved.length || state.read || state.quizzes?.['Alex Lee|1'] ? 'saved' : 'sample';
+    parentSource = saved.length || state.read || Object.keys(state.preparation||{}).some(key=>/^Alex Lee\|([1-9]|1[0-9]|2[0-4])$/.test(key)) || state.quizzes?.['Alex Lee|1'] ? 'saved' : 'sample';
     parentWeek = parentSource==='sample' ? 3 : 1;
   }
   const records = parentSource==='sample' ? Object.entries(FAMILY_SAMPLE).map(([lesson,r])=>({lesson:Number(lesson),...r})).reverse() : saved;
@@ -87,7 +88,7 @@ function familyReadButton(record) {
 }
 function familyReport(record, expanded=false) {
   const seen=!!parentRead[familyReadKey(record,parentSource)];
-  return '<details class="family-report card" '+(expanded?'open':'')+'><summary><div><span class="eyebrow">WEEK '+Math.ceil(record.lesson/2)+' · LESSON '+((record.lesson-1)%2+1)+'</span><h3>'+esc(plan(record.lesson).title)+'</h3></div><span class="family-report-status">'+(seen?'Read':'<span class="unread-dot"></span> New feedback')+'</span></summary><div class="family-report-body"><dl class="family-observations">'+Object.entries(FAMILY_LABELS).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+familyChip(record[key])+'</dd></div>').join('')+'</dl><div class="family-note success"><span class="eyebrow">A SUCCESS TO CELEBRATE</span><p>'+esc(record.success || 'Your teacher has not added a success note yet.')+'</p></div><div class="family-note next"><span class="eyebrow">ONE NEXT STEP</span><p>'+esc(record.next || 'Your teacher has not added a next step yet.')+'</p></div><div class="family-report-actions">'+familyReadButton(record)+'<button type="button" class="link text-button" data-family-contact="'+record.lesson+'">Ask Matthew about this lesson ↗</button></div></div></details>';
+  return '<details class="family-report card" '+(expanded?'open':'')+'><summary><div><span class="eyebrow">WEEK '+Math.ceil(record.lesson/2)+' · LESSON '+((record.lesson-1)%2+1)+'</span><h3>'+esc(plan(record.lesson).title)+'</h3></div><span class="family-report-status">'+(seen?'Read':'<span class="unread-dot"></span> New feedback')+'</span></summary><div class="family-report-body">'+(record.summary?'<div class="family-note"><span class="eyebrow">LESSON RECAP</span><p>'+esc(record.summary)+'</p></div>':'')+'<dl class="family-observations">'+Object.entries(FAMILY_LABELS).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+familyChip(record[key])+'</dd></div>').join('')+'</dl><div class="family-note success"><span class="eyebrow">A SUCCESS TO CELEBRATE</span><p>'+esc(record.success || 'Your teacher has not added a success note yet.')+'</p></div><div class="family-note next"><span class="eyebrow">ONE NEXT STEP</span><p>'+esc(record.next || 'Your teacher has not added a next step yet.')+'</p></div><div class="family-report-actions">'+familyReadButton(record)+'<button type="button" class="link text-button" data-family-contact="'+record.lesson+'">Ask Matthew about this lesson ↗</button></div></div></details>';
 }
 function familyEmpty() {
   return '<section class="card family-empty"><span aria-hidden="true">◎</span><h2>A fresh page.</h2><p>Feedback will appear here after a lesson review. You’ll see a success, a next step, and observations about preparation and engagement.</p><button type="button" class="btn secondary" id="family-show-sample">View the sample journey</button></section>';

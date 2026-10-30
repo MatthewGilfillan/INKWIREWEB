@@ -25,7 +25,7 @@ All records are fictional and stored only in localStorage on the current browser
 Student/teacher/parent navigation is a demo switch, not authorization. Secure sign-in and automatic account-role routing are not connected.
 The enquiry form opens a draft in the visitor's email app; it does not submit or send messages from the site.
 No real student information, secrets, or meeting links belong in this repository.
-The notebook is plain text; shared live editing is not implemented.
+The notebook uses Tiptap rich text with browser-local persistence. Liveblocks collaboration is not connected yet.
 The sample schedule is illustrative and does not send reminders or enforce quiz release windows.
 The reading plan is editable sample content, not a finalized teaching unit.
 
@@ -65,3 +65,27 @@ Parent-facing records use an explicit field list excluding private teacher notes
 
 ### Checks
 Run `node --test tests/parent.test.cjs` for parent record projection, privacy omissions, progress denominators, preparation isolation, read-marker invalidation, sample/saved separation, and sample time-zone conversion.
+
+## Student studio
+Open `studio.html?role=student`. The expanded workspace has Overview, Course timeline, Reading & tasks, My notebook, Preparation quiz, and My feedback.
+
+- All 24 lessons have a focus selector, goals, reading before/after class, and individual reading checklists. Follow-up reading updates the next lesson's preparation; parent saved-work views use the same records. Existing Lesson 1 reading work remains compatible.
+- Readiness counts only assigned preparation items. The working sample quiz is Lesson 1 only; other lessons explicitly say that no quiz is assigned. Completion counts regardless of quiz score.
+- Optional written homework can be set by the teacher. The student's checklist is a self-report, not a submission or teacher grade.
+- The notebook has lesson pages and Discussion, Writing, Reflection, and Homework sections; it uses Tiptap with bold, italic, underline, headings, lists, quotations, and undo/redo. It autosaves locally, remembers the selected page, counts words, and downloads only the current fictional learner's notebook as plain text.
+- Teacher reviews show a recap, success, next step, and recorded observations, filtered to this learner. Reviews saved in another tab update the overview and feedback; open notebook and quiz drafts are left intact.
+- Illustrative lesson times use Beijing / Shanghai (Asia/Shanghai, UTC+8). Dates are samples, and no live Zoom link is connected.
+
+## Manual transcript preview
+The teacher form includes a `.vtt` / `.txt` file picker (2 MB maximum), a readable transcript preview, and removal. Files stay only in the current tab's memory, scoped to the selected fictional learner and lesson. Reloading clears them. No raw transcript is saved in localStorage, uploaded, or displayed in student/parent views. File contents are escaped as text.
+
+The teacher can write and save a reviewed lesson recap using the new shared assessment field. The **Generate draft** button is disabled because no OpenAI API connection exists. Future generation should run on the server with a protected API key, use the lesson plan plus transcript, produce evidence-grounded summaries/targets, and require teacher review before sharing. Zoom integration, real student records, recording consent, authenticated uploads, and API billing are not implemented by this prototype.
+
+Run `node --test tests/*.test.cjs` for preparation isolation, legacy compatibility, family projection, export boundaries, and transcript input validation.
+
+## Notebook editor and Liveblocks
+Run `npm ci` and `npm run build` to rebuild the self-contained Tiptap bundle from `src/notebook-editor.js`. The committed bundle runs without a third-party CDN. Existing plain-text notes are converted to document nodes without interpreting HTML. Rich-text JSON is saved alongside a text mirror for counts and plain-text downloads.
+
+Tiptap + Liveblocks is the agreed live notebook architecture: https://liveblocks.io/docs/products/sync/text-editing/tiptap. This release implements Tiptap only. It does not claim cross-device sync, simultaneous editing, cloud backup, comments, or version history. Multiple tabs editing the same page are not a collaborative session.
+
+Connect Liveblocks only after authenticated accounts and enrollment authorization exist. Use a stable room per enrollment/lesson, separate document fields for Discussion/Writing/Reflection/Homework, and server-issued room access restricted to the assigned learner and teacher. Keep private teacher assessments outside shared documents. Add the Liveblocks collaboration extension and disable StarterKit's local undo/redo when collaboration owns history. Migrate local drafts once into authorized rooms; do not initialize the cloud document repeatedly on page mounts. Configure secrets server-side, never in this repository. Test access isolation and concurrent edits before using real student work.
