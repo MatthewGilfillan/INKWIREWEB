@@ -10,8 +10,8 @@ document.querySelector('#enquiry').addEventListener('submit',event=>{
 event.preventDefault();const d=new FormData(event.target);
 const subject='Ink Wire enquiry: '+d.get('interest');
 const body='Hello Matthew,\n\nI would like to discuss learning support.\n\nName: '+d.get('name')+'\nEmail: '+d.get('email')+'\nStudent grade: '+d.get('grade')+'\nInterested in: '+d.get('interest')+'\n\nLearning goals:\n'+d.get('goals')+'\n\nThank you,\n'+d.get('name');
-const url='mailto:admin@inkwire.online?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-const status=document.querySelector('#enquiry-status');status.hidden=false;status.textContent='Your enquiry is ready to open in your email app. If no draft opens, email admin@inkwire.online directly. Nothing has been sent from this website.';
+const url='mailto:matthew@inkwire.online?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+const status=document.querySelector('#enquiry-status');status.hidden=false;status.textContent='Your enquiry is ready to open in your email app. If no draft opens, email matthew@inkwire.online directly. Nothing has been sent from this website.';
 location.href=url;
 });
 // Keep older workspace bookmarks functional after introducing the homepage.
