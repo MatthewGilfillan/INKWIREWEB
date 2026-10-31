@@ -118,6 +118,8 @@ test('account links follow the Static Assets canonical URL without a redirect lo
     const entry = await f.request('/account.html');
     assert.equal(entry.status, 302);
     assert.equal(entry.headers.get('Location'), ORIGIN + '/account');
+    const signupEntry = await f.request('/account.html?mode=signup');
+    assert.equal(signupEntry.headers.get('Location'), ORIGIN + '/account?mode=signup');
     const canonical = await f.request('/account');
     assert.equal(canonical.status, 200);
     assert.equal(canonical.headers.get('Cache-Control'), 'no-store');

@@ -7,7 +7,7 @@
 [data-account-root] [hidden]{display:none!important}
 .account-form{margin:24px 0 12px}.account-form fieldset{border:0;padding:0;margin:0;min-width:0}
 .account-form label{font-size:.9rem;font-weight:600;display:block;margin:16px 0 7px}
-.account-form input,.account-form select{box-sizing:border-box;font:inherit;font-size:16px;background:#fff;color:#17264a;min-height:50px;width:100%;border:1px solid #b9c9da;border-radius:10px;padding:12px 14px}
+.account-form input,.account-form select{box-sizing:border-box;font:inherit;font-size:16px;background:#fff;color:#17264a;min-height:50px;width:100%;border:1px solid #b9c9da;border-radius:10px;padding:12px 14px;margin:0}
 .account-form input:focus-visible,.account-form select:focus-visible,.account-link:focus-visible,.account-form button:focus-visible{outline:3px solid #8a88cb;outline-offset:3px}
 .account-password{position:relative}.account-password input{padding-right:76px}
 .account-password button{position:absolute;right:8px;top:6px;height:39px;padding:0 12px;border:0;border-radius:6px;background:#f0eef9;font:inherit;font-size:.8rem;color:#26365b;cursor:pointer}
@@ -19,6 +19,15 @@
 .account-message.is-error{background:#fff0ee;color:#8c3029!important}
 .account-email{overflow-wrap:anywhere}.account-badge{display:inline-block;border-radius:20px;padding:5px 12px;background:#e7f5f2;color:#255a54!important;font-size:.8rem!important}
 .account-retry{display:flex;gap:25px;flex-wrap:wrap}
+.account-tabs{display:flex;gap:5px;padding:5px;margin:0 0 28px;border:1px solid #dde3ee;border-radius:12px;background:#f2f4f9}
+.account-tabs button{flex:1;min-height:46px;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#52617b;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.account-tabs button[aria-pressed="true"]{background:#fff;color:#19294b;box-shadow:0 2px 6px #18305312}
+.account-tabs button:focus-visible{outline:3px solid #8a88cb;outline-offset:2px}
+.account-tabs button:disabled{cursor:wait;opacity:.65}
+.account-availability{padding:13px 15px;margin:18px 0;border:1px solid #e1dcef;border-radius:10px;background:#f6f3fb;font-size:.83rem;color:#4c5472}
+.account-availability .account-retry{margin-top:8px}
+.account-page-link{margin:22px 0 0;text-align:center}
+.header-signin{white-space:nowrap}
 [data-account-page]{margin:0;background:#f5f7fa;color:#19294b;font-family:Poppins,Arial,sans-serif;min-height:100vh}
 .account-header{padding:30px 24px;text-align:center;border-bottom:1px solid #dfe7ef;background:#fff}
 .account-header img{width:210px;height:auto}.account-shell{max-width:450px;margin:50px auto;padding:36px;background:#fff;border:1px solid #dbe5ef;border-radius:18px;box-shadow:0 12px 40px #18305308}
