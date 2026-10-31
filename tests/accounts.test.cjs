@@ -458,6 +458,8 @@ test('course overviews persist per class, enforce teacher membership, and preser
     const { classroom } = await (await newClass(f, owner)).json();
     const route = '/api/classes/' + classroom.id + '/overview';
     const course = defaults('Rivendell literature'); course.lessons = generateLessons(course);
+    course.themes = 'Responsibility'; course.essentialQuestions = 'What makes a fair decision?';
+    Object.assign(course.lessons[0], { skills: 'Evidence selection', activities: 'Seminar', evidence: 'Exit ticket', sourcePages: '1–2' });
     course.lessons[0].reading = 'Chapter 1: ' + 'Discuss this passage. '.repeat(300);
     // Trim to the per-field bound but make the whole plan larger than the old 8 KiB body limit.
     course.lessons[0].reading = course.lessons[0].reading.slice(0, 1200);

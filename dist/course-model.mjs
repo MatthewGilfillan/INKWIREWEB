@@ -4,6 +4,7 @@ export const presets = [
   { id: 'literature', name: 'Literature study', description: 'A sustained reading journey with discussion and written responses.', overview: 'Students explore character, language, structure and themes through sustained reading and discussion. They support their interpretations with textual evidence, consider alternative readings and develop an independent final response.' },
   { id: 'essay', name: 'Essay writing', description: 'Build an argument through planning, drafting and revision.', overview: 'Students learn to unpack a question, develop a thesis and organise a convincing argument. They practise evidence selection, analytical paragraphs, coherence and precise expression before drafting and revising an independent essay.' },
   { id: 'blank', name: 'Blank overview', description: 'Start with your own weekly topics.', overview: '' },
+  { id: 'upper-primary', name: 'Upper primary literature', description: 'Author pre-reading, seven study sections and optional Section 8 writing.', overview: 'Explore a book through author pre-reading, seven main study sections, discussion and written responses. An optional final writing activity brings the reading together.' },
 ];
 const literature = [
   ['Introducing the text', 'Explore context, first impressions and reading habits.'],
@@ -53,48 +54,79 @@ export function defaults(title = '') {
   return { version: 1, preset: 'combined', organization: 'Rivendell', title: title || 'Literature & essay writing', description: presets[0].overview, weeks: 15, lessonsPerWeek: 1, lessonMinutes: 120, startDate: '', startTime: '16:00', timeZone: 'Asia/Shanghai', lessons: [] };
 }
 export function courseSummary(course) {
-  const count = course.weeks * course.lessonsPerWeek;
-  return `${course.weeks} weeks · ${course.lessonsPerWeek} lesson${course.lessonsPerWeek === 1 ? '' : 's'}/week · ${course.lessonMinutes} min · ${Number((count * course.lessonMinutes / 60).toFixed(1))} teaching hours`;
+  const count = course.lessonCount ?? course.weeks * course.lessonsPerWeek;
+  const schedule = course.pacing === 'lessons' ? `${count} lessons · dates to arrange` : `${course.weeks} weeks · ${course.lessonsPerWeek} lesson${course.lessonsPerWeek === 1 ? '' : 's'}/week`;
+  return `${schedule} · ${course.lessonMinutes} min · ${Number((count * course.lessonMinutes / 60).toFixed(1))} teaching hours`;
+}
+export function lessonDate(course, index) {
+  return course.pacing === 'lessons' ? '' : addDays(course.startDate, Math.floor(index / course.lessonsPerWeek) * 7 + Math.floor((index % course.lessonsPerWeek) * 7 / course.lessonsPerWeek));
 }
 export function generateLessons(course, outline = '') {
   // One pasted line is one week's topic; tabs from a spreadsheet become columns.
   const lines = outline.trim().split(/\r?\n/).filter(line => line.trim());
-  if (lines.length > course.weeks) throw Error(`Your outline has ${lines.length} rows. Increase the number of weeks or shorten it; no rows have been discarded.`);
+  if (lines.length > course.weeks) throw Error(`Your outline has ${lines.length} rows. Increase the lesson allocation or shorten it; no rows have been discarded.`);
   const lessons = [];
+  const total = course.lessonCount ?? course.weeks * course.lessonsPerWeek;
+  if (course.preset === 'upper-primary') {
+    if (lines.length) throw Error('Choose the blank content starting point to generate a pasted outline, or clear the outline to use the upper primary section structure.');
+    const includeWriting = course.includeWritingActivity !== false;
+    if (total < (includeWriting ? 9 : 8)) throw Error('Allow at least one lesson for author pre-reading, each of the seven study sections, and the optional writing activity.');
+    const sections = ['About the author · pre-reading'];
+    const study = total - 1 - Number(includeWriting);
+    for (let section = 1; section <= 7; section++) for (let n = 0; n < Math.floor(study / 7) + Number(section <= study % 7); n++) sections.push(`Section ${section}`);
+    if (includeWriting) sections.push('Section 8 · writing activity');
+    return sections.map((section, i) => ({ week: Math.floor(i / course.lessonsPerWeek) + 1, slot: i % course.lessonsPerWeek + 1, date: lessonDate(course, i), section, title: section, goal: '', reading: '', homework: '' }));
+  }
   for (let week = 1; week <= course.weeks; week++) {
     const index = course.weeks === 1 ? 0 : Math.round((week - 1) * 14 / (course.weeks - 1));
     const read = literature[index], write = writing[index];
-    const pasted = lines[week - 1]?.replace(/^\s*(?:week\s*\d+\s*[:.\-–—]?|\d+[.)])\s*/i, '').split('\t');
+    const pasted = lines[week - 1]?.replace(/^\s*(?:(?:week|lesson|class)\s*\d+\s*[:.\-–—]?|\d+[.)])\s*/i, '').split('\t');
     for (let slot = 1; slot <= course.lessonsPerWeek; slot++) {
+      if (lessons.length === total) break;
       let title = '', goal = '';
       if (course.preset === 'combined') { title = `${read[0]} / ${write[0]}`; goal = `${read[1]} ${write[1]}`; }
       if (course.preset === 'literature') [title, goal] = read;
       if (course.preset === 'essay') [title, goal] = write;
-      lessons.push({ week, slot, date: addDays(course.startDate, (week - 1) * 7 + Math.floor((slot - 1) * 7 / course.lessonsPerWeek)), title: pasted?.[0]?.trim() || title || `Week ${week}${course.lessonsPerWeek > 1 ? ` · lesson ${slot}` : ''}`, goal: pasted?.[1]?.trim() || goal, reading: pasted?.[2]?.trim() || '', homework: pasted?.slice(3).join(' ').trim() || '' });
+      lessons.push({ week, slot, date: lessonDate(course, lessons.length), title: pasted?.[0]?.trim() || title || `Lesson ${lessons.length + 1}`, goal: pasted?.[1]?.trim() || goal, reading: pasted?.[2]?.trim() || '', homework: pasted?.slice(3).join(' ').trim() || '' });
     }
   }
   return lessons;
 }
 export function validateCourse(value) {
   if (!value || value.version !== 1 || !presets.some(p => p.id === value.preset)) throw Error('Choose a course format.');
-  for (const [key, min, max] of [['weeks', 1, 52], ['lessonsPerWeek', 1, 3], ['lessonMinutes', 15, 240]]) {
-    if (!Number.isInteger(value[key]) || value[key] < min || value[key] > max) throw Error(`Check ${key === 'lessonMinutes' ? 'lesson length (15–240 minutes)' : key === 'lessonsPerWeek' ? 'lessons per week (1–3)' : 'course length (1–52 weeks)'}.`);
+  for (const [key, min, max] of [['weeks', 1, 156], ['lessonsPerWeek', 1, 7], ['lessonMinutes', 15, 240]]) {
+    if (!Number.isInteger(value[key]) || value[key] < min || value[key] > max) throw Error(`Check ${key === 'lessonMinutes' ? 'lesson length (15–240 minutes)' : key === 'lessonsPerWeek' ? 'lessons per week (1–7)' : 'course length (1–156 weeks)'}.`);
   }
   const text = (input, max, label, required = false) => {
     if (typeof input !== 'string' || input.length > max || (required && !input.trim())) throw Error(`Check ${label} (up to ${max.toLocaleString()} characters).`);
     return input.trim();
   };
   const course = { version: 1, preset: value.preset, organization: text(value.organization, 120, 'school or organisation'), title: text(value.title, 160, 'course title', true), description: text(value.description, 4000, 'course description'), weeks: value.weeks, lessonsPerWeek: value.lessonsPerWeek, lessonMinutes: value.lessonMinutes };
+  if (value.pacing !== undefined) { if (!['weekly', 'lessons'].includes(value.pacing)) throw Error('Choose a weekly timetable or individual lesson dates.'); course.pacing = value.pacing; }
+  if (value.lessonCount !== undefined) {
+    if (!Number.isInteger(value.lessonCount) || value.lessonCount < 1 || value.lessonCount > 156 || value.weeks !== Math.ceil(value.lessonCount / value.lessonsPerWeek)) throw Error('Check the total lessons and lesson frequency.');
+    course.lessonCount = value.lessonCount;
+  }
+  if (course.pacing === 'lessons' && course.lessonsPerWeek !== 1) throw Error('Use a weekly timetable to set more than one lesson per week.');
+  if (value.format !== undefined) { if (!['full', 'summer', 'upper-primary', 'custom'].includes(value.format)) throw Error('Choose a teaching format.'); course.format = value.format; }
+  if (value.includeWritingActivity !== undefined) { if (typeof value.includeWritingActivity !== 'boolean') throw Error('Check the writing activity setting.'); course.includeWritingActivity = value.includeWritingActivity; }
+  for (const [key, max] of [['gradeBand', 80], ['themes', 6000], ['essentialQuestions', 6000], ['enduringUnderstandings', 6000], ['sourceNotes', 6000]]) if (value[key] !== undefined) course[key] = text(value[key], max, key);
   if (value.startDate !== '' && !validDate(value.startDate)) throw Error('Choose a valid start date.');
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value.startTime)) throw Error('Choose a valid lesson time.');
   try { if (typeof value.timeZone !== 'string' || value.timeZone.length > 80) throw Error(); new Intl.DateTimeFormat('en', { timeZone: value.timeZone }); }
   catch { throw Error('Choose a valid time zone.'); }
   Object.assign(course, { startDate: value.startDate, startTime: value.startTime, timeZone: value.timeZone });
-  if (!Array.isArray(value.lessons) || value.lessons.length !== course.weeks * course.lessonsPerWeek) throw Error('Generate the weekly plan after changing the course length.');
+  if (!Array.isArray(value.lessons) || value.lessons.length !== (course.lessonCount ?? course.weeks * course.lessonsPerWeek) || value.lessons.length > 156) throw Error('Generate the weekly plan after changing the course length.');
   course.lessons = value.lessons.map((lesson, i) => {
     if (lesson.week !== Math.floor(i / course.lessonsPerWeek) + 1 || lesson.slot !== i % course.lessonsPerWeek + 1 || (lesson.date !== '' && !validDate(lesson.date))) throw Error('Check the lesson dates and order.');
-    return { week: lesson.week, slot: lesson.slot, date: lesson.date, title: text(lesson.title, 160, 'lesson topic', true), goal: text(lesson.goal, 1200, 'learning goals'), reading: text(lesson.reading, 1200, 'reading'), homework: text(lesson.homework, 1200, 'homework') };
+    const result = { week: lesson.week, slot: lesson.slot, date: lesson.date, title: text(lesson.title, 160, 'lesson topic', true), goal: text(lesson.goal, 1200, 'learning goals'), reading: text(lesson.reading, 1200, 'reading'), homework: text(lesson.homework, 1200, 'homework') };
+    for (const [key, max] of [['section', 160], ['skills', 2000], ['activities', 4000], ['evidence', 2000], ['sourcePages', 80]]) if (lesson[key] !== undefined) result[key] = text(lesson[key], max, key);
+    return result;
   });
   if (new TextEncoder().encode(JSON.stringify(course)).byteLength > 120000) throw Error('This overview is too long. Shorten the lesson notes before saving.');
   return course;
+}
+export function readCourseFile(value) {
+  if (!value || value.type !== 'inkwire-course' || value.version !== 1) throw Error('Choose an Ink Wire course file. PDF conversion is a separate step.');
+  return validateCourse(value.course);
 }

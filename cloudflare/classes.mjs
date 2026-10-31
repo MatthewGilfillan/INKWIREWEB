@@ -24,7 +24,7 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (path === '/api/classes' && request.method === 'GET') {
     const rows = await env.DB.prepare(`SELECT ${classFields}, o.revision AS overviewRevision,
       json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
-      json_extract(o.content, '$.lessonMinutes') AS courseMinutes FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
+      json_extract(o.content, '$.lessonMinutes') AS courseMinutes, json_extract(o.content, '$.pacing') AS coursePacing, json_extract(o.content, '$.lessonCount') AS courseLessonCount FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
       WHERE c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers m WHERE m.class_id = c.id AND m.user_id = ?)
       ORDER BY c.created_at DESC, c.id`).bind(user.id, user.id, user.id).all();
     return json({ classes: rows.results });
