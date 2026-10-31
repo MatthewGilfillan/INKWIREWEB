@@ -1,5 +1,6 @@
 import { digest } from './auth.mjs';
 import { createLearningInvite } from './enrollment.mjs';
+import { handleCourseOverview } from './course-overviews.mjs';
 
 export const isTeacher = user => user?.emailVerified === true && user.requestedRole === 'teacher';
 const classFields = `c.id, c.name, c.subject, c.created_at AS createdAt,
@@ -18,8 +19,12 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (!user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
   if (!isTeacher(user)) return fail('This workspace is for teacher accounts.', 403, 'FORBIDDEN');
   const path = new URL(request.url).pathname;
+  const overviewMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/overview$/);
+  if (overviewMatch) return handleCourseOverview(request, env, user, overviewMatch[1], { json, fail, readJSON });
   if (path === '/api/classes' && request.method === 'GET') {
-    const rows = await env.DB.prepare(`SELECT ${classFields} FROM classes c
+    const rows = await env.DB.prepare(`SELECT ${classFields}, o.revision AS overviewRevision,
+      json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
+      json_extract(o.content, '$.lessonMinutes') AS courseMinutes FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
       WHERE c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers m WHERE m.class_id = c.id AND m.user_id = ?)
       ORDER BY c.created_at DESC, c.id`).bind(user.id, user.id, user.id).all();
     return json({ classes: rows.results });

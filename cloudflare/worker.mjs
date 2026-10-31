@@ -23,7 +23,7 @@ async function ready(env) {
   catch { return false; }
 }
 
-async function readJSON(request) {
+async function readJSON(request, maxBytes = 8192) {
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')) throw new Error('JSON_REQUIRED');
   const reader = request.body?.getReader();
   if (!reader) throw new Error('INVALID_BODY');
@@ -32,7 +32,7 @@ async function readJSON(request) {
     const chunk = await reader.read();
     if (chunk.done) break;
     size += chunk.value.byteLength;
-    if (size > 8192) { await reader.cancel(); throw new Error('BODY_TOO_LARGE'); }
+    if (size > maxBytes) { await reader.cancel(); throw new Error('BODY_TOO_LARGE'); }
     parts.push(chunk.value);
   }
   const bytes = new Uint8Array(size); let offset = 0;

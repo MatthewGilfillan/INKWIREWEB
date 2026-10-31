@@ -446,3 +446,43 @@ test('verification emails preserve only valid invitation context and return memb
     assert.ok(!f.mail.at(-1).text.includes('evil.invalid'));
   }finally{f.db.close();}
 });
+
+
+test('course overviews persist per class, enforce teacher membership, and preserve concurrent drafts', async () => {
+  const { defaults, generateLessons } = await import('../dist/course-model.mjs');
+  const f = await fixture();
+  try {
+    const owner = await signInAs(f, 'owner@example.invalid');
+    const guest = await signInAs(f, 'guest@example.invalid');
+    const student = await signInAs(f, 'student@example.invalid', 'student');
+    const { classroom } = await (await newClass(f, owner)).json();
+    const route = '/api/classes/' + classroom.id + '/overview';
+    const course = defaults('Rivendell literature'); course.lessons = generateLessons(course);
+    course.lessons[0].reading = 'Chapter 1: ' + 'Discuss this passage. '.repeat(300);
+    // Trim to the per-field bound but make the whole plan larger than the old 8 KiB body limit.
+    course.lessons[0].reading = course.lessons[0].reading.slice(0, 1200);
+    for (const lesson of course.lessons) lesson.homework = 'Develop your interpretation. '.repeat(25).trim();
+    const body = { revision: 0, course };
+    assert.ok(JSON.stringify(body).length > 8192);
+    assert.equal((await f.request(route, undefined, guest)).status, 404);
+    assert.equal((await f.request(route, body, guest)).status, 404);
+    assert.equal((await f.request(route, body, student)).status, 403);
+    assert.equal((await f.request(route, body, { ...owner, Origin: 'https://evil.invalid' })).status, 403);
+    assert.equal((await f.request(route, body, owner)).status, 200);
+    assert.equal((await f.request(route, body, owner)).status, 200, 'a lost-response retry does not create a conflict');
+    const saved = await (await f.request(route, undefined, owner)).json();
+    assert.deepEqual(saved.course, course); assert.equal(saved.revision, 1);
+    const invite = await (await f.request('/api/classes/' + classroom.id + '/invite', {}, owner)).json();
+    await f.request('/api/classes/join', { code: invite.code }, guest);
+    assert.equal((await f.request(route, undefined, guest)).status, 200);
+    const updated = { ...course, description: 'A revised course overview.' };
+    assert.equal((await f.request(route, { revision: 1, course: updated }, guest)).status, 200);
+    assert.equal((await f.request(route, { revision: 1, course: { ...course, description: 'Stale edit' } }, owner)).status, 409);
+    assert.equal((await (await f.request(route, undefined, owner)).json()).course.description, updated.description);
+    const listed = (await (await f.request('/api/classes', undefined, owner)).json()).classes[0];
+    assert.equal(listed.overviewRevision, 2); assert.equal(listed.courseWeeks, 15); assert.equal(listed.courseMinutes, 120);
+    f.db.prepare('DELETE FROM class_teachers').run();
+    assert.equal((await f.request(route, undefined, guest)).status, 404);
+    assert.equal((await f.request(route, { revision: 2, course: { ...course, weeks: 16 } }, owner)).status, 400);
+  } finally { f.db.close(); }
+});
