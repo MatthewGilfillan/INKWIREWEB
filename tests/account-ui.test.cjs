@@ -7,7 +7,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 
 function fixture({ modal = false, search = '', hash = '', fetch: customFetch } = {}) {
-  const handlers = {}, dialogHandlers = {}, fields = {}, calls = [], history = [];
+  const handlers = {}, dialogHandlers = {}, fields = {}, calls = [], history = [], redirects = [];
   let openAccount;
   const inert = { focus() {}, setAttribute() {}, classList: { remove() {} } };
   const dialog = modal ? { open: false, setAttribute() {}, querySelector: () => null,
@@ -15,7 +15,7 @@ function fixture({ modal = false, search = '', hash = '', fetch: customFetch } =
   const root = { html: '', set innerHTML(html) { this.html = html; for (const key of Object.keys(fields)) delete fields[key]; }, get innerHTML() { return this.html; },
     closest: () => dialog, setAttribute() {}, addEventListener: (name, fn) => { handlers[name] = fn; },
     querySelector: selector => fields[selector] || (selector.startsWith('[name=') ? null : inert), querySelectorAll: () => [] };
-  const context = { URLSearchParams, AbortSignal, location: { search, hash, pathname: '/account', hostname: 'inkwire-education.com' },
+  const context = { URLSearchParams, AbortSignal, location: { search, hash, pathname: '/account', hostname: 'inkwire-education.com', replace: url => redirects.push(url) },
     history: { replaceState: (_a, _b, url) => history.push(url) },
     FormData: class { constructor(form) { this.values = form.values; } get(k) { return this.values[k] ?? null; } has(k) { return k in this.values; } },
     document: { querySelector: () => root, body: { hasAttribute: () => !modal },
@@ -24,7 +24,7 @@ function fixture({ modal = false, search = '', hash = '', fetch: customFetch } =
   vm.runInNewContext(source, context);
   const click = view => handlers.click({ target: { closest: () => ({ dataset: { view }, hasAttribute: () => false }) } });
   const submit = (action, values) => handlers.submit({ preventDefault() {}, target: { closest: () => ({ dataset: { action }, values, reportValidity: () => true, querySelector: () => ({}) }) } });
-  return { root, fields, calls, history, click, submit, open: () => openAccount({ preventDefault() {} }), close: () => dialogHandlers.close() };
+  return { root, fields, calls, history, redirects, click, submit, open: () => openAccount({ preventDefault() {} }), close: () => dialogHandlers.close() };
 }
 
 test('signup deep link survives readiness checks; switching keeps email and selected account type', async () => {
@@ -65,4 +65,41 @@ test('activation token is removed from the address bar and waits for an explicit
   assert.equal(f.history[0], '/account');
   assert.match(f.root.html, /data-action="activate"/);
   assert.equal(f.calls.length, 1);
+});
+
+test('verified teachers go to their dashboard on sign in and when reopening the account page', async () => {
+  const approved = { email: 'teacher@example.invalid', verified: true, role: 'teacher', requestedRole: 'teacher', classroomStatus: 'active', dashboardPath: '/teacher' };
+  let signedIn = false;
+  const fetch = async url => {
+    if (url === '/api/status') return response({ accountsReady: true });
+    if (url === '/api/accounts/signin') { signedIn = true; return response({ status: true }); }
+    return response(approved, signedIn ? 200 : 401);
+  };
+  const f = fixture({ fetch }); await flush();
+  const rememberInput = f.root.html.match(/<input[^>]*name="rememberMe"[^>]*>/)?.[0];
+  assert.ok(rememberInput);
+  assert.doesNotMatch(rememberInput, /\bchecked\b/);
+  await f.submit('signin', { email: approved.email, password: 'test-only-passphrase', rememberMe: 'on' });
+  assert.deepEqual(f.redirects, ['/teacher']);
+  assert.equal(JSON.parse(f.calls.find(call => call.url === '/api/accounts/signin').options.body).rememberMe, true);
+  const reopened = fixture({ fetch }); await flush();
+  assert.deepEqual(reopened.redirects, ['/teacher']);
+  const settings = fixture({ fetch, search: '?manage=1' }); await flush();
+  assert.deepEqual(settings.redirects, []);
+  assert.match(settings.root.html, /Open teacher dashboard/);
+  assert.doesNotMatch(settings.root.html, /awaits Matthew/);
+  assert.doesNotMatch(settings.root.html, /Back to Ink Wire/); // The page already has its own home link.
+});
+
+test('parent accounts stay on their account page; unchecked Remember me sends false', async () => {
+  let signedIn = false;
+  const f = fixture({ fetch: async url => {
+    if (url === '/api/status') return response({ accountsReady: true });
+    if (url === '/api/accounts/signin') { signedIn = true; return response({ status: true }); }
+    return response({ email: 'pending@example.invalid', verified: true, requestedRole: 'parent', classroomStatus: 'pending' }, signedIn ? 200 : 401);
+  } }); await flush();
+  await f.submit('signin', { email: 'pending@example.invalid', password: 'test-only-passphrase' });
+  assert.deepEqual(f.redirects, []);
+  assert.match(f.root.html, /link it to your child/);
+  assert.equal(JSON.parse(f.calls.find(call => call.url === '/api/accounts/signin').options.body).rememberMe, false);
 });

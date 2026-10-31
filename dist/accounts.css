@@ -14,6 +14,9 @@
 .account-hint{font-size:.8rem!important;line-height:1.65}
 .account-submit{display:block;width:100%;min-height:50px;margin-top:24px;border:0;border-radius:10px;background:#8bcfcd;color:#102344;padding:13px 20px;font:inherit;font-weight:600;text-align:center;cursor:pointer}
 .account-submit:hover{background:#7dc4c1}.account-form fieldset:disabled{opacity:.65}.account-form fieldset:disabled button{cursor:wait}
+.account-form .account-remember{display:flex;align-items:center;gap:10px;margin:18px 0 0;cursor:pointer;font-weight:400}
+.account-form .account-remember input{width:18px;height:18px;min-height:18px;flex:none;padding:0;accent-color:#245c68}
+.account-dashboard{box-sizing:border-box;text-decoration:none}
 .account-link{border:0;background:none;padding:0;color:#485491;font:inherit;font-size:.9rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .account-message{padding:14px;border-radius:10px;background:#e7f5f2;color:#1c514a!important;font-size:.85rem!important}
 .account-message.is-error{background:#fff0ee;color:#8c3029!important}

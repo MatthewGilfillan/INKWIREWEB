@@ -12,11 +12,9 @@ let parentSource = null;
 let parentWeek = 3;
 const FAMILY_TIMEZONES = {'Asia/Shanghai':'Beijing / Shanghai','Asia/Bangkok':'Bangkok','UTC':'UTC'};
 let parentTimezone = 'Asia/Shanghai';
-try { const savedZone=localStorage.getItem('inkwire-timezone'); if(FAMILY_TIMEZONES[savedZone])parentTimezone=savedZone; } catch {}
 let parentFeedbackWeek = 'all';
 let parentContactLesson = 0;
 let parentRead = {};
-try { parentRead = JSON.parse(localStorage.getItem('inkwire-parent-read-v1') || '{}') || {}; } catch { /* Use an empty read history. */ }
 
 function familyRecords(assessments, learner = 'Alex Lee') {
   return Object.entries(assessments || {}).flatMap(([key,value]) => {
@@ -119,11 +117,11 @@ function parentProgress() {
     '<section class="card family-progress-overview"><div><h2>'+m.metrics.reviewed+' of 24 lessons reviewed</h2></div><div><progress max="24" value="'+m.metrics.reviewed+'" aria-label="Lessons reviewed"></progress><span class="muted">'+m.unread+' unread review'+(m.unread===1?'':'s')+'</span></div></section>'+
     '<div class="family-section-title"><h2>Lesson-by-lesson feedback</h2><label class="family-week-select">Show<select id="family-feedback-week"><option value="all" '+(parentFeedbackWeek==='all'?'selected':'')+'>All weeks</option>'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'" '+(String(i+1)===parentFeedbackWeek?'selected':'')+'>Week '+(i+1)+'</option>').join('')+'</select></label></div>'+
     (filtered.length?filtered.map((record,i)=>familyReport(record,i===0)).join(''):parentFeedbackWeek==='all'?familyEmpty():'<section class="card family-empty"><h2>No review for Week '+parentFeedbackWeek+' yet.</h2><p>Your teacher’s feedback will appear after a lesson review.</p><button class="btn secondary" type="button" id="family-all-feedback">Show all feedback</button></section>')+
-    '<p class="family-footnote">Read markers are saved in this browser only. They are not sent to your teacher in this preview.</p>';
+    '<p class="family-footnote">Read markers last for this visit only. They are not sent to your teacher in this preview.</p>';
 }
 function parentContact() {
   return familyTop('Contact Matthew','Share a question or a useful update with Matthew.')+
-    '<div class="family-grid"><section class="card"><h2>What would you like to discuss?</h2><form id="family-contact-form"><label class="formlabel" for="family-topic">Topic</label><select id="family-topic" name="topic"><option>Learning progress</option><option>Reading or homework</option><option>Lesson schedule</option><option>Something else</option></select><label class="formlabel" for="family-contact-lesson">Related lesson</label><select id="family-contact-lesson" name="lesson"><option value="0">General question</option>'+Array.from({length:24},(_,i)=>'<option value="'+(i+1)+'" '+(parentContactLesson===i+1?'selected':'')+'>Week '+Math.ceil((i+1)/2)+' · Lesson '+(i%2+1)+' — '+esc(plan(i+1).title)+'</option>').join('')+'</select><label class="formlabel" for="family-message">Your message</label><textarea id="family-message" name="message" required placeholder="For example: Which part of the reading would be most useful to revisit together?"></textarea><p><button class="btn" type="submit">Open email draft ↗</button></p><p class="family-footnote">Opens your email app. Nothing is sent until you send it.</p><p id="family-contact-status" class="notice" role="status" hidden></p></form></section><aside><section class="card family-contact-card"><div class="avatar">MG</div><h2>Matthew Gilfillan</h2><p>Founder & teacher<br>Ink Wire Education</p><a href="mailto:matthew@inkwire.online">matthew@inkwire.online ↗</a></section><section class="card family-home-support"><span class="eyebrow">USEFUL THINGS TO SHARE</span><ul class="goals"><li>A question about an assignment or teacher feedback.</li><li>A change to your child’s availability.</li><li>Something that helped your child engage with a book.</li></ul></section></aside></div>';
+    '<section class="card"><h2>Learning, homework or lesson questions</h2><p>Use the enquiry form to tell Matthew what you would like to discuss. Include the lesson or assignment if your question is about classwork.</p><a class="btn" href="./#start">Open enquiry form →</a></section>';
 }
 function bindParentEvents() {
   if(role!=='parent') return;
@@ -131,7 +129,7 @@ function bindParentEvents() {
   $('#family-source')?.addEventListener('change',event=>{
     parentSource=event.target.value;parentWeek=parentSource==='sample'?3:1;parentFeedbackWeek='all';render();document.querySelector('.preview-options').open=true;$('#family-source')?.focus();
   });
-  $('#family-timezone')?.addEventListener('change',event=>{parentTimezone=event.target.value;try{localStorage.setItem('inkwire-timezone',parentTimezone);}catch{}render();$('#family-timezone')?.focus();});
+  $('#family-timezone')?.addEventListener('change',event=>{parentTimezone=event.target.value;render();$('#family-timezone')?.focus();});
   $('#family-week')?.addEventListener('change',event=>{parentWeek=Number(event.target.value);render();$('#family-week')?.focus();});
   document.querySelectorAll('[data-family-week]').forEach(button=>button.addEventListener('click',()=>{
     const target=Number(button.dataset.familyWeek);if(target<1||target>12)return;parentWeek=target;timelineExpanded.clear();timelineExpanded.add(target);
@@ -143,16 +141,10 @@ function bindParentEvents() {
   document.querySelectorAll('[data-family-read]').forEach(button=>button.addEventListener('click',()=>{
     const record=familyModel().records.find(r=>r.lesson===Number(button.dataset.familyRead));if(!record)return;
     const key=familyReadKey(record,parentSource), updated={...parentRead,[key]:true};
-    try{localStorage.setItem('inkwire-parent-read-v1',JSON.stringify(updated));parentRead=updated;render();toast('Marked as read in this browser.');}catch{toast('Your read marker could not be saved.');}
+    parentRead=updated;render();toast('Marked as read for this visit.');
   }));
   document.querySelectorAll('[data-family-contact]').forEach(button=>button.addEventListener('click',()=>{parentContactLesson=Number(button.dataset.familyContact);location.hash='parent-contact';}));
-  $('#family-contact-form')?.addEventListener('submit',event=>{
-    event.preventDefault();const data=new FormData(event.target),lesson=Number(data.get('lesson'));
-    const subject='Ink Wire parent enquiry: '+data.get('topic');
-    const body='Hello Matthew,\n\n'+(lesson?'About Week '+Math.ceil(lesson/2)+', Lesson '+((lesson-1)%2+1)+' — '+plan(lesson).title+':\n\n':'')+data.get('message')+'\n\nThank you';
-    const status=$('#family-contact-status');status.hidden=false;status.textContent='Your draft is ready to open in your email app. If it does not open, email matthew@inkwire.online directly. Nothing has been sent from this portal.';
-    location.href='mailto:matthew@inkwire.online?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  });
+
 }
 
 function dashboardTimezone(id,zone) {

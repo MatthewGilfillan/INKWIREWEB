@@ -1,4 +1,5 @@
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
+import { isTeacher, handleClasses } from './classes.mjs';
 
 const actions = new Map([
   ['signup', '/sign-up/email'], ['signin', '/sign-in/email'], ['signout', '/sign-out'],
@@ -11,6 +12,8 @@ const secureHeaders = {
 const json = (value, status = 200) => Response.json(value, { status, headers: secureHeaders });
 const fail = (message, status, code = 'REQUEST_FAILED') => json({ message, code }, status);
 const unavailable = () => fail('Account access is temporarily unavailable. Please try again later.', 503, 'UNAVAILABLE');
+
+const privateRedirect = destination => new Response(null, { status: 302, headers: { ...secureHeaders, Location: destination } });
 
 async function ready(env) {
   if (env.ACCOUNTS_ENABLED !== 'true' || !env.DB || !env.EMAIL || !env.APP_ORIGIN?.startsWith('https://') ||
@@ -67,6 +70,25 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
+      if (/^\/teacher(?:\.html)?\/?$/.test(url.pathname)) {
+        if (url.origin !== env.APP_ORIGIN) return privateRedirect(`${env.APP_ORIGIN}/teacher`);
+        if (!await ready(env)) return unavailable();
+        try {
+          const session = await createAuth(env).api.getSession({ headers: request.headers });
+          if (!session?.user?.emailVerified) return privateRedirect('/account');
+          if (!isTeacher(session.user)) return privateRedirect('/account?manage=1');
+          if (url.pathname !== '/teacher') return privateRedirect('/teacher' + url.search);
+          const assetURL = new URL('/teacher', env.APP_ORIGIN);
+          const response = await env.ASSETS.fetch(new Request(assetURL, { method: 'GET' }));
+          if (!response.ok) return unavailable();
+          const html = await response.text();
+          return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
+        } catch {
+          console.error('Ink Wire teacher access check failed.');
+          return unavailable();
+        }
+      }
       if (url.pathname === '/account' || url.pathname === '/account.html') {
         if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN) return Response.redirect(`${env.APP_ORIGIN}/account${url.search}`, 302);
         // Static Assets serves account.html at /account and redirects the extension.
@@ -91,7 +113,14 @@ export default {
       if (url.pathname === '/api/account' && request.method === 'GET') {
         const session = await auth.api.getSession({ headers: request.headers });
         if (!session?.user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
-        return json({ email: session.user.email, verified: true, requestedRole: session.user.requestedRole, classroomStatus: 'pending' });
+        const approved = isTeacher(session.user);
+        return json({ email: session.user.email, verified: true, requestedRole: session.user.requestedRole,
+          classroomStatus: approved ? 'active' : 'pending',
+          ...(approved ? { role: 'teacher', dashboardPath: '/teacher' } : {}) });
+      }
+      if (url.pathname === '/api/classes' || url.pathname.startsWith('/api/classes/')) {
+        const session = await auth.api.getSession({ headers: request.headers });
+        return await handleClasses(request, env, session?.user, { json, fail, readJSON });
       }
       const action = url.pathname.replace('/api/accounts/', '');
       if (!url.pathname.startsWith('/api/accounts/') || (!actions.has(action) && action !== 'activate')) return fail('Not found.', 404);
@@ -135,7 +164,7 @@ export default {
         body.name = 'Ink Wire member';
         body.requestedRole = input.accountType;
       }
-      if (action === 'signin') body.rememberMe = false;
+      if (action === 'signin') body.rememberMe = input.rememberMe === true;
       if (action === 'reset') {
         if (typeof input.token !== 'string' || input.token.length > 512) return fail('Invalid reset link.', 400, 'INVALID_TOKEN');
         body.token = input.token;

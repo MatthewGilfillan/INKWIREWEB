@@ -1,0 +1,7 @@
+.storage-notice{box-sizing:border-box;max-width:760px;margin:42px auto;padding:36px;background:#fff;border:1px solid #dbe5ef;border-radius:18px;line-height:1.8}
+.storage-notice h1{font-size:clamp(1.8rem,5vw,2.4rem);line-height:1.25;letter-spacing:-.03em;margin:0 0 24px}
+.storage-notice h2{font-size:1.2rem;line-height:1.4;margin:32px 0 12px}
+.storage-notice p{font-size:.95rem;color:#50627d;margin:12px 0}
+.storage-notice .account-link{display:inline-block;margin-top:24px}
+.storage-footer{text-align:center;padding:0 24px 32px;font-size:.8rem;color:#50627d}
+@media(max-width:800px){.storage-notice{margin:24px 16px;padding:26px 22px}}

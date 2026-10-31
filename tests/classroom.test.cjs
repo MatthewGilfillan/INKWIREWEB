@@ -6,7 +6,7 @@ function classroom() {
   const ctx=vm.createContext({localStorage:{getItem:()=>null},Intl,Date,URL,role:'teacher'});
   for(const file of ['student.js','parent.js','classroom.js'])vm.runInContext(fs.readFileSync('dist/'+file,'utf8'),ctx);
   const app=fs.readFileSync('dist/app.js','utf8');
-  vm.runInContext(app.slice(0,app.indexOf('const roleParam=')),ctx);
+  vm.runInContext(app.slice(0,app.indexOf('const signedInTeacher=')),ctx);
   return ctx;
 }
 test('past schedule is distinct from completed or rescheduled attendance',()=>{

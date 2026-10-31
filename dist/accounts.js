@@ -8,7 +8,7 @@
   let token = fragments.get('activate') || fragments.get('reset') || '';
   const entryView = new URLSearchParams(location.search).get('mode') === 'signup' ? 'signup' : 'signin';
   let view = fragments.has('activate') ? 'activate' : fragments.has('reset') ? 'reset' : entryView;
-  let email = '', accountType = '', account = null, busy = false, requestId = 0, availability = 'checking';
+  let email = '', accountType = '', rememberMe = false, account = null, busy = false, requestId = 0, availability = 'checking';
   if (standalone && location.hash) history.replaceState(null, '', location.pathname + location.search);
   const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const titles = { signin: 'Sign in', signup: 'Create account', verify: 'Check your email.', forgot: 'Reset your password.', forgotSent: 'Check your email.', reset: 'Choose a new password.', activate: 'Activate your account.', account: 'Your account', unavailable: 'Account access' };
@@ -17,18 +17,23 @@
   const accountTypeInput = () => `<label for="account-type">Account type</label><select id="account-type" name="accountType" required><option value="">Select account type</option>${['parent', 'student', 'teacher'].map(role => `<option value="${role}" ${accountType === role ? 'selected' : ''}>${role[0].toUpperCase() + role.slice(1)}</option>`).join('')}</select>`;
   const passwordInput = isNew => `<label for="account-password">${isNew ? 'Set a password' : 'Password'}</label><div class="account-password"><input id="account-password" name="password" type="password" autocomplete="${isNew ? 'new-password' : 'current-password'}" ${isNew ? 'minlength="12" aria-describedby="password-hint"' : ''} maxlength="128" required><button type="button" data-show-password aria-label="Show password" aria-pressed="false">Show</button></div>${isNew ? '<p id="password-hint" class="account-hint">Use at least 12 characters. You can use a memorable passphrase.</p>' : ''}`;
   const form = (action, fields, label) => `<form class="account-form" data-action="${action}"><fieldset ${availability !== 'ready' ? 'disabled' : ''}>${fields}<button class="button full account-submit" type="submit">${label}</button></fieldset></form>`;
+  const dashboardPath = () => account?.classroomStatus === 'active' && account?.role === 'teacher' && account?.dashboardPath === '/teacher' ? '/teacher' : '';
+  function showAccount() {
+    render('account');
+    if (dashboardPath() && new URLSearchParams(location.search).get('manage') !== '1') location.replace(dashboardPath());
+  }
 
   function render(next = view, message = '', error = false) {
     view = next; busy = false;
     let content = '';
-    if (view === 'signin') content = `<p>Access your Ink Wire account.</p>${form('signin', emailInput() + passwordInput(false), 'Sign in')}<p>${link('forgot', 'Forgot password?')}</p>`;
-    if (view === 'signup') content = `<p>Register with your email and password. We’ll send a link to activate your account.</p>${form('signup', accountTypeInput() + emailInput() + passwordInput(true), 'Create account')}<p class="account-hint">Classroom access is arranged by Matthew. Teacher accounts require approval.</p>`;
+    if (view === 'signin') content = `<p>Access your Ink Wire account.</p>${form('signin', emailInput() + passwordInput(false) + `<label class="account-remember"><input name="rememberMe" type="checkbox" aria-describedby="remember-hint" ${rememberMe ? 'checked' : ''}><span>Remember me</span></label><p id="remember-hint" class="account-hint">Uses a sign-in cookie to remember this device for up to 7 days. Leave unchecked on a shared device.</p>`, 'Sign in')}<p>${link('forgot', 'Forgot password?')}</p>`;
+    if (view === 'signup') content = `<p>Register with your email and password. We’ll send a link to activate your account.</p>${form('signup', accountTypeInput() + emailInput() + passwordInput(true), 'Create account')}<p class="account-hint">Teachers can create a class or join with an invite code after verifying their email. Student and parent classroom links are arranged separately.</p>`;
     if (view === 'verify') content = `<p>If this address needs activation, an email will arrive with your activation link. The link expires after one hour.</p><p class="account-hint">Check your spam folder too. If you already activated your account, you can sign in.</p>${form('resend', emailInput(), 'Resend activation email')}<p>${link('signin', 'Back to sign in')}</p>`;
     if (view === 'forgot') content = `<p>Enter your account email to request a password reset link.</p>${form('forgot', emailInput(), 'Send reset link')}<p>${link('signin', 'Back to sign in')}</p>`;
     if (view === 'forgotSent') content = `<p>If an account matches that email, you’ll receive a reset link. The link expires after 30 minutes.</p><p class="account-hint">Check your spam folder and allow a few minutes for delivery.</p><p>${link('forgot', 'Request another link')} · ${link('signin', 'Back to sign in')}</p>`;
     if (view === 'activate') content = `<p>Select the button below to confirm your email address and activate your Ink Wire account.</p>${form('activate', '', 'Activate account')}<p>${link('verify', 'Request a new activation link')} · ${link('signin', 'Sign in')}</p>`;
     if (view === 'reset') content = `<p>Set a new password for your Ink Wire account.</p>${form('reset', passwordInput(true), 'Save new password')}<p>${link('forgot', 'Request a new reset link')} · ${link('signin', 'Sign in')}</p>`;
-    if (view === 'account') content = `<p class="account-email">${escape(account?.email || email)}</p><p class="account-badge">Email verified</p><h3>Classroom access</h3><p>${account?.requestedRole === 'teacher' ? 'Your account is active. Teacher access awaits Matthew’s approval.' : account?.requestedRole === 'parent' ? 'Your account is active. Matthew will link it to your child’s classroom.' : 'Your account is active. Matthew will arrange access to your classroom.'}</p>${form('signout', '', 'Sign out')}<a class="account-link" href="./">Back to Ink Wire</a>`;
+    if (view === 'account') content = `<p class="account-email">${escape(account?.email || email)}</p><p class="account-badge">Email verified</p><h3>Classroom access</h3>${dashboardPath() ? '<p>Your teacher access is active.</p><a class="account-submit account-dashboard" href="/teacher">Open teacher dashboard →</a>' : `<p>${account?.requestedRole === 'teacher' ? 'Your account is active. Please reload to open your teacher dashboard.' : account?.requestedRole === 'parent' ? 'Your account is active. Matthew will link it to your child’s classroom.' : 'Your account is active. Matthew will arrange access to your classroom.'}</p>`}${form('signout', '', 'Sign out')}${standalone ? '' : '<a class="account-link" href="./">Back to Ink Wire</a>'}`;
     if (view === 'unavailable') content = `<p>${location.hostname.endsWith('.chatgpt.site') ? 'Use the Ink Wire website to register or sign in.' : 'Account access is temporarily unavailable. Please try again shortly.'}</p><div class="account-retry">${link('retry', 'Try again')}<a class="account-link" href="https://inkwire-education.com/account.html">Open Ink Wire</a></div>`;
     const tabs = ['signin', 'signup'].includes(view) ? `<div class="account-tabs" role="group" aria-label="Account options"><button type="button" data-view="signin" aria-pressed="${view === 'signin'}">Sign in</button><button type="button" data-view="signup" aria-pressed="${view === 'signup'}">Create account</button></div>` : '';
     const notice = availability === 'ready' ? '' : `<div class="account-availability" role="status">${availability === 'checking' ? 'Connecting securely…' : `Account access is temporarily unavailable. Please try again shortly.<div class="account-retry">${link('retry', 'Try again')}${location.hostname.endsWith('.chatgpt.site') ? '<a class="account-link" href="https://inkwire-education.com/account">Open Ink Wire website</a>' : ''}</div>`}</div>`;
@@ -61,15 +66,17 @@
       catch (error) { if (error.status !== 401) throw error; currentAccount = null; }
       if (id !== requestId) return;
       account = currentAccount; availability = 'ready';
-      render(account ? 'account' : view);
+      if (account) showAccount(); else render(view);
     } catch { if (id === requestId) { availability = 'unavailable'; render(view); } }
   }
 
   function rememberFields() {
     const emailField = root.querySelector('[name="email"]');
     const roleField = root.querySelector('[name="accountType"]');
+    const rememberField = root.querySelector('[name="rememberMe"]');
     if (emailField) email = emailField.value.trim();
     if (roleField) accountType = roleField.value;
+    if (rememberField) rememberMe = rememberField.checked;
   }
 
   root.addEventListener('click', event => {
@@ -100,6 +107,7 @@
     accountType = data.get('accountType') || accountType;
     const body = action === 'reset' ? { token, newPassword: data.get('password') } : action === 'activate' ? { token } : action === 'signout' ? {} : { email, ...(data.has('password') ? { password: data.get('password') } : {}) };
     if (action === 'signup') body.accountType = accountType;
+    if (action === 'signin') { rememberMe = data.has('rememberMe'); body.rememberMe = rememberMe; }
     busy = true; root.setAttribute('aria-busy', 'true');
     root.querySelectorAll('button').forEach(button => { button.disabled = true; });
     form.querySelector('fieldset').disabled = true;
@@ -111,11 +119,11 @@
       if (action === 'forgot') render('forgotSent');
       if (action === 'activate') { token = ''; render('signin', 'Your account is activated. You can now sign in.'); }
       if (action === 'reset') { token = ''; render('signin', 'Your password has been updated. Sign in with your new password.'); }
-      if (action === 'signout') { account = null; render('signin', 'You’re signed out.'); }
+      if (action === 'signout') { account = null; rememberMe = false; render('signin', 'You’re signed out.'); }
       if (action === 'signin') {
         const signedInAccount = await api('/api/account');
         if (id !== requestId) return;
-        account = signedInAccount; render('account');
+        account = signedInAccount; showAccount();
       }
       root.querySelector('h2').focus();
     } catch (error) {

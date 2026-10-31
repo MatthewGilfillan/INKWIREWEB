@@ -3,13 +3,7 @@
 const STUDENT_NAME = 'Alex Lee';
 const STUDENT_SECTIONS = ['Discussion','Writing','Reflection','Homework'];
 let studentTimezone='Asia/Shanghai';
-try {const zone=localStorage.getItem('inkwire-timezone');if(['Asia/Shanghai','Asia/Bangkok','UTC'].includes(zone))studentTimezone=zone;}catch{}
 let studentLesson = 1, studentSection = 'Discussion', studentFeedbackWeek = 'all';
-try {
-  const view = JSON.parse(localStorage.getItem('inkwire-student-view-v1') || '{}');
-  if(Number.isInteger(view?.lesson) && view.lesson>=1 && view.lesson<=24) studentLesson=view.lesson;
-  if(STUDENT_SECTIONS.includes(view?.section)) studentSection=view.section;
-} catch { /* Start with the first lesson. */ }
 function studentKey(lesson) { return STUDENT_NAME+'|'+lesson; }
 function studentPrep(data,lesson) {
   const record=data.preparation?.[studentKey(lesson)] || {};
@@ -34,15 +28,12 @@ function studentExport(data,getPlan) {
   }
   return 'Ink Wire · Literature & the World\n'+STUDENT_NAME+' · My notebook\n\n'+(pages.join('\n\n────────────────────\n\n') || 'No notebook entries yet.');
 }
-function studentRemember() {
-  try { localStorage.setItem('inkwire-student-view-v1',JSON.stringify({lesson:studentLesson,section:studentSection})); } catch { /* Navigation still works without storage. */ }
-}
 function studentLabel(lesson) { return 'Week '+Math.ceil(lesson/2)+' · Lesson '+((lesson-1)%2+1); }
 function studentBefore(lesson) { return lesson===1?'Read Act 2 through Gerald’s departure. Bring one quotation and one question.':plan(lesson-1).reading; }
 function studentGo(lesson,route='dashboard',section=studentSection) {
   if(!Number.isInteger(lesson)||lesson<1||lesson>24)return;
   if(route==='timeline'){timelineExpanded.clear();timelineExpanded.add(Math.ceil(lesson/2));}
-  studentLesson=lesson;studentSection=STUDENT_SECTIONS.includes(section)?section:'Discussion';studentRemember();
+  studentLesson=lesson;studentSection=STUDENT_SECTIONS.includes(section)?section:'Discussion';
   if(location.hash==='#'+route || (!location.hash && route==='dashboard')){render();window.scrollTo(0,0);}else location.hash=route;
 }
 function studentTop(title,description) {
@@ -100,10 +91,10 @@ function studentFeedback() {
 }
 function bindStudentEvents() {
   if(role!=='student')return;
-  $('#student-timezone')?.addEventListener('change',e=>{studentTimezone=e.target.value;try{localStorage.setItem('inkwire-timezone',studentTimezone);}catch{}render();$('#student-timezone')?.focus();});
-  $('#student-lesson')?.addEventListener('change',e=>{studentLesson=Number(e.target.value);studentRemember();render();$('#student-lesson')?.focus();});
+  $('#student-timezone')?.addEventListener('change',e=>{studentTimezone=e.target.value;render();$('#student-timezone')?.focus();});
+  $('#student-lesson')?.addEventListener('change',e=>{studentLesson=Number(e.target.value);render();$('#student-lesson')?.focus();});
   document.querySelectorAll('[data-student-lesson]').forEach(b=>b.addEventListener('click',()=>studentGo(Number(b.dataset.studentLesson),b.dataset.studentRoute,b.dataset.studentSection||studentSection)));
-  document.querySelectorAll('[data-student-tab]').forEach(b=>b.addEventListener('click',()=>{studentSection=b.dataset.studentTab;studentRemember();render();document.querySelector('[data-student-tab="'+studentSection+'"]')?.focus();}));
+  document.querySelectorAll('[data-student-tab]').forEach(b=>b.addEventListener('click',()=>{studentSection=b.dataset.studentTab;render();document.querySelector('[data-student-tab="'+studentSection+'"]')?.focus();}));
   document.querySelectorAll('[data-prep-field]').forEach(input=>input.addEventListener('change',()=>{
     const key=studentKey(Number(input.dataset.prepLesson)),field=input.dataset.prepField,previous=state.preparation?.[key];
     state.preparation ||= {};state.preparation[key]={...previous,[field]:input.checked};

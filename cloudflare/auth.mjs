@@ -17,7 +17,7 @@ export function authOptions(env, deliver) {
     database: env.AUTH_DB || env.DB,
     trustedOrigins: [env.APP_ORIGIN],
     logger: { disabled: true },
-    // A preference for manual assignment, never an authorization role.
+    // Account type selects a workspace. Class membership is checked separately.
     user: { additionalFields: { requestedRole: { type: ['parent', 'student', 'teacher'], required: true, input: true } } },
     emailAndPassword: {
       enabled: true,
