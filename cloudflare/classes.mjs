@@ -1,16 +1,17 @@
 import { digest } from './auth.mjs';
+import { createLearningInvite } from './enrollment.mjs';
 
 export const isTeacher = user => user?.emailVerified === true && user.requestedRole === 'teacher';
 const classFields = `c.id, c.name, c.subject, c.created_at AS createdAt,
   CASE WHEN c.owner_id = ? THEN 'owner' ELSE 'teacher' END AS membership`;
 
-async function limit(env, userId, action) {
+export async function limitClassAction(env, userId, action, max = 10) {
   const period = Math.floor(Date.now() / 900000);
   await env.DB.prepare('DELETE FROM class_action_limits WHERE expires_at < ?').bind(Date.now()).run();
   const key = await digest(`${userId}:${action}:${period}`);
   return !!await env.DB.prepare(`INSERT INTO class_action_limits (key, count, expires_at) VALUES (?, 1, ?)
-    ON CONFLICT(key) DO UPDATE SET count = count + 1 WHERE count < 10 RETURNING count`)
-    .bind(key, (period + 1) * 900000).first();
+    ON CONFLICT(key) DO UPDATE SET count = count + 1 WHERE count < ? RETURNING count`)
+    .bind(key, (period + 1) * 900000, max).first();
 }
 
 export async function handleClasses(request, env, user, { json, fail, readJSON }) {
@@ -29,7 +30,7 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (request.headers.get('Origin') !== env.APP_ORIGIN || request.headers.get('Sec-Fetch-Site') === 'cross-site') return fail('Invalid origin.', 403, 'INVALID_ORIGIN');
   let input;
   try { input = await readJSON(request); } catch { return fail('Invalid request.', 400, 'INVALID_INPUT'); }
-  if (!await limit(env, user.id, inviteMatch ? 'invite' : path)) return fail('Too many attempts. Please try again in 15 minutes.', 429, 'RATE_LIMITED');
+  if (!await limitClassAction(env, user.id, inviteMatch ? 'invite' : path)) return fail('Too many attempts. Please try again in 15 minutes.', 429, 'RATE_LIMITED');
   if (path === '/api/classes') {
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const subject = typeof input.subject === 'string' ? input.subject.trim() : '';
@@ -37,6 +38,7 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
     await env.DB.prepare(`INSERT INTO classes (id, owner_id, name, subject, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(owner_id, request_id) DO NOTHING`).bind(crypto.randomUUID(), user.id, name, subject, input.requestId, Date.now()).run();
     const classroom = await env.DB.prepare(`SELECT ${classFields} FROM classes c WHERE c.owner_id = ? AND c.request_id = ?`).bind(user.id, user.id, input.requestId).first();
+    await createLearningInvite(env, classroom.id);
     return json({ classroom }, 201);
   }
   if (path === '/api/classes/join') {

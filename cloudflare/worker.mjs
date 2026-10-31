@@ -1,5 +1,6 @@
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
 import { isTeacher, handleClasses } from './classes.mjs';
+import { handleEnrollment } from './enrollment.mjs';
 
 const actions = new Map([
   ['signup', '/sign-up/email'], ['signin', '/sign-in/email'], ['signout', '/sign-out'],
@@ -70,30 +71,32 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
-      if (/^\/teacher(?:\.html)?\/?$/.test(url.pathname)) {
-        if (url.origin !== env.APP_ORIGIN) return privateRedirect(`${env.APP_ORIGIN}/teacher`);
+      const workspaceMatch = url.pathname.match(/^\/(teacher|student|parent)(?:\.html)?\/?$/);
+      if (workspaceMatch) {
+        const role = workspaceMatch[1], destination = '/' + role;
+        if (url.origin !== env.APP_ORIGIN) return privateRedirect(`${env.APP_ORIGIN}${destination}`);
         if (!await ready(env)) return unavailable();
         try {
           const session = await createAuth(env).api.getSession({ headers: request.headers });
           if (!session?.user?.emailVerified) return privateRedirect('/account');
-          if (!isTeacher(session.user)) return privateRedirect('/account?manage=1');
-          if (url.pathname !== '/teacher') return privateRedirect('/teacher' + url.search);
-          const assetURL = new URL('/teacher', env.APP_ORIGIN);
+          if (session.user.requestedRole !== role) return privateRedirect('/account?manage=1');
+          if (url.pathname !== destination) return privateRedirect(destination + url.search);
+          const assetURL = new URL(destination, env.APP_ORIGIN);
           const response = await env.ASSETS.fetch(new Request(assetURL, { method: 'GET' }));
           if (!response.ok) return unavailable();
           const html = await response.text();
           return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8',
             'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
         } catch {
-          console.error('Ink Wire teacher access check failed.');
+          console.error('Ink Wire workspace access check failed.');
           return unavailable();
         }
       }
-      if (url.pathname === '/account' || url.pathname === '/account.html') {
-        if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN) return Response.redirect(`${env.APP_ORIGIN}/account${url.search}`, 302);
+      if (['/account', '/account.html', '/join', '/join.html'].includes(url.pathname)) {
+        if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN) return Response.redirect(`${env.APP_ORIGIN}${url.pathname}${url.search}`, 302);
         // Static Assets serves account.html at /account and redirects the extension.
         // Keep that canonical direction so email links cannot enter a redirect loop.
-        if (url.pathname === '/account.html') return Response.redirect(`${url.origin}/account${url.search}`, 302);
+        if (url.pathname.endsWith('.html')) return Response.redirect(`${url.origin}${url.pathname.slice(0,-5)}${url.search}`, 302);
         const response = await env.ASSETS.fetch(request);
         const result = new Response(response.body, response);
         for (const [key, value] of Object.entries(secureHeaders)) result.headers.set(key, value);
@@ -113,10 +116,15 @@ export default {
       if (url.pathname === '/api/account' && request.method === 'GET') {
         const session = await auth.api.getSession({ headers: request.headers });
         if (!session?.user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
-        const approved = isTeacher(session.user);
+        const role = session.user.requestedRole;
+        const approved = ['teacher','student','parent'].includes(role);
         return json({ email: session.user.email, verified: true, requestedRole: session.user.requestedRole,
           classroomStatus: approved ? 'active' : 'pending',
-          ...(approved ? { role: 'teacher', dashboardPath: '/teacher' } : {}) });
+          ...(approved ? { role, dashboardPath: '/' + role } : {}) });
+      }
+      if (url.pathname.startsWith('/api/enrollment/')) {
+        const session = await auth.api.getSession({headers:request.headers});
+        return await handleEnrollment(request,env,session?.user,{json,fail,readJSON});
       }
       if (url.pathname === '/api/classes' || url.pathname.startsWith('/api/classes/')) {
         const session = await auth.api.getSession({ headers: request.headers });
@@ -143,6 +151,7 @@ export default {
         await env.DB.prepare('DELETE FROM activation_links WHERE email = ?').bind(link.email).run();
         return json({ status: true });
       }
+      delivery.join = typeof input.join === 'string' && /^(class\.[A-HJ-NP-Z2-9]{8}|(?:student|family)\.[A-HJ-NP-Z2-9]{12})$/.test(input.join) ? input.join : '';
       let body = {};
       if (['signup', 'signin', 'resend', 'forgot'].includes(action)) {
         const email = normalizeEmail(input.email);

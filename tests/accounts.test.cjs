@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');
-const { readFileSync } = require('node:fs');
+const { readFileSync, readdirSync } = require('node:fs');
 const { randomBytes } = require('node:crypto');
 const path = require('node:path');
 const ORIGIN = 'https://inkwire-education.com';
@@ -11,7 +11,7 @@ const PASSWORD = 'An original test passphrase 42!';
 async function fixture() {
   const { default: worker } = await import('../cloudflare/worker.mjs');
   const db = new DatabaseSync(':memory:');
-  for (const name of ['0001_auth.sql', '0002_account_access.sql', '0003_teacher_access.sql']) db.exec(readFileSync(path.join(__dirname, '../cloudflare/migrations', name), 'utf8'));
+  for (const name of readdirSync(path.join(__dirname, '../cloudflare/migrations')).filter(name => name.endsWith('.sql')).sort()) db.exec(readFileSync(path.join(__dirname, '../cloudflare/migrations', name), 'utf8'));
   const DB = { prepare(sql) {
     const statement = db.prepare(sql); let args = [];
     return { bind(...values) { args = values; return this; }, async run() { return statement.run(...args); }, async first() { return statement.get(...args) || null; }, async all() { return { results: statement.all(...args) }; } };
@@ -19,7 +19,7 @@ async function fixture() {
   const mail = [];
   const env = { DB, AUTH_DB: db, APP_ORIGIN: ORIGIN, ACCOUNT_EMAIL: 'accounts@inkwire-education.com', ACCOUNTS_ENABLED: 'true', BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     EMAIL: { async send(message) { mail.push(message); return { messageId: 'test-mail-only' }; } },
-    ASSETS: { async fetch(request) { return new Response(readFileSync(path.join(__dirname, new URL(request.url).pathname === '/teacher' ? '../dist/teacher.html' : '../dist/account.html'), 'utf8')); } },
+    ASSETS: { async fetch(request) { return new Response(readFileSync(path.join(__dirname, ['/teacher','/student','/parent','/join'].includes(new URL(request.url).pathname) ? '../dist' + new URL(request.url).pathname + '.html' : '../dist/account.html'), 'utf8')); } },
   };
   const request = (route, body, extra = {}) => worker.fetch(new Request(ORIGIN + route, {
     method: body === undefined ? 'GET' : 'POST',
@@ -231,9 +231,10 @@ test('Remember me adds a seven-day persistent session cookie only for an explici
 });
 
 async function signInAs(f, email, accountType = 'teacher') {
-  assert.equal((await f.post('signup', { email, password: PASSWORD, accountType })).status, 200);
-  await f.activate();
-  const signedIn = await f.post('signin', { email, password: PASSWORD });
+  const extra = {'cf-connecting-ip': '192.0.2.' + (40 + f.db.prepare('SELECT count(*) AS n FROM user').get().n)};
+  assert.equal((await f.post('signup', { email, password: PASSWORD, accountType }, extra)).status, 200);
+  assert.equal((await f.post('activate', {token:decodeURIComponent(f.token())}, extra)).status, 200);
+  const signedIn = await f.post('signin', { email, password: PASSWORD }, extra);
   assert.equal(signedIn.status, 200);
   return { Cookie: f.cookie(signedIn) };
 }
@@ -304,4 +305,144 @@ test('new invite codes replace old codes, expired invites fail, and removing mem
     f.db.prepare('DELETE FROM class_teachers').run();
     assert.deepEqual((await (await f.request('/api/classes', undefined, guest)).json()).classes, []);
   } finally { f.db.close(); }
+});
+
+const enroll = (f, path, body, headers) => f.request('/api/enrollment'+path,body,headers);
+const addLearner = async (f,teacher,classId,name='Sample learner') => {
+  const response=await enroll(f,'/classes/'+classId+'/students',{name,requestId:crypto.randomUUID()},teacher);
+  assert.equal(response.status,201,await response.clone().text());return (await response.json()).learnerId;
+};
+const inviteLearner = async (f,teacher,classId,kind,learnerId,action='open') => {
+  const response=await enroll(f,'/classes/'+classId+'/invite',{kind,learnerId,action},teacher);
+  assert.equal(response.status,200,await response.clone().text());return response.json();
+};
+const joinLearner = (f,headers,invitation,name='Sample person') => enroll(f,'/join',{kind:invitation.kind,code:invitation.code,name},headers);
+
+test('one learner roster entry connects student and parent accounts; parents follow the child across classes',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'owner@example.invalid');
+    const parent=await signInAs(f,'parent@example.invalid','parent');
+    const student=await signInAs(f,'student@example.invalid','student');
+    const stranger=await signInAs(f,'stranger@example.invalid');
+    const first=(await (await newClass(f,teacher,'Reading')).json()).classroom.id;
+    const second=(await (await newClass(f,teacher,'Writing')).json()).classroom.id;
+    const learnerId=await addLearner(f,teacher,first,'Example learner');
+    let roster=await (await enroll(f,'/classes/'+first+'/roster',undefined,teacher)).json();
+    assert.equal(roster.students[0].connected,0);assert.deepEqual(roster.students[0].parents,[]);
+    assert.equal((await enroll(f,'/classes/'+first+'/roster',undefined,stranger)).status,404);
+    assert.equal((await enroll(f,'/classes/'+first+'/roster',undefined,parent)).status,404);
+    const family=await inviteLearner(f,teacher,first,'family',learnerId);
+    assert.equal((await joinLearner(f,parent,family,'Example parent')).status,200);
+    const personal=await inviteLearner(f,teacher,first,'student',learnerId);
+    assert.equal((await joinLearner(f,student,personal)).status,200);
+    assert.equal((await joinLearner(f,student,personal)).status,200);
+    assert.equal((await enroll(f,'/classes/'+second+'/students',{learnerId},teacher)).status,201);
+    const mine=await (await enroll(f,'/mine',undefined,parent)).json();
+    assert.equal(mine.children.length,1);assert.equal(mine.children[0].classes.length,2);
+    assert.equal((await (await enroll(f,'/mine',undefined,student)).json()).classes.length,2);
+    roster=await (await enroll(f,'/classes/'+second+'/roster',undefined,teacher)).json();
+    assert.equal(roster.students[0].connected,1);assert.equal(roster.students[0].parents[0].name,'Example parent');
+    assert.equal((await enroll(f,'/classes/'+first+'/remove',{learnerId},teacher)).status,200);
+    assert.equal((await (await enroll(f,'/mine',undefined,parent)).json()).children[0].classes.length,1);
+    assert.equal((await enroll(f,'/classes/'+second+'/disconnect',{learnerId,parentId:roster.students[0].parents[0].id},teacher)).status,200);
+    assert.deepEqual((await (await enroll(f,'/mine',undefined,parent)).json()).children,[]);
+    assert.equal((await joinLearner(f,parent,family)).status,400);
+  }finally{f.db.close();}
+});
+
+test('class codes are generated automatically, reusable for verified students, isolated from personal and teacher codes',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'teacher@example.invalid');
+    const student=await signInAs(f,'student@example.invalid','student');
+    const parent=await signInAs(f,'parent@example.invalid','parent');
+    const {classroom}=await (await newClass(f,teacher)).json();
+    assert.equal(f.db.prepare("SELECT count(*) AS n FROM learning_invites WHERE kind='class'").get().n,1);
+    const invitation=await inviteLearner(f,teacher,classroom.id,'class');
+    assert.match(invitation.code,/^[A-HJ-NP-Z2-9]{8}$/);assert.equal(invitation.link,ORIGIN+'/join#class='+invitation.code);
+    assert.equal((await inviteLearner(f,teacher,classroom.id,'class')).code,invitation.code);
+    assert.equal(JSON.stringify(f.db.prepare('SELECT * FROM learning_invites').get()).includes(invitation.code),false);
+    assert.equal((await joinLearner(f,parent,invitation)).status,409);
+    assert.equal((await joinLearner(f,teacher,invitation)).status,409);
+    assert.equal((await enroll(f,'/preview',{...invitation})).status,401);
+    assert.equal((await enroll(f,'/preview',invitation,student)).status,200);
+    assert.equal((await joinLearner(f,student,{...invitation,code:invitation.code.toLowerCase().match(/.{4}/g).join('-')},'Student name')).status,200);
+    assert.equal((await joinLearner(f,student,invitation,'Student name')).status,200);
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM class_students').get().n,1);
+    const account=await(await f.request('/api/account',undefined,student)).json();assert.equal(account.dashboardPath,'/student');
+    assert.equal((await f.request('/student',undefined,student)).status,200);
+    assert.equal((await f.request('/parent',undefined,student)).headers.get('Location'),'/account?manage=1');
+    assert.equal((await f.request('/parent',undefined,parent)).status,200);
+  }finally{f.db.close();}
+});
+
+test('student and family invitations cannot be reused by a different account or grant access to other children',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'teacher@example.invalid');
+    const student=await signInAs(f,'student@example.invalid','student');
+    const otherStudent=await signInAs(f,'otherstudent@example.invalid','student');
+    const parent=await signInAs(f,'parent@example.invalid','parent');
+    const otherParent=await signInAs(f,'otherparent@example.invalid','parent');
+    const {classroom}=await (await newClass(f,teacher)).json();
+    const a=await addLearner(f,teacher,classroom.id,'Learner A'),b=await addLearner(f,teacher,classroom.id,'Learner B');
+    const studentInvite=await inviteLearner(f,teacher,classroom.id,'student',a);
+    const familyInvite=await inviteLearner(f,teacher,classroom.id,'family',a);
+    assert.equal((await joinLearner(f,student,studentInvite)).status,200);
+    assert.equal((await joinLearner(f,otherStudent,studentInvite)).status,400);
+    assert.equal((await joinLearner(f,parent,familyInvite)).status,200);
+    assert.equal((await joinLearner(f,otherParent,familyInvite)).status,400);
+    assert.equal((await joinLearner(f,student,await inviteLearner(f,teacher,classroom.id,'student',b))).status,409);
+    assert.equal((await (await enroll(f,'/mine',undefined,parent)).json()).children[0].id,a);
+    assert.deepEqual((await (await enroll(f,'/mine',undefined,otherParent)).json()).children,[]);
+    const newFamily=await inviteLearner(f,teacher,classroom.id,'family',a);
+    assert.notEqual(newFamily.code,familyInvite.code);
+    assert.equal((await joinLearner(f,otherParent,newFamily)).status,200);
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM learner_parents WHERE learner_id=?').get(a).n,2);
+  }finally{f.db.close();}
+});
+
+test('resetting, closing and expiring invites blocks new joins while existing access remains',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'teacher@example.invalid'),student=await signInAs(f,'student@example.invalid','student');
+    const {classroom}=await(await newClass(f,teacher)).json();
+    const first=await inviteLearner(f,teacher,classroom.id,'class');
+    const next=await inviteLearner(f,teacher,classroom.id,'class',null,'reset');
+    assert.notEqual(first.code,next.code);assert.equal((await joinLearner(f,student,first)).status,400);
+    assert.equal((await joinLearner(f,student,next)).status,200);
+    await inviteLearner(f,teacher,classroom.id,'class',null,'disable');
+    assert.equal((await joinLearner(f,student,next)).status,400);
+    assert.equal((await(await enroll(f,'/mine',undefined,student)).json()).classes.length,1);
+    const expired=await inviteLearner(f,teacher,classroom.id,'class');f.db.prepare('UPDATE learning_invites SET expires_at=1').run();
+    assert.equal((await joinLearner(f,student,expired)).status,400);
+  }finally{f.db.close();}
+});
+
+test('roster and invitations reject unauthorized edits, CSRF, duplicate retries and code guessing',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'teacher@example.invalid'),stranger=await signInAs(f,'stranger@example.invalid'),student=await signInAs(f,'student@example.invalid','student');
+    const {classroom}=await(await newClass(f,teacher)).json();const route='/classes/'+classroom.id;
+    const body={name:'Example',requestId:crypto.randomUUID()};
+    assert.equal((await enroll(f,route+'/students',body,{...teacher,Origin:'https://evil.invalid'})).status,403);
+    assert.equal((await enroll(f,route+'/students',body,stranger)).status,404);
+    assert.equal((await enroll(f,route+'/students',body,student)).status,404);
+    const one=await(await enroll(f,route+'/students',body,teacher)).json(),two=await(await enroll(f,route+'/students',body,teacher)).json();
+    assert.equal(one.learnerId,two.learnerId);
+    assert.equal((await enroll(f,route+'/invite',{kind:'family',learnerId:one.learnerId},stranger)).status,404);
+    assert.equal((await enroll(f,route+'/students',{learnerId:one.learnerId},stranger)).status,404);
+    for(let i=0;i<10;i++)assert.equal((await enroll(f,'/join',{kind:'class',code:'AAAAAAAA',name:'Example'},student)).status,400);
+    assert.equal((await enroll(f,'/join',{kind:'class',code:'AAAAAAAA',name:'Example'},student)).status,429);
+  }finally{f.db.close();}
+});
+
+test('verification emails preserve only valid invitation context and return members to the correct workspace',async()=>{
+  const f=await fixture();try{
+    const join='family.ABCDEFGHJKLM';
+    assert.equal((await f.post('signup',{email:EMAIL,password:PASSWORD,accountType:'parent',join})).status,200);
+    const url=new URL(f.mail.at(-1).text.match(/https:\/\/\S+/)[0]);
+    const fragment=new URLSearchParams(url.hash.slice(1));assert.equal(fragment.get('join'),join);
+    assert.equal((await f.post('activate',{token:fragment.get('activate')})).status,200);
+    const login=await f.post('signin',{email:EMAIL,password:PASSWORD});
+    assert.equal((await(await f.request('/api/account',undefined,{Cookie:f.cookie(login)})).json()).dashboardPath,'/parent');
+    await f.post('signup',{email:'new@example.invalid',password:PASSWORD,accountType:'student',join:'https://evil.invalid'});
+    assert.ok(!f.mail.at(-1).text.includes('evil.invalid'));
+  }finally{f.db.close();}
 });

@@ -103,3 +103,23 @@ test('parent accounts stay on their account page; unchecked Remember me sends fa
   assert.match(f.root.html, /link it to your child/);
   assert.equal(JSON.parse(f.calls.find(call => call.url === '/api/accounts/signin').options.body).rememberMe, false);
 });
+
+test('an invitation survives signup, email activation and sign-in without optional browser storage',async()=>{
+  const join='family.ABCDEFGHJKLM';
+  const f=fixture({search:'?mode=signup',hash:'#join='+join});await flush();
+  assert.match(f.root.html,/value="parent" selected/);assert.doesNotMatch(f.root.html,/value="teacher"/);
+  f.click('signin');f.click('signup');assert.equal(f.history.at(-1),'/account?mode=signup#join='+join);
+  await f.submit('signup',{email:'parent@example.invalid',password:'test-only-passphrase',accountType:'parent'});
+  assert.equal(JSON.parse(f.calls.find(c=>c.url==='/api/accounts/signup').options.body).join,join);
+  const activated=fixture({hash:'#activate=verification-token&join='+join,fetch:async url=>response(url==='/api/status'?{accountsReady:true}:{verified:true,role:'parent',classroomStatus:'active',dashboardPath:'/parent'})});await flush();
+  assert.equal(activated.history[0],'/account#join='+join);await activated.submit('activate',{});await activated.submit('signin',{email:'parent@example.invalid',password:'test-only-passphrase'});
+  assert.deepEqual(activated.redirects,['/join#family=ABCDEFGHJKLM']);
+  assert.doesNotMatch(source,/localStorage|sessionStorage/);
+});
+
+test('verified student and parent accounts open their own dashboards; malicious destinations are rejected',async()=>{
+  for(const role of ['student','parent']){
+    const f=fixture({fetch:async url=>response(url==='/api/status'?{accountsReady:true}:{verified:true,role,classroomStatus:'active',dashboardPath:'/'+role})});await flush();assert.deepEqual(f.redirects,['/'+role]);
+  }
+  const f=fixture({hash:'#join=javascript:bad',fetch:async url=>response(url==='/api/status'?{accountsReady:true}:{verified:true,role:'parent',classroomStatus:'active',dashboardPath:'https://evil.invalid'})});await flush();assert.deepEqual(f.redirects,[]);
+});

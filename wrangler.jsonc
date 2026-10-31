@@ -9,7 +9,7 @@
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
-    "run_worker_first": ["/api/*", "/account", "/account.html", "/teacher*"],
+    "run_worker_first": ["/api/*", "/account", "/account.html", "/teacher*", "/student*", "/parent*", "/join", "/join.html"],
     "not_found_handling": "404-page"
   },
   "vars": {

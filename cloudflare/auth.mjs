@@ -7,8 +7,8 @@ export async function digest(value) {
 }
 
 // The caller supplies a delivery function; tests use an in-memory mailbox.
-export function authOptions(env, deliver) {
-  const accountLink = (mode, token) => `${env.APP_ORIGIN}/account.html#${mode}=${encodeURIComponent(token)}`;
+export function authOptions(env, deliver, context = {}) {
+  const accountLink = (mode, token) => `${env.APP_ORIGIN}/account.html#${mode}=${encodeURIComponent(token)}${context.join ? '&join=' + encodeURIComponent(context.join) : ''}`;
   return {
     appName: 'Ink Wire Education',
     baseURL: env.APP_ORIGIN,
@@ -79,7 +79,7 @@ export function createAuth(env, delivery = {}) {
       subject,
       text: `${action}\n\n${url}\n\nThis link expires in ${expiry}. If you did not request this, you can ignore this email.\n\nInk Wire Education`,
     });
-  });
+  }, delivery);
   // Better Auth deliberately catches notification failures. Surface a safe failure
   // to our form instead of telling the visitor to expect mail that was not accepted.
   for (const [config, key] of [[options.emailVerification, 'sendVerificationEmail'], [options.emailAndPassword, 'sendResetPassword']]) {

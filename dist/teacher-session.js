@@ -1,79 +1,93 @@
-(() => {
-  if (!document.body.hasAttribute('data-teacher-workspace')) return;
-  const $ = selector => document.querySelector(selector);
-  const list = $('#class-list'), status = $('#dashboard-status'), retry = $('#retry-classes');
-  const escape = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let loading = false, createRequestId = '', classrooms = [], returnFocus;
-  async function api(path, body) {
-    const response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
-      headers: body === undefined ? { Accept: 'application/json' } : { 'Content-Type': 'application/json', Accept: 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(20000) });
-    if (response.status === 401 || response.status === 403) { list.replaceChildren(); location.replace('/account'); throw new Error('Please sign in again.'); }
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || 'Could not complete this request. Please try again.');
-    return result;
-  }
-  function renderClasses() {
-    list.innerHTML = classrooms.length ? classrooms.map(c => `<details class="class-card" data-class-id="${escape(c.id)}"><summary><span><h2>${escape(c.name)}</h2><small>${escape(c.subject || 'Class details')}</small></span></summary><div class="class-details"><span class="class-badge">${c.membership === 'owner' ? 'Class owner' : 'Joined teacher'}</span><p>Created ${escape(new Date(c.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }))}</p>${c.membership === 'owner' ? '<p>Invite another teacher to this class. Codes last seven days. Creating a new code replaces the previous one.</p><button type="button" class="teacher-button secondary" data-invite="'+escape(c.id)+'">Create teacher invite</button>' : '<p>You joined this class with a teacher invite.</p>'}</div></details>`).join('') : '<div class="empty-classes"><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div>';
-  }
-  async function loadClasses() {
-    if (loading) return;
-    loading = true; retry.hidden = true; status.textContent = 'Loading your classes…';
-    try { classrooms = (await api('/api/classes')).classes; renderClasses(); status.textContent = ''; }
-    catch (error) { status.textContent = error.message; retry.hidden = false; }
-    finally { loading = false; }
-  }
-  function openDialog(id, button) { returnFocus = button; const dialog = document.getElementById(id); dialog.showModal(); }
-  document.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => openDialog(button.dataset.open, button)));
-  document.querySelectorAll('dialog').forEach(dialog => {
-    dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => { if (returnFocus?.isConnected) returnFocus.focus(); });
+import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
+const $=selector=>document.querySelector(selector);
+const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
+let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
+const rosters=new Map();
+function problem(error) {status.textContent=error.message;if(error.status===401){list.replaceChildren();location.replace('/account');}}
+function openDialog(id,button){returnFocus=button;document.getElementById(id).showModal();}
+document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openDialog(button.dataset.open,button)));
+document.querySelectorAll('dialog').forEach(dialog=>{
+  dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
+});
+function renderClasses(){
+  const opened=new Set([...list.querySelectorAll('details.class-card[open]')].map(card=>card.dataset.classId));
+  list.innerHTML=classrooms.length ? classrooms.map(c=>`<details class="class-card" data-class-id="${escape(c.id)}" ${opened.has(c.id)?'open':''}><summary><span><h2>${escape(c.name)}</h2><small>${escape(c.subject || 'Class details')}</small></span></summary><div class="class-details"><div class="roster-heading"><h3>Students &amp; families</h3><span class="class-badge">${c.membership==='owner'?'Class owner':'Teacher'}</span></div><div class="teacher-actions"><button type="button" class="teacher-button" data-add-student="${escape(c.id)}">+ Add student</button><button type="button" class="teacher-button secondary" data-share-kind="class" data-class="${escape(c.id)}">Invite students</button></div><div data-roster="${escape(c.id)}" class="roster"><p>Loading students…</p></div>${c.membership==='owner'?`<details class="invite-settings"><summary>Teacher access</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" data-invite="${escape(c.id)}">Create teacher invite</button></details>`:''}</div></details>`).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div>';
+}
+async function loadRoster(classId){
+  const target=list.querySelector(`[data-roster="${classId}"]`);if(!target)return;
+  try{
+    const {students}=await api('/api/enrollment/classes/'+classId+'/roster');rosters.set(classId,students);
+    if(!target.isConnected)return;
+    target.innerHTML=students.length?students.map(s=>`<article class="student-slot"><div class="slot-heading"><h4>${escape(s.name)}</h4><button type="button" class="text-button small" data-remove="${escape(s.id)}" data-class="${classId}">Remove from class</button></div><div class="slot-views"><section><h5>Student view</h5><p class="connection-status">${s.connected?'● Account connected':'○ Not connected yet'}</p>${s.connected?'':`<button type="button" class="teacher-button secondary" data-share-kind="student" data-learner="${escape(s.id)}" data-class="${classId}">Invite student</button>`}</section><section><h5>Parent view</h5>${s.parents.length?s.parents.map(p=>`<p class="connection-status">● ${escape(p.name)} <button type="button" class="text-button small" data-disconnect="${escape(p.id)}" data-learner="${escape(s.id)}" data-class="${classId}">Disconnect</button></p>`).join(''):'<p class="connection-status">○ No parent connected</p>'}<button type="button" class="teacher-button secondary" data-share-kind="family" data-learner="${escape(s.id)}" data-class="${classId}">${s.parents.length?'Invite another parent':'Invite parent'}</button></section></div></article>`).join(''):'<p class="roster-empty">No students yet. Add a student to create their student and parent invitations, or share the class join code.</p>';
+  }catch(error){if(target.isConnected)target.innerHTML='<p>Could not load students.</p><button type="button" class="text-button" data-retry-roster="'+classId+'">Try again</button>';problem(error);}
+}
+list.addEventListener('toggle',event=>{if(event.target.matches('details.class-card')&&event.target.open)loadRoster(event.target.dataset.classId);},true);
+async function loadClasses(){
+  if(loading)return;loading=true;retry.hidden=true;status.textContent='Loading your classes…';
+  try{classrooms=(await api('/api/classes')).classes;renderClasses();status.textContent='';}
+  catch(error){problem(error);retry.hidden=false;}finally{loading=false;}
+}
+for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes/join']]){
+  const form=document.getElementById(id);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();const submit=form.querySelector('[type="submit"]'),error=form.querySelector('.form-error');if(submit.disabled)return;submit.disabled=true;error.hidden=true;
+    const body=Object.fromEntries(new FormData(form));if(id==='create-form'){createRequestId ||= requestId();body.requestId=createRequestId;}
+    try{const result=await api(route,body);form.closest('dialog').close();form.reset();if(id==='create-form')createRequestId='';await loadClasses();const card=list.querySelector(`[data-class-id="${result.classroom.id}"]`);if(card){card.open=true;card.querySelector('summary').focus();}status.textContent=id==='create-form'?'Class created. Add students or share its invitation.':'You have joined the class.';}
+    catch(problem){error.textContent=problem.message;error.hidden=false;}finally{submit.disabled=false;}
   });
-  for (const [id, route] of [['create-form','/api/classes'],['join-form','/api/classes/join']]) {
-    const form = document.getElementById(id);
-    form.addEventListener('submit', async event => {
-      event.preventDefault(); const submit = form.querySelector('[type="submit"]'), error = form.querySelector('.form-error');
-      if (submit.disabled) return;
-      submit.disabled = true; error.hidden = true;
-      const data = new FormData(form), body = Object.fromEntries(data);
-      if (id === 'create-form') { createRequestId ||= crypto.randomUUID(); body.requestId = createRequestId; }
-      try {
-        const result = await api(route, body);
-        form.closest('dialog').close(); form.reset(); if (id === 'create-form') createRequestId = '';
-        await loadClasses();
-        const card = list.querySelector('[data-class-id="'+result.classroom.id+'"]');
-        if (card) { card.open = true; card.querySelector('summary').focus(); }
-        status.textContent = id === 'create-form' ? 'Class created.' : 'You have joined the class.';
-      } catch (problem) { error.textContent = problem.message; error.hidden = false; }
-      finally { submit.disabled = false; }
-    });
-  }
-  list.addEventListener('click', async event => {
-    const button = event.target.closest('[data-invite]');
-    if (!button || button.disabled) return;
-    button.disabled = true;
-    try {
-      const invitation = await api('/api/classes/'+button.dataset.invite+'/invite', {});
-      $('#created-code').value = invitation.code.match(/.{4}/g).join('-');
-      $('#invite-class-name').textContent = classrooms.find(c => c.id === button.dataset.invite)?.name || '';
-      $('#invite-expiry').textContent = 'Expires '+new Date(invitation.expiresAt).toLocaleString()+'.';
-      $('#copy-status').textContent = '';
-      openDialog('teacher-invite', button);
-    } catch (error) { status.textContent = error.message; }
-    finally { button.disabled = false; }
-  });
-  $('#copy-code').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText($('#created-code').value); $('#copy-status').textContent = 'Copied.'; }
-    catch { $('#created-code').focus(); $('#created-code').select(); $('#copy-status').textContent = 'Select and copy the code above.'; }
-  });
-  $('[data-session-signout]').addEventListener('click', async event => {
-    const button = event.currentTarget; button.disabled = true;
-    try { await api('/api/accounts/signout', {}); list.replaceChildren(); location.replace('/account'); }
-    catch (error) { status.textContent = error.message; button.disabled = false; }
-  });
-  retry.addEventListener('click', loadClasses);
-  window.addEventListener('pageshow', loadClasses);
-  window.addEventListener('pagehide', () => list.replaceChildren());
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('dialog[open]')) loadClasses(); });
-  loadClasses();
-})();
+}
+function showInvitation(invitation){
+  sharing.invitation=invitation;
+  const kind=invitation.kind;
+  $('#learning-invite-title').textContent=kind==='family'?'Invite a parent':kind==='student'?'Invite student':'Invite students';
+  $('#learning-invite-subtitle').textContent=invitation.studentName || classrooms.find(c=>c.id===sharing.classId)?.name || '';
+  $('#learning-invite-description').textContent=kind==='family'?'Connect a parent to this student across their classes. Share privately with one parent.':kind==='student'?'Connect the student’s account to this roster entry. Share privately with the student or their parent.':'Students join this class after signing in or creating a Student account. For a student already on your roster, use their individual invitation.';
+  $('#learning-code').value=invitation.code.match(/.{4}/g).join('-');$('#learning-link').value=invitation.link;
+  $('#learning-expiry').textContent='Expires '+new Date(invitation.expiresAt).toLocaleString()+'.'+(kind==='class'?'':' One account per invitation.');
+  $('#learning-copy-status').textContent='';$('#download-qr').href=window.InkWireQR($('#invite-qr'),invitation.link);
+  $('#download-qr').download='inkwire-'+kind+'-invitation.png';
+}
+async function generateShare(reset=false){
+  const invitation=await api('/api/enrollment/classes/'+sharing.classId+'/invite',{kind:sharing.kind,learnerId:sharing.learnerId,action:reset?'reset':'open'});showInvitation(invitation);
+}
+list.addEventListener('click',async event=>{
+  const button=event.target.closest('button');if(!button||button.disabled)return;button.disabled=true;
+  try{
+    if(button.dataset.retryRoster)await loadRoster(button.dataset.retryRoster);
+    if(button.dataset.addStudent){
+      addingClass=button.dataset.addStudent;addRequestId='';$('#add-student-form').reset();$('#new-student-name').hidden=false;$('#student-name').required=true;$('#add-student-form .form-error').hidden=true;
+      const {learners}=await api('/api/enrollment/learners');const already=new Set((rosters.get(addingClass)||[]).map(s=>s.id));
+      $('#existing-learner').innerHTML='<option value="">Add a new student</option>'+learners.filter(l=>!already.has(l.id)).map(l=>`<option value="${escape(l.id)}">${escape(l.name)} · already in your classes</option>`).join('');
+      openDialog('add-student',button);
+    }
+    if(button.dataset.shareKind){sharing={classId:button.dataset.class,kind:button.dataset.shareKind,learnerId:button.dataset.learner};await generateShare();openDialog('learning-invite',button);}
+    if(button.dataset.remove&&confirm('Remove this student from this class? Their account and parent connections will remain.')){
+      await api('/api/enrollment/classes/'+button.dataset.class+'/remove',{learnerId:button.dataset.remove});await loadRoster(button.dataset.class);
+    }
+    if(button.dataset.disconnect&&confirm('Disconnect this parent from the student? This removes their access to the student across all classes.')){
+      await api('/api/enrollment/classes/'+button.dataset.class+'/disconnect',{learnerId:button.dataset.learner,parentId:button.dataset.disconnect});await loadRoster(button.dataset.class);
+    }
+    if(button.dataset.invite){
+      const invitation=await api('/api/classes/'+button.dataset.invite+'/invite',{});$('#created-code').value=invitation.code.match(/.{4}/g).join('-');$('#invite-class-name').textContent=classrooms.find(c=>c.id===button.dataset.invite)?.name||'';$('#invite-expiry').textContent='Expires '+new Date(invitation.expiresAt).toLocaleString()+'.';$('#copy-status').textContent='';openDialog('teacher-invite',button);
+    }
+  }catch(error){problem(error);}finally{button.disabled=false;}
+});
+$('#existing-learner').addEventListener('change',()=>{const existing=Boolean($('#existing-learner').value);$('#new-student-name').hidden=existing;$('#student-name').required=!existing;});
+$('#add-student-form').addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type="submit"]'),error=form.querySelector('.form-error');if(button.disabled)return;button.disabled=true;error.hidden=true;addRequestId ||= requestId();
+  try{await api('/api/enrollment/classes/'+addingClass+'/students',{...Object.fromEntries(new FormData(form)),requestId:addRequestId});form.closest('dialog').close();await loadRoster(addingClass);status.textContent='Student added. Invite their student and parent accounts from the roster.';}
+  catch(problem){error.textContent=problem.message;error.hidden=false;}finally{button.disabled=false;}
+});
+$('#copy-code').addEventListener('click',()=>copy($('#created-code').value,$('#created-code'),$('#copy-status')));
+for(const kind of ['code','link'])$('#copy-learning-'+kind).addEventListener('click',()=>copy($('#learning-'+kind).value,$('#learning-'+kind),$('#learning-copy-status')));
+for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-invite','disable']])$('#'+id).addEventListener('click',async event=>{
+  if(!confirm(action==='reset'?'Replace this invitation? The previous code and QR will stop working.':'Close this invitation? Existing class members and parent connections keep their access.'))return;
+  const button=event.currentTarget;button.disabled=true;
+  try{if(action==='reset')await generateShare(true);else{await api('/api/enrollment/classes/'+sharing.classId+'/invite',{kind:sharing.kind,learnerId:sharing.learnerId,action:'disable'});$('#learning-invite').close();status.textContent='Invitation closed. You can create another when needed.';}}
+  catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
+});
+signOut($('[data-session-signout]'),status);
+retry.addEventListener('click',loadClasses);window.addEventListener('pageshow',loadClasses);window.addEventListener('pagehide',()=>{list.replaceChildren();rosters.clear();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
+loadClasses();

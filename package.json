@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "esbuild src/notebook-editor.js --bundle --minify --format=iife --target=es2020 --outfile=dist/notebook-editor.js --legal-comments=linked && node scripts/notebook-licenses.mjs",
+    "build": "esbuild src/notebook-editor.js --bundle --minify --format=iife --target=es2020 --outfile=dist/notebook-editor.js --legal-comments=linked && node scripts/notebook-licenses.mjs && node scripts/build-invitations.mjs",
     "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
@@ -15,8 +15,9 @@
     "@tiptap/pm": "3.31.3",
     "@tiptap/starter-kit": "3.31.3",
     "@tiptap/y-tiptap": "3.0.7",
-    "yjs": "13.6.27",
-    "better-auth": "1.7.14"
+    "better-auth": "1.7.14",
+    "qrcode-generator": "2.0.4",
+    "yjs": "13.6.27"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
