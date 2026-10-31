@@ -25,8 +25,12 @@ The original source is preserved under `experiments/collaborative-editor/` on `c
 
 ## Features still to add
 
-Teacher comments, reusable feedback snippets, drawing/ink, image and table workflows, named collaborator cursors, revision history, DOCX import/export, and lifecycle controls are not implemented here. The existing import is plain text; export is HTML or browser print/PDF.
+The PDF worksheet experiment now includes drawing/ink, free-positioned text and emoji, highlighting/shapes, lasso movement, erasing, teacher/student annotation layers, server-enforced capability roles, offline recovery and flattened PDF export. See `WORKSHEETS.md`. These features remain isolated from production notebook pages and verified classroom accounts.
+
+Threaded teacher comments, reusable feedback snippets, image and table workflows in rich-text documents, named collaborator cursors, revision history, DOCX import/export, and lifecycle controls still need development. Rich-text import remains plain text; its export remains HTML or browser print/PDF. Worksheet editable-copy import/export is separate.
 
 The starter permits 30 connections per document and a 1 MiB encoded Yjs state. It writes a full snapshot for each update. Review these limits and storage behavior before expanding usage.
+
+Worksheet PDFs and annotation records are stored outside that Yjs state. The worksheet limits and permission model are documented in `WORKSHEETS.md`; capability roles do not replace the account/class/learner authorization requirements above.
 
 AI-generated unit plans, quizzes, summaries, and feedback are separate future integrations. This snapshot makes no OpenAI calls.
