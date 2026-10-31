@@ -6,6 +6,7 @@ import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { Worksheet } from './worksheet.js';
 import { formattingExtensions, mountTextFormatting } from './text-formatting.js';
+import { SubmissionPanel } from './submission.js';
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const room = params.get('doc');
@@ -17,6 +18,7 @@ const capabilityScope = [...new Uint8Array(await crypto.subtle.digest('SHA-256',
 const persistence = new IndexeddbPersistence(room ? `folio-${room}-${capabilityScope}` : 'folio-local', doc);
 let socket, connected = false, retry, stopped = false, pending = 0;
 let accessRole = room ? 'viewer' : 'teacher';
+let submissionState = { status: 'draft', revision: 0, attempt: 0 }, synchronizingReady = false;
 $('title').disabled = !!room;
 function status(text) { $('status').textContent = text; }
 function toast(text) { $('toast').textContent = text; $('toast').hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => $('toast').hidden = true, 5000); }
@@ -26,6 +28,17 @@ const editor = new Editor({ element: $('editor'), editable: !room, extensions: [
 const textControls = document.createElement('div'); textControls.id = 'document-text-controls'; document.querySelector('#document-panel .toolbar').append(textControls);
 const documentFormatting = mountTextFormatting(textControls, editor);
 const worksheet = new Worksheet({ root: $('worksheet'), room, key, toast, send: message => { if (socket?.readyState === WebSocket.OPEN && connected) socket.send(JSON.stringify(message)); else worksheet.disconnected(); } });
+const reviewRoot = document.createElement('section'); reviewRoot.id = 'submission'; document.querySelector('.page-tabs').before(reviewRoot);
+const review = new SubmissionPanel({ root: reviewRoot, room, key, toast, pending: () => pending > 0 || worksheet.hasPendingChanges(), onChange: (state, busy) => {
+  const reopened = submissionState.status === 'submitted' && state.status === 'returned';
+  submissionState = state; updateAccess(busy);
+  if (reopened && accessRole === 'student' && connected && !synchronizingReady) { pending++; socket.send(Y.encodeStateAsUpdate(doc)); }
+} });
+function updateAccess(busy = review.busy) {
+  const editable = !room || (accessRole !== 'viewer' && !(accessRole === 'student' && (submissionState.status === 'submitted' || busy)));
+  editor.setEditable(editable); $('title').disabled = !editable; $('import').disabled = !editable;
+  worksheet.setSubmission(submissionState, busy); refreshToolbar(); documentFormatting.refresh();
+}
 function selectTab(kind) {
   const isWorksheet = kind === 'worksheet';
   $('document-panel').hidden = isWorksheet; $('worksheet').hidden = !isWorksheet;
@@ -35,6 +48,7 @@ function selectTab(kind) {
 $('document-tab').onclick = () => selectTab('document'); $('worksheet-tab').onclick = () => selectTab('worksheet');
 $('document-tab').disabled = false; $('worksheet-tab').disabled = false;
 await worksheet.ready;
+review.receive(worksheet.submission || submissionState);
 editor.on('update', refresh);
 editor.on('selectionUpdate', refreshToolbar);
 if (!room && editor.isEmpty) {
@@ -45,7 +59,7 @@ $('title').value = metadata.get('title') || 'Untitled document';
 metadata.observe(() => { if (document.activeElement !== $('title')) $('title').value = metadata.get('title') || 'Untitled document'; });
 $('title').addEventListener('input', () => metadata.set('title', $('title').value));
 doc.on('update', (update, origin) => {
-  if (origin === 'remote' || (room && accessRole === 'viewer')) return;
+  if (origin === 'remote' || (room && !editor.isEditable)) return;
   if (connected) { pending++; status('Saving…'); socket.send(update); }
   else status(room ? 'Offline — changes kept on this device' : 'Local draft — kept on this device');
 });
@@ -63,29 +77,29 @@ function connect() {
     if (typeof event.data !== 'string') { Y.applyUpdate(doc, new Uint8Array(event.data), 'remote'); return; }
     const message = JSON.parse(event.data);
     if (message.type === 'ready') {
-      connected = true; accessRole = message.role || 'teacher'; editor.setEditable(accessRole !== 'viewer'); $('title').disabled = accessRole === 'viewer';
-      $('import').disabled = accessRole === 'viewer';
-      refreshToolbar();
-      documentFormatting.refresh();
-      if (accessRole !== 'viewer') { pending = 1; socket.send(Y.encodeStateAsUpdate(doc)); status('Saving…'); }
-      else status('Read-only · all changes saved');
+      connected = true; accessRole = message.role || 'teacher'; synchronizingReady = true;
+      review.connect(accessRole); review.receive(message.submission || submissionState); synchronizingReady = false;
+      if (editor.isEditable) { pending = 1; socket.send(Y.encodeStateAsUpdate(doc)); status('Saving…'); }
+      else { pending = 0; status(accessRole === 'student' ? 'Submitted · waiting for teacher feedback' : 'Read-only · all changes saved'); }
       await worksheet.receive(message);
     }
+    if (message.type === 'submission-state') review.receive(message.submission);
+    if (message.type === 'submission-locked') { pending = 0; review.receive(message.submission); status('Submitted · local unsent edits remain on this device'); toast('The submitted work is locked. Export your document if you need to keep edits made before the lock arrived.'); }
     if (message.type.startsWith('worksheet-')) await worksheet.receive(message);
     if (message.type === 'saved') { pending = Math.max(0, pending - 1); status(pending ? 'Saving…' : 'All changes saved'); }
     if (message.type === 'presence') $('presence').textContent = `${message.count} ${message.count === 1 ? 'person' : 'people'} connected`;
     if (message.type === 'error') { status(message.message); toast(message.message); stopped = true; socket.close(); }
   };
-  socket.onclose = event => { if (socket !== currentSocket) return; connected = false; worksheet.disconnected(); $('presence').textContent = 'Disconnected'; if ([1007,1008,1009].includes(event.code)) stopped = true; if (!stopped) { status('Disconnected — retrying; changes kept on this device'); retry = setTimeout(connect, 3000); } };
+  socket.onclose = event => { if (socket !== currentSocket) return; connected = false; worksheet.disconnected(); review.disconnect(); $('presence').textContent = 'Disconnected'; if ([1007,1008,1009].includes(event.code)) stopped = true; if (!stopped) { status('Disconnected — retrying; changes kept on this device'); retry = setTimeout(connect, 3000); } };
   socket.onerror = () => { if (socket === currentSocket) status('Cannot connect — check the server and editing link'); };
   $('mode').textContent = 'Shared document';
 }
 connect();
-window.addEventListener('offline', () => { connected = false; worksheet.disconnected(); socket?.close(); });
+window.addEventListener('offline', () => { connected = false; worksheet.disconnected(); review.disconnect(); socket?.close(); });
 window.addEventListener('online', () => { if (room && !connected && !stopped) { clearTimeout(retry); connect(); } });
 function refreshToolbar() {
-  document.querySelectorAll('[data-cmd]').forEach(button => { const command = button.dataset.cmd; const active = editor.isActive(command); button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); button.disabled = room && accessRole === 'viewer'; });
-  $('style').disabled = room && accessRole === 'viewer';
+  document.querySelectorAll('[data-cmd]').forEach(button => { const command = button.dataset.cmd; const active = editor.isActive(command); button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); button.disabled = !editor.isEditable; });
+  $('style').disabled = !editor.isEditable;
   $('style').value = editor.isActive('heading') ? String(editor.getAttributes('heading').level) : 'paragraph';
 }
 function refresh() {

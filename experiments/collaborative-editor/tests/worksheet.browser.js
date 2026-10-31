@@ -12,7 +12,7 @@ async function addText(page, message, x = 220, y = 170) {
   await page.locator('[data-tool=text]').click();
   await page.locator('.worksheet-overlay').first().click({ position: { x, y } });
   await page.locator('[data-ws=text-value] .tiptap').fill(message);
-  await page.getByRole('button', { name: 'Save text', exact: true }).click();
+  await page.locator('[data-ws=text-form] button[type=submit]').click();
   await until(async () => (await text(page)).includes(message));
 }
 async function stroke(page, tool, points) {
@@ -62,7 +62,7 @@ test('browser: import, annotation tools, roles, offline sync, zoom, export and e
     await textToolbar.locator('[data-text=align]').selectOption('center');
     await teacher.locator('[data-ws=box-width]').fill('260');
     if (process.env.TEST_TEXT_SCREENSHOT_PATH) await teacher.locator('[data-ws=text-dialog]').screenshot({ path: process.env.TEST_TEXT_SCREENSHOT_PATH });
-    await teacher.getByRole('button', { name: 'Save text', exact: true }).click();
+    await teacher.locator('[data-ws=text-form] button[type=submit]').click();
     await until(async () => !(await teacher.locator('[data-ws=text-dialog]').isVisible()));
     await teacher.locator('[data-tool=select]').click();
     await teacher.locator('.worksheet-overlay').first().click({ position: { x: 230, y: 180 } });

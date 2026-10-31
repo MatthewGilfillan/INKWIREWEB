@@ -10,7 +10,7 @@
     "deploy": "npm run build && wrangler deploy",
     "test": "node --test tests/*.test.js",
     "test:unit": "node --test tests/worksheet-model.test.js tests/rich-text.test.js",
-    "test:browser": "node --test tests/worksheet.browser.js"
+    "test:browser": "node --test tests/*.browser.js"
   },
   "dependencies": {
     "@tiptap/core": "^3.31.3",

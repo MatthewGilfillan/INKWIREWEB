@@ -27,10 +27,14 @@ The original source is preserved under `experiments/collaborative-editor/` on `c
 
 The PDF worksheet experiment now includes drawing/ink, free-positioned text and emoji, highlighting/shapes, lasso movement, erasing, teacher/student annotation layers, server-enforced capability roles, offline recovery and flattened PDF export. See `WORKSHEETS.md`. These features remain isolated from production notebook pages and verified classroom accounts.
 
-Threaded teacher comments, reusable feedback snippets, image and table workflows in rich-text documents, named collaborator cursors, revision history, DOCX import/export, and lifecycle controls still need development. Rich-text import remains plain text; its export remains HTML or browser print/PDF. Worksheet editable-copy import/export is separate.
+Threaded teacher comments, reusable feedback snippets, image and table workflows in rich-text documents, named collaborator cursors, revision history, DOCX import/export, and lifecycle controls still need development. Pasting now supports a safe subset of rich-text formatting; file import remains plain text; its export remains HTML or browser print/PDF. Worksheet editable-copy import/export is separate.
 
 The starter permits 30 connections per document and a 1 MiB encoded Yjs state. It writes a full snapshot for each update. Review these limits and storage behavior before expanding usage.
 
 Worksheet PDFs and annotation records are stored outside that Yjs state. The worksheet limits and permission model are documented in `WORKSHEETS.md`; capability roles do not replace the account/class/learner authorization requirements above.
 
 AI-generated unit plans, quizzes, summaries, and feedback are separate future integrations. This snapshot makes no OpenAI calls.
+
+## Submission experiment update
+
+The standalone editor now has submit/return/resubmit, private general feedback drafts and optional deadlines with late submission labels. This does not connect notebook capabilities to verified classroom accounts or generated course lessons. Submitted text and annotation snapshots are retained server-side, but there is no history browser or archive of replaced PDF bytes. Connect assignment identity, class membership and deadlines before surfacing this workflow in authenticated student dashboards.

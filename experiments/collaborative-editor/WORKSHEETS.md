@@ -36,7 +36,7 @@ These are bearer links, not account invitations. They do not identify an individ
 - The server persists an accepted operation before acknowledging it. Other connected browsers receive the accepted record.
 - A browser-local IndexedDB database stores the PDF, annotations, and queued operations. Shared caches are scoped to the document and a hash of its capability. Raw capability keys are not saved in this cache. The browser retains recovery data until site data is cleared.
 - Offline edits are queued before transmission and replayed after reconnecting. The UI reports unsent changes. Reloading the app itself while completely offline requires it to be available in the browser cache; there is no service worker or offline app-shell guarantee.
-- Limits: 15 MiB/PDF, 100 pages, 4,000 annotation records including tombstones, 2 MiB encoded annotation records, 2,048 points/stroke, 2,000 characters/text box, 30 connected browsers/document. The original rich-text state limit remains 1 MiB. The latest 2,000 operation receipts are retained.
+- Limits: 15 MiB/PDF, 100 pages, 4,000 annotation records including tombstones, 2 MiB encoded annotation records, 2,048 points/stroke, 20,000 characters/text box, 30 connected browsers/document. The original rich-text state limit remains 1 MiB. The latest 2,000 operation receipts are retained.
 - Offscreen pages release their canvas buffers and render when near the viewport. Each active canvas is capped at four million pixels. PDF.js, its worker, fonts, CMaps and WASM assets are bundled locally; no PDF upload to a third-party renderer is needed.
 
 ## Validation
@@ -79,3 +79,13 @@ Text tests also cover mixed formatting within one text box, resizing via its han
 - `scripts/pdf-assets.mjs`: copies PDF.js support assets before dev/build.
 
 This is an original browser implementation using PDF.js and pdf-lib. No OneNote source code or bundled assets are included.
+
+## Paste, submission and feedback
+
+Paste with Cmd/Ctrl+V into the document or a text box. Pasting onto a focused PDF page stages a text box for review. The Paste controls preserve supported text formatting; Paste without formatting inserts plain text. If clipboard reading is blocked, a keyboard-paste field is offered. Basic lists, fonts, colours, emphasis and alignment are supported; scripts, remote images and embedded objects are removed. Tables are flattened into text, not imported as editable tables.
+
+**Add to worksheet** and **Update text** save draft annotations. **Submit work** hands in the entire document and worksheet, records the server submission time, stores a separate text/annotation snapshot and locks student edits. The teacher can save a private general feedback draft, then **Return feedback** to publish that comment and reopen student editing. Teacher ink/text annotations remain shared live; only the general feedback draft is private. Up to 20 submission attempts are retained, each with its time and late status.
+
+The teacher can set an optional homework deadline in Bangkok time (UTC+7). Late work is always accepted and labelled **Submitted late**, with a note that teacher feedback before class is not guaranteed. A submission exactly at the deadline is on time. Extending or clearing the deadline updates the current attempt’s late label without changing its submission time; earlier attempts retain their recorded status. This standalone notebook workflow is not yet connected to account-based classroom assignments.
+
+Server and browser suites also exercise submission locks, private feedback redaction, return/resubmission, deadlines, late acceptance, supported external paste, plain paste and denied-clipboard fallback.

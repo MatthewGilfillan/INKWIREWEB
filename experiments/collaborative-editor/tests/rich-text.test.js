@@ -26,7 +26,7 @@ test('rich text rejects executable styles, unsupported fonts and oversized input
   assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], fontFamily: 'url(https://example.com)' }] }], defaults), /Invalid font/);
   assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], color: 'red;position:fixed' }] }], defaults), /Invalid font/);
   assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], fontSize: Infinity }] }], defaults));
-  assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], text: 'x'.repeat(2001) }] }], defaults), /2,000/);
+  assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], text: 'x'.repeat(20001) }] }], defaults), /20,000/);
   assert.throws(() => validateRichText([{ ...blocks[0], runs: [{ ...runs[0], bold: 'false' }] }], defaults));
   const safe = validateRichText([{ ...blocks[0], onclick: 'unsafe', runs: [{ ...runs[0], html: '<script>bad</script>' }] }], defaults);
   assert.equal(safe[0].onclick, undefined); assert.equal(safe[0].runs[0].html, undefined);

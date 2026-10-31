@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { submittedLate } from '../worker/submission.js';
+const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:8787';
+const digest = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(x => x.toString(16).padStart(2, '0')).join('');
+test('deadline comparison includes the deadline itself and never labels work late without a deadline', () => {
+  const due = '2027-01-01T12:00:00.000Z';
+  assert.equal(submittedLate(due, due), false);
+  assert.equal(submittedLate('2027-01-01T12:00:00.001Z', due), true);
+  assert.equal(submittedLate(due, null), false);
+});
+test('late homework is accepted, timestamped, retained per attempt, and corrected when a deadline is extended', async () => {
+  const creation = await fetch(base + '/api/documents', { method: 'POST', headers: { Authorization: `Bearer ${process.env.TEST_OWNER_KEY || 'local-development-test'}` } });
+  const { id, key } = await creation.json(), student = await digest(`${key}:student`), viewer = await digest(`${key}:viewer`);
+  const action = (access, input) => fetch(base + `/api/documents/${id}/submission`, { method: 'POST', headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: crypto.randomUUID(), ...input }) });
+  const dueAt = '2020-01-01T05:00:00.000Z';
+  assert.equal((await action(student, { action: 'set-deadline', revision: 0, dueAt })).status, 403);
+  assert.equal((await action(viewer, { action: 'set-deadline', revision: 0, dueAt })).status, 403);
+  assert.equal((await action(key, { action: 'set-deadline', revision: 0, dueAt: 'invalid' })).status, 400);
+  assert.equal((await action(key, { action: 'set-deadline', revision: 0, dueAt })).status, 200);
+  const first = await (await action(student, { action: 'submit', revision: 1 })).json();
+  assert.equal(first.status, 'submitted'); assert.equal(first.isLate, true); assert.equal(first.attempts.length, 1);
+  assert.equal(first.attempts[0].submittedAt, first.submittedAt);
+  const returned = await (await action(key, { action: 'return', revision: 2, feedback: 'Please revise.' })).json();
+  assert.equal(returned.status, 'returned');
+  const second = await (await action(student, { action: 'submit', revision: 3 })).json();
+  assert.equal(second.isLate, true); assert.equal(second.attempt, 2); assert.equal(second.attempts.length, 2);
+  const extended = await (await action(key, { action: 'set-deadline', revision: 4, dueAt: '2099-01-01T05:00:00.000Z' })).json();
+  assert.equal(extended.isLate, false); assert.equal(extended.submittedAt, second.submittedAt);
+  assert.equal(extended.attempts[0].isLate, true); assert.equal(extended.attempts[1].isLate, false);
+  const cleared = await (await action(key, { action: 'set-deadline', revision: 5, dueAt: null })).json();
+  assert.equal(cleared.dueAt, null); assert.equal(cleared.isLate, false);
+});

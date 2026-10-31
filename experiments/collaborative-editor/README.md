@@ -4,6 +4,8 @@ A portable starter using Tiptap, Yjs, a Cloudflare Worker and one SQLite-backed 
 
 Included: rich text, headings, lists, links, quotes, undo/redo, live shared editing, connected-user count, durable server saving, browser offline recovery, editing links, iframe embedding, plain-text import, HTML export and browser print/PDF.
 
+Shared notebooks also support student submission, private general feedback drafts, teacher return/resubmission, optional deadlines with late acceptance, and supported rich-text or plain-text paste. These are capability-based experiment workflows, not authenticated classroom assignments.
+
 The **PDF worksheet** tab now supports locked PDF pages, free-positioned text and emoji, pressure-aware pen strokes, highlighting, arrows and shapes, lasso selection/movement, whole-stroke erasing, local undo/redo, separate teacher/student layers, role-enforced sharing, offline annotation recovery, flattened PDF export and editable worksheet copies. See [WORKSHEETS.md](WORKSHEETS.md) for the workflow, tests and integration limits.
 
 ## Run locally

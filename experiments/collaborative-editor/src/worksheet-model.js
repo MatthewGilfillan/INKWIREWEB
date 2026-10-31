@@ -28,7 +28,7 @@ export function validateAnnotation(value, file) {
   });
   const result = { kind: value.kind, page: value.page, color: value.color.toLowerCase(), width: value.width, points };
   if (value.kind === 'text') {
-    if (points.length !== 1 || typeof value.text !== 'string' || !value.text.trim() || value.text.length > 2000
+    if (points.length !== 1 || typeof value.text !== 'string' || !value.text.trim() || value.text.length > 20000
       || !finite(value.fontSize, 8, 96) || !finite(value.boxWidth, 30, 1000)) throw Error('Invalid text box.');
     Object.assign(result, { text: value.text, fontSize: value.fontSize, boxWidth: Math.min(value.boxWidth, 1000 - points[0][0]) });
     if (value.fontFamily !== undefined) {

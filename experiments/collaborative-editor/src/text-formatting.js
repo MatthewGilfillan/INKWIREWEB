@@ -2,12 +2,13 @@ import { TextStyleKit } from '@tiptap/extension-text-style';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import { FONT_FAMILIES } from './rich-text.js';
+import { ClipboardSupport, pasteFromClipboard } from './clipboard.js';
 
-export const formattingExtensions = () => [TextStyleKit, TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right'] }), Highlight.configure({ multicolor: true })];
+export const formattingExtensions = () => [TextStyleKit, TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right'] }), Highlight.configure({ multicolor: true }), ClipboardSupport];
 
 export function mountTextFormatting(root, editor, { full = false, defaultSize = 17, defaultFont = 'Arial', defaultColor = '#233e36' } = {}) {
   root.classList.add('text-formatting'); root.setAttribute('role', 'toolbar'); root.setAttribute('aria-label', 'Text formatting');
-  root.innerHTML = `<label>Font <select data-text="font">${FONT_FAMILIES.map(font => `<option>${font}</option>`).join('')}</select></label>
+  root.innerHTML = `<button type="button" data-text="paste" title="Paste from another window or document">Paste</button><label><input data-text="plain-paste" type="checkbox"> Paste without formatting</label><label>Font <select data-text="font">${FONT_FAMILIES.map(font => `<option>${font}</option>`).join('')}</select></label>
     <label>Size <input data-text="size" aria-label="Font size" type="number" min="8" max="96" step="1" value="${defaultSize}"></label>
     ${full ? '<button type="button" data-text="bold" aria-label="Bold"><b>B</b></button><button type="button" data-text="italic" aria-label="Italic"><i>I</i></button><button type="button" data-text="underline" aria-label="Underline"><u>U</u></button><button type="button" data-text="strike" aria-label="Strikethrough"><s>S</s></button>' : ''}
     <label>Text colour <input data-text="color" type="color" value="${defaultColor}"></label>
@@ -18,6 +19,9 @@ export function mountTextFormatting(root, editor, { full = false, defaultSize = 
     <button type="button" data-text="clear">Clear formatting</button>`;
   const $ = name => root.querySelector(`[data-text="${name}"]`);
   const apply = command => { if (editor.isEditable) command(editor.chain().focus()).run(); };
+  $('paste').onmousedown = event => event.preventDefault();
+  $('paste').onclick = () => pasteFromClipboard(editor);
+  $('plain-paste').onchange = () => { editor.storage.inkwireClipboard.plain = $('plain-paste').checked; };
   $('font').onchange = () => apply(chain => chain.setFontFamily($('font').value));
   $('font').value = defaultFont;
   $('size').onchange = () => {

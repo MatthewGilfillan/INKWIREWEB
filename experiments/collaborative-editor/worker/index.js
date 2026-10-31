@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import * as Y from 'yjs';
 import { WorksheetStore } from './worksheet.js';
 import { MAX_PDF_BYTES } from '../src/worksheet-model.js';
+import { SubmissionStore } from './submission.js';
 const MAX_BYTES = 1024 * 1024;
 const json = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 async function digest(value) {
@@ -22,10 +23,10 @@ export default {
       if (!response.ok) return json({ error: 'Could not create document.' }, 500);
       return json({ id, key }, 201);
     }
-    const match = url.pathname.match(/^\/api\/documents\/([0-9a-f-]{36})\/(connect|pdf)$/);
+    const match = url.pathname.match(/^\/api\/documents\/([0-9a-f-]{36})\/(connect|pdf|submission)$/);
     if (match) {
       const target = env.DOCUMENTS.get(env.DOCUMENTS.idFromName(match[1]));
-      if (match[2] === 'pdf' && request.method === 'PUT' && request.body) {
+      if (((match[2] === 'pdf' && request.method === 'PUT') || (match[2] === 'submission' && request.method === 'POST')) && request.body) {
         // Buffer a bounded upload before crossing the Durable Object boundary.
         // An early authorization rejection must not leave an in-flight proxy
         // reading the incoming request after the response has been returned.
@@ -33,7 +34,8 @@ export default {
         while (true) {
           const { done, value } = await reader.read(); if (done) break;
           length += value.byteLength;
-          if (length > MAX_PDF_BYTES) { await reader.cancel(); return json({ error: 'Choose a PDF smaller than 15 MB.' }, 413); }
+          const limit = match[2] === 'pdf' ? MAX_PDF_BYTES : 32768;
+          if (length > limit) { await reader.cancel(); return json({ error: match[2] === 'pdf' ? 'Choose a PDF smaller than 15 MB.' : 'The feedback request is too large.' }, 413); }
           chunks.push(value);
         }
         const body = new Uint8Array(length); let offset = 0;
@@ -50,7 +52,8 @@ export class DocumentRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.ctx = ctx;
-    this.worksheet = new WorksheetStore(ctx);
+    this.submission = new SubmissionStore(ctx);
+    this.worksheet = new WorksheetStore(ctx, this.submission);
     ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS document (id INTEGER PRIMARY KEY CHECK(id=1), key_hash TEXT NOT NULL, state BLOB)');
   }
   row() { return this.ctx.storage.sql.exec('SELECT * FROM document WHERE id=1').toArray()[0]; }
@@ -69,7 +72,8 @@ export class DocumentRoom extends DurableObject {
     if (!row) return new Response('Not found', { status: 404 });
     const protocols = (request.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(x => x.trim());
     const isPdf = new URL(request.url).pathname.endsWith('/pdf');
-    const key = isPdf ? (request.headers.get('Authorization') || '').replace(/^Bearer /, '') : protocols.find(x => /^[a-f0-9]{64}$/.test(x)) || '';
+    const isSubmission = new URL(request.url).pathname.endsWith('/submission');
+    const key = isPdf || isSubmission ? (request.headers.get('Authorization') || '').replace(/^Bearer /, '') : protocols.find(x => /^[a-f0-9]{64}$/.test(x)) || '';
     const keyHash = await digest(key);
     const role = this.worksheet.role(keyHash, row.key_hash);
     if (!role) {
@@ -78,6 +82,7 @@ export class DocumentRoom extends DurableObject {
     }
     if (role === 'teacher') await this.worksheet.setupAccess(key, digest);
     if (isPdf) return this.worksheet.pdf(request, role);
+    if (isSubmission) return this.submission.request(request, role, () => this.row().state, () => this.worksheet.state());
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('WebSocket required', { status: 426 });
     if (this.ctx.getWebSockets().length >= 30) return new Response('Room full', { status: 429 });
     const [client, server] = Object.values(new WebSocketPair());
@@ -85,14 +90,14 @@ export class DocumentRoom extends DurableObject {
     server.serializeAttachment({ role });
     server.send(row.state);
     server.send(JSON.stringify({ type: 'worksheet-state', ...this.worksheet.state() }));
-    server.send(JSON.stringify({ type: 'ready', role }));
+    server.send(JSON.stringify({ type: 'ready', role, submission: this.submission.forRole(role) }));
     this.presence();
     return new Response(null, { status: 101, webSocket: client, headers: { 'Sec-WebSocket-Protocol': 'folio' } });
   }
   webSocketMessage(socket, message) {
     const role = socket.deserializeAttachment()?.role || 'viewer';
     if (typeof message === 'string') {
-      if (new TextEncoder().encode(message).byteLength > 180000) { socket.close(1009, 'Annotation update is too large'); return; }
+      if (new TextEncoder().encode(message).byteLength > 524288) { socket.close(1009, 'Annotation update is too large'); return; }
       try {
         const input = JSON.parse(message);
         if (input.type !== 'worksheet-op') throw Error();
@@ -101,6 +106,7 @@ export class DocumentRoom extends DurableObject {
       return;
     }
     if (role === 'viewer') { socket.close(1008, 'This link is read-only'); return; }
+    if (!this.submission.canEdit(role)) { socket.send(JSON.stringify({ type: 'submission-locked', message: 'Your work is submitted. You can edit again when the teacher returns it.', submission: this.submission.forRole(role) })); return; }
     if (message.byteLength > MAX_BYTES) { socket.close(1009, 'Document update is too large'); return; }
     const doc = new Y.Doc();
     try {

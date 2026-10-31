@@ -1,8 +1,9 @@
 import { applyOperation, validateFile, MAX_PDF_BYTES } from '../src/worksheet-model.js';
 
 export class WorksheetStore {
-  constructor(ctx) {
+  constructor(ctx, submission) {
     this.ctx = ctx;
+    this.submission = submission;
     this.sql = ctx.storage.sql;
     this.sql.exec('CREATE TABLE IF NOT EXISTS worksheet (id INTEGER PRIMARY KEY CHECK(id=1), file TEXT NOT NULL, records TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS worksheet_pdf (part INTEGER PRIMARY KEY, data BLOB NOT NULL)');
@@ -44,6 +45,7 @@ export class WorksheetStore {
     }
     if (request.method !== 'PUT') return reply('Method not allowed.', 405);
     if (role !== 'teacher') return reply('Only the teacher link can import or replace a PDF.', 403);
+    if (this.submission.state().status === 'submitted') return reply('Return the student’s work before replacing the worksheet.', 409);
     if (request.headers.get('Content-Type') !== 'application/pdf') return reply('Choose a PDF file.', 415);
     let file;
     try { file = validateFile(JSON.parse(decodeURIComponent(request.headers.get('X-Worksheet-Metadata') || ''))); }
@@ -84,6 +86,7 @@ export class WorksheetStore {
         return;
       }
       const state = this.state();
+      if (role === 'student' && !this.submission.canEdit(role)) throw Error('Your work is submitted. You can edit again when the teacher returns it.');
       const record = applyOperation(state, input, role);
       result = { type: 'worksheet-result', opId: input.opId, pdfId: state.file.id, record };
       const response = JSON.stringify(result);

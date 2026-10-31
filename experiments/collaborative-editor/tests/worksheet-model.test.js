@@ -37,7 +37,7 @@ test('invalid geometry, unsafe fields, oversized text and invalid pages are reje
   assert.throws(() => validateFile({ ...file, pages: [{ width: 10, height: 10000 }] }));
   const text = { ...ink, kind: 'text', points: [[100, 100, .5]], text: 'Well done! ⭐', fontSize: 20, boxWidth: 320 };
   assert.equal(validateAnnotation(text, file).text, text.text);
-  assert.throws(() => validateAnnotation({ ...text, text: 'a'.repeat(2001) }, file));
+  assert.throws(() => validateAnnotation({ ...text, text: 'a'.repeat(20001) }, file));
   assert.throws(() => validateAnnotation({ ...text, points: [[995, 100, .5]] }, file));
 });
 

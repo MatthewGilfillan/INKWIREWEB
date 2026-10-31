@@ -3,7 +3,7 @@
 export const FONT_FAMILIES = ['Arial', 'Georgia', 'Verdana', 'Trebuchet MS', 'Times New Roman', 'Courier New'];
 const color = value => /^#[0-9a-f]{6}$/i.test(value);
 export function validateRichText(blocks, defaults) {
-  if (!Array.isArray(blocks) || !blocks.length || blocks.length > 100) throw Error('Text has too many paragraphs.');
+  if (!Array.isArray(blocks) || !blocks.length || blocks.length > 500) throw Error('Text has too many paragraphs.');
   let characters = 0, runs = 0;
   const result = blocks.map(block => {
     if (!block || !['left', 'center', 'right'].includes(block.align) || !Number.isInteger(block.indent) || block.indent < 0 || block.indent > 3
@@ -31,7 +31,7 @@ export function validateRichText(blocks, defaults) {
     }, []);
     return output;
   });
-  if (characters + result.length - 1 > 2000 || runs > 500) throw Error('Keep text boxes within 2,000 characters and 500 formatting runs.');
+  if (characters + result.length - 1 > 20000 || runs > 500) throw Error('Keep text boxes within 20,000 characters and 500 formatting runs.');
   return result;
 }
 

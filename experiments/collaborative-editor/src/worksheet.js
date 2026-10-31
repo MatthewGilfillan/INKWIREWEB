@@ -7,6 +7,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { formattingExtensions, mountTextFormatting } from './text-formatting.js';
 import { FONT_FAMILIES, jsonFromRich, richFromJSON, plainRichText } from './rich-text.js';
+import { cleanPastedHTML, insertPlainText, pasteFromClipboard } from './clipboard.js';
 
 const toolNames = { hand: 'Scroll', select: 'Select / move', text: 'Type', pen: 'Pen', marker: 'Highlight', eraser: 'Erase stroke', lasso: 'Lasso', arrow: 'Arrow', rectangle: 'Rectangle', ellipse: 'Ellipse' };
 const clone = value => structuredClone(value);
@@ -41,6 +42,9 @@ export class Worksheet {
       root.querySelector('.worksheet-tools').append(button);
     }
     this.$('import').onclick = () => this.$('file').click();
+    const pasteButton = document.createElement('button'); pasteButton.textContent = 'Paste text onto page'; pasteButton.dataset.ws = 'paste';
+    this.root.querySelector('.worksheet-actions').prepend(pasteButton);
+    pasteButton.onclick = async () => { if (!this.editable()) return; this.editText(null, this.newTextValue()); await pasteFromClipboard(this.richEditor); };
     this.$('file').onchange = async () => { const file = this.$('file').files[0]; this.$('file').value = ''; if (file) await this.importPDF(file); };
     this.$('export').onclick = () => this.exportPDF();
     this.$('backup').onclick = () => this.backup();
@@ -64,7 +68,7 @@ export class Worksheet {
     try {
       this.cache = await openWorksheetCache(`${this.room || 'local'}:${this.key || 'local'}`);
       const cached = await this.cache.read();
-      Object.assign(this, { file: cached.file || null, records: cached.records || {}, pending: cached.pending || [], role: cached.role || this.role, recovery: cached.recovery });
+      Object.assign(this, { file: cached.file || null, records: cached.records || {}, pending: cached.pending || [], role: cached.role || this.role, recovery: cached.recovery, submission: cached.submission || this.submission });
       if (cached.cachedPdf && this.file && cached.cachedPdf.id === this.file.id) this.bytes = cached.cachedPdf.bytes;
       if (this.file && this.bytes) await this.openPDF(this.bytes);
     } catch (error) { this.storageError = true; this.toast(`Local recovery is unavailable: ${error.message}`); }
@@ -72,7 +76,7 @@ export class Worksheet {
   }
   persist(pdf) {
     this.saving = (this.saving || 0) + 1;
-    const value = clone({ file: this.file, records: this.records, pending: this.pending, role: this.role, recovery: this.recovery });
+    const value = clone({ file: this.file, records: this.records, pending: this.pending, role: this.role, recovery: this.recovery, submission: this.submission });
     this.saveChain = this.saveChain.then(() => this.cache.write(value, pdf)).catch(error => {
       this.storageError = true; this.toast(`Could not save on this device. Export your work: ${error.message}`); this.update();
     }).finally(() => { this.saving--; });
@@ -87,16 +91,18 @@ export class Worksheet {
     };
     return records;
   }
-  editable() { return this.initialized && !this.storageError && ['teacher', 'student'].includes(this.role) && !!this.file && !this.busy; }
+  setSubmission(state, busy = false) { this.submission = state; this.submitting = busy; this.update(); if (this.cache) this.persist(); }
+  editable() { return this.initialized && !this.storageError && ['teacher', 'student'].includes(this.role) && !!this.file && !this.busy && !(this.role === 'student' && (this.submission?.status === 'submitted' || this.submitting)); }
   own(record) { return record?.value && record.layer === this.role && this.visible.has(record.layer); }
   update() {
     const editable = this.editable();
+    this.$('paste').disabled = !editable;
     for (const button of this.root.querySelectorAll('[data-tool]')) {
       button.disabled = button.dataset.tool !== 'hand' && !editable;
       button.setAttribute('aria-pressed', String(button.dataset.tool === this.tool));
     }
     this.$('role').textContent = ({ teacher: 'Teacher · feedback layer', student: 'Student · answer layer', viewer: 'Read-only view' })[this.role];
-    this.$('import').disabled = !this.initialized || this.role !== 'teacher' || this.busy || this.storageError || (!!this.room && !this.online);
+    this.$('import').disabled = !this.initialized || this.role !== 'teacher' || this.busy || this.storageError || (!!this.room && (!this.online || this.submission?.status === 'submitted'));
     this.$('restore').disabled = !this.initialized || !!this.room || !!this.busy || !!this.storageError;
     this.$('restore').title = this.room ? 'Open editable copies in a local draft.' : 'Restore a PDF and its editable annotation layers.';
     this.$('export').disabled = !this.pdf || !!this.busy;
@@ -119,6 +125,7 @@ export class Worksheet {
   }
   async receive(message) {
     if (message.type === 'ready') {
+      this.submission = message.submission || this.submission;
       this.role = message.role || 'teacher'; this.online = true; this.inFlight = null;
       if (this.role === 'viewer' && this.pending.length) { this.recovery = { file: this.file, records: this.overlay() }; this.pending = []; }
       await this.persist(); this.flush(); this.update();
@@ -141,6 +148,7 @@ export class Worksheet {
       if (message.pdfId !== this.file?.id) { this.inFlight = null; return; }
       const operation = this.pending.find(op => op.opId === message.opId);
       if (!operation) return;
+      if (message.error) this.recovery = { file: this.file, records: this.overlay() };
       if (message.record) this.acceptRecord(message.record);
       this.pending = this.pending.filter(op => op.opId !== message.opId && (!message.error || op.id !== operation.id));
       if (message.error) { this.history = []; this.redo = []; this.toast(message.error); }
@@ -218,6 +226,14 @@ export class Worksheet {
       overlay.onpointermove = event => this.pointerMove(event, page);
       overlay.onpointerup = event => this.pointerUp(event, page);
       overlay.onpointercancel = () => { this.gesture = null; this.draw(page); };
+      overlay.onpaste = event => {
+        if (!this.editable()) return;
+        event.preventDefault();
+        const html = event.clipboardData?.getData('text/html'), text = event.clipboardData?.getData('text/plain');
+        this.editText(null, this.newTextValue(page.index));
+        if (html && !event.shiftKey) this.richEditor.commands.setContent(cleanPastedHTML(html));
+        else if (text) insertPlainText(this.richEditor, text);
+      };
       overlay.ondblclick = event => { if (!this.editable()) return; const record = this.hit(this.point(event, page), index); if (this.own(record) && record.value.kind === 'text') this.editText(record.id, record.value); };
       const option = document.createElement('option'); option.value = index; option.textContent = index + 1; this.$('page').append(option);
       this.observer.observe(element);
@@ -296,6 +312,7 @@ export class Worksheet {
   }
   hit(point, index) { return this.pageRecords(index).reverse().find(record => this.own(record) && hitAnnotation(point, record.value, this.measureContext)); }
   pointerDown(event, page) {
+    this.pastePoint = { page: page.index, point: this.point(event, page) };
     if (!this.editable() || this.tool === 'hand' || event.button !== 0 || (event.pointerType === 'touch' && !this.$('finger').checked) || this.gesture) return;
     event.preventDefault(); page.overlay.focus({ preventScroll: true }); this.activePage = page.index; this.$('page').value = page.index;
     const point = this.point(event, page), hit = this.hit(point, page.index);
@@ -352,18 +369,20 @@ export class Worksheet {
   editText(id, value) {
     if (!this.editable()) return;
     const dialog = this.$('text-dialog'), pdfId = this.file.id;
+    this.$('text-form').querySelector('button[type=submit]').textContent = id ? 'Update text' : 'Add to worksheet';
     this.richEditor?.destroy(); this.$('text-value').replaceChildren();
     this.richEditor = new Editor({ element: this.$('text-value'), extensions: [StarterKit.configure({ link: false, code: false, codeBlock: false, horizontalRule: false, blockquote: false }), ...formattingExtensions()],
       content: jsonFromRich(value), editorProps: { attributes: { class: 'worksheet-rich-editor', role: 'textbox', 'aria-label': 'Worksheet text', 'aria-multiline': 'true' } },
-      onUpdate: ({ editor }) => { this.$('text-count').textContent = `${editor.getText().length} / 2,000 characters`; } });
+      onUpdate: ({ editor }) => { this.$('text-count').textContent = `${editor.getText().length} / 20,000 characters`; } });
     const formatting = mountTextFormatting(this.$('text-toolbar'), this.richEditor, { full: true, defaultSize: value.fontSize, defaultFont: value.fontFamily || 'Arial', defaultColor: value.color });
     this.$('box-width').value = Math.round(value.boxWidth); this.$('box-width').max = Math.floor(1000 - value.points[0][0]);
-    this.$('text-count').textContent = `${value.text.length} / 2,000 characters`;
+    this.$('text-count').textContent = `${value.text.length} / 20,000 characters · Paste with ⌘V / Ctrl+V. Use the plain-text option to discard source formatting.`;
     dialog.onclose = () => { formatting.destroy(); this.richEditor?.destroy(); this.richEditor = null; };
     this.$('text-form').onsubmit = async event => {
       event.preventDefault();
       try {
         if (this.file?.id !== pdfId) throw Error('The PDF changed. Copy your text before reopening the new worksheet.');
+        if (!this.editable()) throw Error('This work is now submitted. Copy your text before closing; the teacher must return the work before you can change it.');
         const rich = richFromJSON(this.richEditor.getJSON(), value), text = plainRichText(rich);
         if (!text.trim()) throw Error('Write something in the text box.');
         const first = rich.flatMap(block => block.runs).find(run => run.text), boxWidth = Number(this.$('box-width').value);
@@ -373,6 +392,11 @@ export class Worksheet {
     };
     this.$('text-cancel').onclick = () => dialog.close(); dialog.showModal(); this.richEditor.commands.focus('end');
     if (!value.text) this.richEditor.chain().setFontFamily(value.fontFamily || 'Arial').setFontSize(`${value.fontSize}px`).setColor(value.color).run();
+  }
+  newTextValue(pageIndex = this.pastePoint?.page ?? this.activePage) {
+    pageIndex = Math.max(0, Math.min(pageIndex, this.file.pages.length - 1));
+    const point = this.pastePoint?.page === pageIndex ? [...this.pastePoint.point] : [100, 100, .5]; point[0] = Math.min(970, point[0]);
+    return { kind: 'text', page: pageIndex, points: [point], text: '', fontFamily: this.$('family').value, fontSize: Math.max(8, Math.min(96, Number(this.$('font').value) || 20)), boxWidth: Math.min(Number(this.$('text-width').value), 1000 - point[0]), width: 2, color: this.$('color').value };
   }
   keydown(event) {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) || this.root.querySelector('dialog[open]')) return;
