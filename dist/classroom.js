@@ -2,10 +2,10 @@
 const CLASSROOM_STUDENTS = ['Alex Lee', 'Jamie Chen', 'Sam Rivera'];
 const timelineExpanded = new Set();
 function courseHeading(title, subtitle) {
-  return '<div class="course-heading"><div><h1>'+title+'</h1><p>'+subtitle+'</p></div><span class="course-meta">Beijing / Shanghai · UTC+8</span></div>';
+  return '<div class="course-heading"><div><h1>'+title+'</h1><p>'+subtitle+'</p></div>'+(role==='student'?dashboardTimezone('student-timezone',studentTimezone):'<span class="course-meta">Beijing / Shanghai · UTC+8</span>')+'</div>';
 }
 function courseDate(n, long=false) {
-  return new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Shanghai',month:long?'long':'short',day:'numeric'}).format(familySampleDate(n));
+  return new Intl.DateTimeFormat('en-US',{timeZone:courseTimezone(),month:long?'long':'short',day:'numeric'}).format(familySampleDate(n));
 }
 function courseTopic(n) {
   if(n<=2)return 'An Inspector Calls — Act II';
@@ -39,7 +39,7 @@ function teacherDashboard() {
   const next=courseNextLesson(),p=plan(next),reviewed=Array.from({length:24},(_,i)=>courseRecords(i+1,'teacher')).filter(r=>r.length).length;
   return courseHeading('Active classes','1 class · Autumn semester')+
     '<p class="course-demo">Demo · Fictional students and sample dates. Changes save in this browser.</p>'+
-    '<details class="active-class"><summary><span class="class-icon" aria-hidden="true">▤</span><span class="class-summary"><strong>Literature & the World</strong><span>An Inspector Calls → Lord of the Flies</span><small>3 demo students · 12 weeks · 24 lessons</small></span><span class="class-next"><small>Next scheduled lesson</small><b>'+courseDate(next,true)+' · 6:00 PM</b><span>'+esc(p.title)+'</span></span><span class="disclosure-icon" aria-hidden="true">+</span></summary><div class="active-class-body"><div class="class-overview"><div><span class="eyebrow">NEXT LESSON</span><h2>'+courseTopic(next)+'</h2><p>'+esc(p.title)+'</p></div><a href="#timeline" class="btn">Open course timeline →</a></div><div class="class-actions">'+courseAction(next,'notebook','Open notebook')+courseAction(next,'assessment','Post-lesson assessment')+'<span>'+reviewed+' of 24 lessons have feedback</span></div><details class="course-disclosure"><summary>Students <span>3 enrolled</span></summary><div class="class-roster">'+CLASSROOM_STUDENTS.map(name=>'<div><span><b>'+esc(name)+'</b><small>Demo student</small></span>'+courseAction(next,'assessment','View assessment',name,'link text-button')+'</div>').join('')+'</div></details></div></details>'+
+    '<details class="active-class"><summary><span class="class-icon" aria-hidden="true">▤</span><span class="class-summary"><strong>Literature & the World</strong><span>An Inspector Calls → Lord of the Flies</span><small>3 demo students · 12 weeks · 24 lessons</small></span><span class="class-next"><small>Next scheduled lesson</small><b>'+courseDate(next,true)+' · '+courseTime(next)+'</b><span>'+esc(p.title)+'</span></span><span class="disclosure-icon" aria-hidden="true">+</span></summary><div class="active-class-body"><div class="class-overview"><div><span class="eyebrow">NEXT LESSON</span><h2>'+courseTopic(next)+'</h2><p>'+esc(p.title)+'</p></div><a href="#timeline" class="btn">Open course timeline →</a></div><div class="class-actions">'+courseAction(next,'notebook','Open notebook')+courseAction(next,'assessment','Post-lesson assessment')+'<span>'+reviewed+' of 24 lessons have feedback</span></div><details class="course-disclosure"><summary>Students <span>3 enrolled</span></summary><div class="class-roster">'+CLASSROOM_STUDENTS.map(name=>'<div><span><b>'+esc(name)+'</b><small>Demo student</small></span>'+courseAction(next,'assessment','View assessment',name,'link text-button')+'</div>').join('')+'</div></details></div></details>'+
     '<div class="teacher-shortcuts"><a href="#timeline"><b>Course timeline</b><span>Weeks, lesson details and assignments →</span></a><a href="#assessment"><b>Post-lesson assessments</b><span>Attendance, homework and feedback →</span></a></div>';
 }
 function coursePreparation(n, name, view) {
@@ -61,7 +61,7 @@ function courseSummary(n,view) {
 }
 function courseLesson(n, view) {
   const p=plan(n),status=courseStatus(n,view),past=courseIsPast(n,view),zoom=courseZoomLink(p.zoom);
-  return '<article class="course-lesson '+(past?'is-past':'')+'"><div class="course-lesson-heading"><div><span class="eyebrow">LESSON '+((n-1)%2+1)+' · '+courseDate(n)+' · 6:00 PM</span><h3>'+esc(p.title)+'</h3></div><span class="course-status '+status+'">'+courseStatusLabel(status)+'</span></div>'+
+  return '<article class="course-lesson '+(past?'is-past':'')+'"><div class="course-lesson-heading"><div><span class="eyebrow">LESSON '+((n-1)%2+1)+' · '+courseDate(n)+' · '+courseTime(n)+'</span><h3>'+esc(p.title)+'</h3></div><span class="course-status '+status+'">'+courseStatusLabel(status)+'</span></div>'+
     (past?courseSummary(n,view):'')+
     (past?'<details class="course-disclosure"><summary>Lesson plan & resources</summary><div class="course-resource-body">':'<div class="course-resource-body">')+
     '<div class="course-resource-grid"><section><h3>Learning goals</h3><p>'+esc(p.goal)+'</p></section><section><h3>Reading before class</h3><p>'+esc(studentBefore(n))+'</p></section><section><h3>Assignments after class</h3><p>'+esc(p.reading)+'</p>'+(p.homework?'<p><b>Written homework:</b> '+esc(p.homework)+'</p>':'<p class="course-small">No written homework assigned.</p>')+'</section><section><h3>Preparation quiz</h3><p>'+(n===1?'Four reading questions and one reflection.':'No quiz assigned yet.')+'</p>'+(n===1 && view!=='parent'?courseAction(n,'quiz',view==='teacher'?'View preparation quiz':'Open preparation quiz'):'')+'</section></div><div class="course-lesson-actions"><div><h3>Zoom lesson</h3>'+(zoom?'<a class="btn light" href="'+esc(zoom)+'" target="_blank" rel="noopener noreferrer">Join Zoom ↗</a>':'<button class="btn secondary" disabled>Zoom link not set</button>')+'</div>'+(view!=='parent'?courseAction(n,'notebook','Open notebook →'):'')+'</div></div>'+(past?'</details>':'')+
@@ -91,3 +91,6 @@ function bindCourseEvents() {
     if(location.hash==='#'+route)render();else location.hash=route;
   }));
 }
+
+function courseTimezone() {return role==='parent'?parentTimezone:role==='student'?studentTimezone:'Asia/Shanghai';}
+function courseTime(n) {return new Intl.DateTimeFormat('en-US',{timeZone:courseTimezone(),hour:'numeric',minute:'2-digit'}).format(familySampleDate(n));}

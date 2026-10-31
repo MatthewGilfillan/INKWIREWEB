@@ -61,3 +61,9 @@ test('reviewed recaps are projected without private teacher notes',()=>{
  assert.equal(r[0].summary,'We explored responsibility.');
  assert.equal(r[0].private,undefined);
 });
+test('homework timing is projected only when explicitly recorded',()=>{
+ const records=context.familyRecords({'Alex Lee|1':{homework:'Complete'},'Alex Lee|2':{homework:'Partial',homeworkTiming:'Late',private:'Do not share'}});
+ assert.equal(records[0].homeworkTiming,'Late');
+ assert.equal(records[1].homeworkTiming,undefined);
+ assert.equal(records[0].private,undefined);
+});

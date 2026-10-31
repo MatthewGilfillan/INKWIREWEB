@@ -1,17 +1,18 @@
 // Parent-facing projections use an explicit field list. This is presentation filtering,
 // not access control: production roles and private notes must be enforced on a server.
-const FAMILY_FIELDS = ['attendance','homework','preparation','attitude','participation','focus','learning','summary','success','next'];
-const FAMILY_LABELS = {attendance:'Attendance',homework:'Homework',preparation:'Preparation',attitude:'Attitude',participation:'Participation',focus:'Effort & focus',learning:'Learning goals'};
+const FAMILY_FIELDS = ['attendance','homework','homeworkTiming','preparation','attitude','participation','focus','learning','summary','success','next'];
+const FAMILY_LABELS = {attendance:'Attendance',homework:'Homework',homeworkTiming:'Homework timing',preparation:'Preparation',attitude:'Attitude',participation:'Participation',focus:'Effort & focus',learning:'Learning goals'};
 const FAMILY_SAMPLE = {
   1:{attendance:'Present',homework:'Complete',preparation:'Ready',attitude:'Engaged',participation:'Contributes constructively',focus:'Sustained',learning:'Developing',success:'You noticed how Sheila’s response changes as she learns more about Gerald. You supported your interpretation with a well-chosen quotation.',next:'After each quotation, explain what the reader learns about the character.'},
   2:{attendance:'Present',homework:'Partial',preparation:'Partly ready',attitude:'Responds to encouragement',participation:'Contributes with prompting',focus:'Inconsistent',learning:'Developing',success:'You connected Mrs. Birling’s choices with the idea of responsibility and listened carefully to another interpretation.',next:'Finish the reading before class and mark two passages you want to discuss.'},
   3:{attendance:'Present',homework:'Complete',preparation:'Ready',attitude:'Engaged',participation:'Contributes constructively',focus:'Sustained',learning:'Developing',success:'Your paragraph used a clear point and relevant evidence to explain Eric’s responsibility.',next:'Develop the exploration: why might Priestley want his audience to question this behavior?'},
-  4:{attendance:'Present',homework:'Complete',preparation:'Ready',attitude:'Engaged',participation:'Contributes constructively',focus:'Sustained',learning:'Secure',success:'You explained how the Inspector’s language encourages a sense of shared responsibility. Your evidence and explanation worked together.',next:'Carry that precision into a comparison of Birling’s speech and the Inspector’s message.'}
+  4:{attendance:'Present',homework:'Complete',homeworkTiming:'On time',summary:'Alex explained how the Inspector’s language encourages shared responsibility, using a clear point and relevant evidence.',preparation:'Ready',attitude:'Engaged',participation:'Contributes constructively',focus:'Sustained',learning:'Secure',success:'You explained how the Inspector’s language encourages a sense of shared responsibility. Your evidence and explanation worked together.',next:'Carry that precision into a comparison of Birling’s speech and the Inspector’s message.'}
 };
 let parentSource = null;
 let parentWeek = 3;
 const FAMILY_TIMEZONES = {'Asia/Shanghai':'Beijing / Shanghai','Asia/Bangkok':'Bangkok','UTC':'UTC'};
 let parentTimezone = 'Asia/Shanghai';
+try { const savedZone=localStorage.getItem('inkwire-timezone'); if(FAMILY_TIMEZONES[savedZone])parentTimezone=savedZone; } catch {}
 let parentFeedbackWeek = 'all';
 let parentContactLesson = 0;
 let parentRead = {};
@@ -63,16 +64,16 @@ function familyModel() {
   return {records,metrics:familyMetrics(records),firstLesson:(parentWeek-1)*2+1,unread:records.filter(r=>!parentRead[familyReadKey(r,parentSource)]).length};
 }
 function familyChip(value) {
-  const positive = ['Present','Complete','Ready','Engaged','Contributes constructively','Sustained','Secure','Submitted'];
-  const support = ['Partial','Partly ready','Responds to encouragement','Contributes with prompting','Inconsistent','Developing','Needs support','Not submitted','Unprepared','Frequent redirection','Absent'];
+  const positive = ['Present','Complete','Ready','Engaged','Contributes constructively','Sustained','Secure','Submitted','On time'];
+  const support = ['Partial','Partly ready','Responds to encouragement','Contributes with prompting','Inconsistent','Developing','Needs support','Not submitted','Unprepared','Frequent redirection','Absent','Late'];
   const tone = positive.includes(value) ? 'good' : support.includes(value) ? 'support' : 'neutral';
   return '<span class="family-chip '+tone+'">'+esc(value || 'Not recorded')+'</span>';
 }
 function familyTop(title,description) {
   familyModel();
-  return '<div class="family-heading"><div><div class="eyebrow">PARENT PORTAL</div><h1>'+title+'</h1><p>'+description+'</p></div><div class="family-learner"><span class="avatar">AL</span><div><b>Alex Lee</b><small>Literature & the World</small></div></div></div>'+
-    '<div class="family-preview"><p><strong>Parent portal preview</strong> · Fictional learner. '+(parentSource==='sample'?'Sample journey and illustrative schedule.':'Reading, quizzes, and assessments saved in this browser.')+'</p><div class="family-controls"><label>View<select id="family-source"><option value="sample" '+(parentSource==='sample'?'selected':'')+'>Sample journey</option><option value="saved" '+(parentSource==='saved'?'selected':'')+'>Saved demo work</option></select></label><label>Time zone<select id="family-timezone">'+Object.entries(FAMILY_TIMEZONES).map(([zone,label])=>'<option value="'+zone+'" '+(zone===parentTimezone?'selected':'')+'>'+label+'</option>').join('')+'</select></label></div></div>';
+  return '<div class="family-heading"><div><h1>'+title+'</h1><p>Alex Lee · '+description+'</p></div>'+dashboardTimezone('family-timezone',parentTimezone)+'</div><div class="dashboard-demo"><span>Demo · Fictional learner · '+(parentSource==='sample'?'Illustrative records and dates':'Work saved in this browser')+'</span><details class="preview-options"><summary>Preview options</summary><label for="family-source">Show records from</label><select id="family-source"><option value="sample" '+(parentSource==='sample'?'selected':'')+'>Illustrative example</option><option value="saved" '+(parentSource==='saved'?'selected':'')+'>Work saved in this browser</option></select></details></div>';
 }
+
 function familyWeekSelect() {
   return '<label class="family-week-select">Week<select id="family-week">'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'" '+(parentWeek===i+1?'selected':'')+'>Week '+(i+1)+'</option>').join('')+'</select></label>';
 }
@@ -88,32 +89,34 @@ function familyReadButton(record) {
 }
 function familyReport(record, expanded=false) {
   const seen=!!parentRead[familyReadKey(record,parentSource)];
-  return '<details class="family-report card" '+(expanded?'open':'')+'><summary><div><span class="eyebrow">WEEK '+Math.ceil(record.lesson/2)+' · LESSON '+((record.lesson-1)%2+1)+'</span><h3>'+esc(plan(record.lesson).title)+'</h3></div><span class="family-report-status">'+(seen?'Read':'<span class="unread-dot"></span> New feedback')+'</span></summary><div class="family-report-body">'+(record.summary?'<div class="family-note"><span class="eyebrow">LESSON RECAP</span><p>'+esc(record.summary)+'</p></div>':'')+'<dl class="family-observations">'+Object.entries(FAMILY_LABELS).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+familyChip(record[key])+'</dd></div>').join('')+'</dl><div class="family-note success"><span class="eyebrow">A SUCCESS TO CELEBRATE</span><p>'+esc(record.success || 'Your teacher has not added a success note yet.')+'</p></div><div class="family-note next"><span class="eyebrow">ONE NEXT STEP</span><p>'+esc(record.next || 'Your teacher has not added a next step yet.')+'</p></div><div class="family-report-actions">'+familyReadButton(record)+'<button type="button" class="link text-button" data-family-contact="'+record.lesson+'">Ask Matthew about this lesson ↗</button></div></div></details>';
+  return '<details class="family-report card" '+(expanded?'open':'')+'><summary><div><span class="eyebrow">WEEK '+Math.ceil(record.lesson/2)+' · LESSON '+((record.lesson-1)%2+1)+'</span><h3>'+esc(plan(record.lesson).title)+'</h3></div><span class="family-report-status">'+(seen?'Read':'<span class="unread-dot"></span> New feedback')+'</span></summary><div class="family-report-body">'+(record.summary?'<div class="family-note"><span class="eyebrow">LESSON RECAP</span><p>'+esc(record.summary)+'</p></div>':'')+'<dl class="family-observations">'+Object.entries(FAMILY_LABELS).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+familyChip(record[key])+'</dd></div>').join('')+'</dl><div class="family-note success"><span class="eyebrow">SUCCESS</span><p>'+esc(record.success || 'Your teacher has not added a success note yet.')+'</p></div><div class="family-note next"><span class="eyebrow">NEXT STEP</span><p>'+esc(record.next || 'Your teacher has not added a next step yet.')+'</p></div><div class="family-report-actions">'+familyReadButton(record)+'<button type="button" class="link text-button" data-family-contact="'+record.lesson+'">Ask Matthew about this lesson ↗</button></div></div></details>';
 }
 function familyEmpty() {
-  return '<section class="card family-empty"><span aria-hidden="true">◎</span><h2>A fresh page.</h2><p>Feedback will appear here after a lesson review. You’ll see a success, a next step, and observations about preparation and engagement.</p><button type="button" class="btn secondary" id="family-show-sample">View the sample journey</button></section>';
+  return '<section class="card"><h2>No lesson feedback yet</h2><p class="muted">Attendance, homework and teacher feedback will appear after a lesson review.</p></section>';
 }
+
 function familyPrepCard(lesson) {
   const p=familyPreparation(parentSource,lesson,state), reading=lesson===1?'Read Act 2 through Gerald’s departure.':plan(lesson-1).reading;
   const readingLabel=p.reading===true?'Marked complete':p.reading===false?'Not marked complete':'No update yet';
-  return '<section class="card"><div class="cardtop"><h2>Ready for the conversation?</h2><span class="family-chip neutral">Lesson '+lesson+'</span></div><div class="family-check-row"><span class="family-check '+(p.reading?'ready':'')+'">'+(p.reading?'✓':'1')+'</span><div><b>Reading before class</b><p>'+esc(reading)+'</p><small>'+readingLabel+(p.reading?' · student-reported':'')+'</small></div></div><div class="family-check-row"><span class="family-check '+(p.quiz?'ready':'')+'">'+(p.quiz?'✓':'2')+'</span><div><b>Preparation quiz</b><p>'+(p.quiz?'Submitted'+(Number.isFinite(p.quiz.score)?' · '+p.quiz.score+'/4':'')+'. Completion is the entry ticket.':'A short reading check before the lesson.')+'</p><small>'+(p.quiz?'Ready for discussion':parentSource==='saved'&&lesson!==1?'Quiz not configured for this lesson':'Awaiting submission')+'</small></div></div><p class="family-footnote">Parents can check preparation here; students complete their reading and quiz in their own workspace.</p></section>';
+  return '<section class="card"><div class="cardtop"><h2>Before the next class</h2><span class="family-chip neutral">Lesson '+lesson+'</span></div><div class="family-check-row"><span class="family-check '+(p.reading?'ready':'')+'">'+(p.reading?'✓':'1')+'</span><div><b>Reading before class</b><p>'+esc(reading)+'</p><small>'+readingLabel+(p.reading?' · student-reported':'')+'</small></div></div><div class="family-check-row"><span class="family-check '+(p.quiz?'ready':'')+'">'+(p.quiz?'✓':'2')+'</span><div><b>Preparation quiz</b><p>'+(p.quiz?'Submitted'+(Number.isFinite(p.quiz.score)?' · '+p.quiz.score+'/4':'')+'.':'A short reading check before the lesson.')+'</p><small>'+(p.quiz?'Submitted':lesson!==1?'No quiz assigned':'Awaiting submission')+'</small></div></div><p class="family-footnote">Parents can check preparation here; students complete their reading and quiz in their own workspace.</p></section>';
 }
 function familyLessonCard(lesson) {
-  return '<section class="card family-meeting"><div class="eyebrow">'+(parentSource==='sample'?'ILLUSTRATIVE LIVE LESSON':'LIVE LESSON')+'</div><h2>'+ (parentSource==='sample'?familyDate(lesson):'Schedule to be confirmed')+'</h2>'+(parentSource==='sample'?'<div class="family-time">'+familyTime(lesson)+'</div><p class="muted">90 minutes · '+FAMILY_TIMEZONES[parentTimezone]+'</p>':'<p class="muted">Your confirmed date and time will appear here once the program is scheduled.</p>')+'<p>'+esc(plan(lesson).title)+'</p><button class="btn wide" disabled>Zoom link not set</button><p class="family-footnote">Your child’s individual lesson link will appear here.</p></section>';
+  if(!lesson)return '<section class="card dashboard-next"><span class="eyebrow">NEXT CLASS</span><h2>No upcoming lesson</h2><p>There are no more lessons on the sample schedule.</p><a class="link" href="#timeline">View course timeline →</a></section>';
+  const zoom=courseZoomLink(plan(lesson).zoom);
+  return '<section class="card dashboard-next"><span class="eyebrow">NEXT CLASS · SAMPLE SCHEDULE</span><h2>'+familyDate(lesson)+' <span class="dashboard-time">'+familyTime(lesson)+'</span></h2><p class="dashboard-course">'+courseTopic(lesson)+'</p><p>'+esc(plan(lesson).title)+'</p><p class="dashboard-meta">'+studentLabel(lesson)+' · 90 minutes</p><div class="dashboard-actions">'+(zoom?'<a class="btn light" href="'+esc(zoom)+'" target="_blank" rel="noopener noreferrer">Join Zoom ↗</a>':'<button class="btn secondary" disabled>Zoom link not set</button>')+'<a class="link" href="#timeline">Lesson details →</a></div></section>';
 }
+
 function parentDashboard() {
-  const m=familyModel(), latest=m.records[0],stats=m.metrics;
-  return familyTop('Parent dashboard','Class schedule, assignments and teacher feedback.')+
-    '<section class="family-hero"><div><span class="eyebrow">LITERATURE & THE WORLD · 12-WEEK PROGRAM</span><h2>Literature &<br>the World</h2><p>An Inspector Calls → Lord of the Flies<br>Reading, writing, and thoughtful conversations about the world.</p><a class="btn light" href="#timeline">Explore the weekly plan →</a></div><div class="family-course-progress"><span>LESSON REVIEWS</span><strong>'+stats.reviewed+'<small> / 24</small></strong><progress max="24" value="'+stats.reviewed+'" aria-label="Lessons reviewed"></progress><p>Two lessons a week.<br>12-week program.</p></div></section>'+
-    '<div class="family-stats"><section class="card"><span class="eyebrow">HOMEWORK</span><strong>'+(stats.assigned?stats.complete+' / '+stats.assigned:'—')+'</strong><p>'+(stats.assigned?'assigned tasks completed in reviewed lessons':'No homework observations yet')+'</p></section><section class="card"><span class="eyebrow">ATTENDANCE</span><strong>'+(stats.attendanceRecorded?stats.attended+' / '+stats.attendanceRecorded:'—')+'</strong><p>'+(stats.attendanceRecorded?'attended lessons with attendance recorded':'No attendance recorded yet')+'</p></section><section class="card"><span class="eyebrow">FEEDBACK TO READ</span><strong>'+m.unread+'</strong><a class="link" href="#parent-progress">View lesson feedback →</a></section></div>'+
-    '<div class="family-section-title"><div><span class="eyebrow">THE WEEK IN FOCUS</span><h2>Week '+parentWeek+' · Lesson preparation</h2></div>'+familyWeekSelect()+'</div><div class="family-grid"><div>'+familyPrepCard(m.firstLesson)+'<div class="family-section-title"><h2>Latest teacher feedback</h2><a class="link" href="#parent-progress">All feedback →</a></div>'+(latest?familyReport(latest,true):familyEmpty())+'</div><aside>'+familyLessonCard(m.firstLesson)+'<section class="card family-home-support"><span class="eyebrow">A SMALL MOMENT AT HOME</span><h2>“What made you think that?”</h2><p>Invite your child to share one idea from the reading and the passage that sparked it. A curious question can open a good conversation.</p><a class="link" href="#parent-contact">Keep in touch with Matthew ↗</a></section></aside></div>'+
-    '<section class="card"><div class="cardtop"><h2>Course timeline</h2><span class="muted">12 weeks · 24 lessons</span></div>'+familyWeekStrip(m.records,true)+'<p class="family-footnote">Select a week to explore its goals, readings, and lesson reviews.</p></section>';
+  const m=familyModel(),latest=m.records[0],next=parentSource==='sample'?familyNextLesson(m.records,new Date('2026-11-09T00:00:00Z')):familyNextLesson(m.records);
+  const outstanding=m.records.filter(r=>['Partial','Not submitted'].includes(r.homework));
+  return familyTop('Parent dashboard','Literature & the World')+'<div class="dashboard-grid"><div><section class="card"><div class="cardtop"><h2>Last class</h2>'+(latest?'<span class="dashboard-meta">'+familyDate(latest.lesson)+'</span>':'')+'</div>'+(latest?'<p class="dashboard-course">'+courseTopic(latest.lesson)+'</p><p class="dashboard-meta">'+esc(plan(latest.lesson).title)+'</p><dl class="dashboard-facts"><div><dt>Attendance</dt><dd>'+familyChip(latest.attendance)+'</dd></div><div><dt>Learning goals</dt><dd>'+familyChip(latest.learning)+'</dd></div></dl><h3>How did Alex do?</h3><p>'+esc(latest.summary||latest.success||'The teacher has not added a lesson summary yet.')+'</p><details class="dashboard-details"><summary>Teacher feedback & next step</summary><div class="dashboard-detail-body"><h3>Success</h3><p>'+esc(latest.success||'Not recorded yet.')+'</p><h3>Next step</h3><p>'+esc(latest.next||'Not recorded yet.')+'</p>'+familyReadButton(latest)+'</div></details>':'<p class="muted">No class review yet. Attendance and feedback will appear here once recorded.</p>')+'</section>'+dashboardHomework(dashboardHomeworkRecord(m.records,next),'parent')+'</div><div>'+familyLessonCard(next)+(next?'<details class="card dashboard-disclosure"><summary>Preparation for the next class</summary><div>'+familyPrepCard(next)+'</div></details>':'')+'<section class="card dashboard-links"><h2>Course & feedback</h2><a href="#timeline"><span>Course timeline</span><span aria-hidden="true">→</span></a><a href="#parent-progress"><span>All teacher feedback <small>'+m.unread+' unread</small></span><span aria-hidden="true">→</span></a><a href="#parent-contact"><span>Contact Matthew</span><span aria-hidden="true">→</span></a></section></div></div>'+(outstanding.length?'<details id="homework-attention" class="card dashboard-disclosure"><summary>Homework needing attention <span class="family-chip support">'+outstanding.length+'</span></summary><div>'+outstanding.map(r=>dashboardHomework(r,'parent',true)).join('')+'</div></details>':'');
 }
+
 function parentWeekPlan(){return courseTimeline('parent');}
 function parentProgress() {
   const m=familyModel(), filtered=m.records.filter(r=>parentFeedbackWeek==='all'||Math.ceil(r.lesson/2)===Number(parentFeedbackWeek));
   return familyTop('Progress & feedback','Teacher observations after each lesson, with specific feedback to build on.')+
-    '<section class="card family-progress-overview"><div><span class="eyebrow">THE JOURNEY SO FAR</span><h2>'+m.metrics.reviewed+' of 24 lessons reviewed</h2><p>Observations describe a lesson, not a label for your child.</p></div><div><progress max="24" value="'+m.metrics.reviewed+'" aria-label="Lessons reviewed"></progress><span class="muted">'+m.unread+' unread review'+(m.unread===1?'':'s')+'</span></div></section>'+
+    '<section class="card family-progress-overview"><div><h2>'+m.metrics.reviewed+' of 24 lessons reviewed</h2></div><div><progress max="24" value="'+m.metrics.reviewed+'" aria-label="Lessons reviewed"></progress><span class="muted">'+m.unread+' unread review'+(m.unread===1?'':'s')+'</span></div></section>'+
     '<div class="family-section-title"><h2>Lesson-by-lesson feedback</h2><label class="family-week-select">Show<select id="family-feedback-week"><option value="all" '+(parentFeedbackWeek==='all'?'selected':'')+'>All weeks</option>'+Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'" '+(String(i+1)===parentFeedbackWeek?'selected':'')+'>Week '+(i+1)+'</option>').join('')+'</select></label></div>'+
     (filtered.length?filtered.map((record,i)=>familyReport(record,i===0)).join(''):parentFeedbackWeek==='all'?familyEmpty():'<section class="card family-empty"><h2>No review for Week '+parentFeedbackWeek+' yet.</h2><p>Your teacher’s feedback will appear after a lesson review.</p><button class="btn secondary" type="button" id="family-all-feedback">Show all feedback</button></section>')+
     '<p class="family-footnote">Read markers are saved in this browser only. They are not sent to your teacher in this preview.</p>';
@@ -124,10 +127,11 @@ function parentContact() {
 }
 function bindParentEvents() {
   if(role!=='parent') return;
+  document.querySelectorAll('[data-show-homework]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const details=$('#homework-attention');if(details){details.open=true;details.scrollIntoView({block:'center'});details.querySelector('summary').focus();}}));
   $('#family-source')?.addEventListener('change',event=>{
-    parentSource=event.target.value;parentWeek=parentSource==='sample'?3:1;parentFeedbackWeek='all';render();$('#family-source')?.focus();
+    parentSource=event.target.value;parentWeek=parentSource==='sample'?3:1;parentFeedbackWeek='all';render();document.querySelector('.preview-options').open=true;$('#family-source')?.focus();
   });
-  $('#family-timezone')?.addEventListener('change',event=>{parentTimezone=event.target.value;render();$('#family-timezone')?.focus();});
+  $('#family-timezone')?.addEventListener('change',event=>{parentTimezone=event.target.value;try{localStorage.setItem('inkwire-timezone',parentTimezone);}catch{}render();$('#family-timezone')?.focus();});
   $('#family-week')?.addEventListener('change',event=>{parentWeek=Number(event.target.value);render();$('#family-week')?.focus();});
   document.querySelectorAll('[data-family-week]').forEach(button=>button.addEventListener('click',()=>{
     const target=Number(button.dataset.familyWeek);if(target<1||target>12)return;parentWeek=target;timelineExpanded.clear();timelineExpanded.add(target);
@@ -149,4 +153,27 @@ function bindParentEvents() {
     const status=$('#family-contact-status');status.hidden=false;status.textContent='Your draft is ready to open in your email app. If it does not open, email matthew@inkwire.online directly. Nothing has been sent from this portal.';
     location.href='mailto:matthew@inkwire.online?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
   });
+}
+
+function dashboardTimezone(id,zone) {
+  return '<label class="dashboard-timezone" for="'+id+'">Time zone<select id="'+id+'">'+Object.entries(FAMILY_TIMEZONES).map(([value,label])=>'<option value="'+value+'" '+(value===zone?'selected':'')+'>'+label+'</option>').join('')+'</select></label>';
+}
+function familyNextLesson(records, now=new Date()) {
+  const after=Math.max(0,...records.filter(r=>r.attendance==='Present').map(r=>r.lesson));
+  return Array.from({length:24},(_,i)=>i+1).find(n=>n>after && familySampleDate(n).getTime()+90*60000>Number(now)) || null;
+}
+function dashboardHomework(record,view,compact=false) {
+  const n=record?.lesson, sample=view==='parent'&&parentSource==='sample';
+  const examples={2:'Finish the paragraph explaining how Mrs. Birling responds to responsibility. Include two quotations and explain each one.',4:'Write a paragraph explaining how the Inspector presents shared responsibility. Support your point with evidence.'};
+  const task=n?(sample?examples[n]||'':plan(n).homework):'',timing=record?.homeworkTiming;
+  const status=record?.homework;
+  const instruction=task || (status==='Not assigned'?'No written homework was assigned.':status?'Assignment details have not been added.':'Written homework and its status will appear when your teacher adds them.');
+  const isStudent=view==='student',outstanding=view==='parent'&&!compact?familyModel().records.filter(r=>['Partial','Not submitted'].includes(r.homework)).length:0;
+  return '<section class="'+(compact?'dashboard-homework-row':'card')+'"><div class="cardtop"><h2>'+(compact?studentLabel(n):'Homework')+'</h2>'+familyChip(status)+'</div>'+(n&&!compact?'<p class="dashboard-meta">'+studentLabel(n)+' · '+esc(plan(n).title)+'</p>':'')+'<p>'+esc(instruction)+'</p>'+(status&&status!=='Not assigned'?'<p class="dashboard-timing">Submission timing: <strong>'+esc(['On time','Late'].includes(timing)?timing:'Not recorded')+'</strong></p>':'')+(outstanding?'<p><a class="link" href="#homework-attention" data-show-homework>'+outstanding+' assignment'+(outstanding===1?' needs':'s need')+' attention ↓</a></p>':'')+(isStudent&&n?studentAction(n,'notebook','Open homework page →','Homework','link text-button'):'')+'</section>';
+}
+
+function dashboardHomeworkRecord(records,next) {
+  if(records[0]?.homework)return records[0];
+  const assigned=Array.from({length:next||24},(_,i)=>i+1).reverse().find(n=>plan(n).homework);
+  return assigned ? records.find(r=>r.lesson===assigned)||{lesson:assigned} : records[0];
 }

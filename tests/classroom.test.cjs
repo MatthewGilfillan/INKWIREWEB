@@ -53,3 +53,29 @@ test('saved lesson text is escaped when rendered in the timeline',()=>{
   const html=c.courseTimeline('teacher');
   assert.doesNotMatch(html,/<script>|<img onerror/);assert.match(html,/&lt;script&gt;bad/);
 });
+test('next class skips completed and elapsed lessons and ends at the final lesson',()=>{
+  const c=classroom(),now=new Date('2026-10-31T00:00:00Z');
+  assert.equal(c.familyNextLesson([],now),2);
+  assert.equal(c.familyNextLesson([{lesson:4,attendance:'Present'}],now),5);
+  assert.equal(c.familyNextLesson([{lesson:24,attendance:'Present'}],now),null);
+  assert.equal(c.familyNextLesson([],new Date('2027-03-01T00:00:00Z')),null);
+  assert.equal(c.familyNextLesson([{lesson:4,attendance:'Rescheduled'}],now),2);
+});
+test('assigned homework appears before assessment without claiming submission or timeliness',()=>{
+  const c=classroom();
+  vm.runInContext("state.plan[1]={homework:'Write a paragraph'};state.preparation['Alex Lee|1']={homework:true}",c);
+  const record=c.dashboardHomeworkRecord([],2),html=c.dashboardHomework(record,'student');
+  assert.equal(record.lesson,1);assert.match(html,/Write a paragraph/);
+  assert.match(html,/Not recorded/);assert.doesNotMatch(html,/On time|Late|Complete|Submitted/);
+});
+test('student and parent time zones reach the timeline and configured meeting links work',()=>{
+  const c=classroom();
+  vm.runInContext("role='student';studentTimezone='UTC';state.plan[2]={zoom:'https://example.zoom.us/j/123'}",c);
+  assert.equal(c.courseTime(2),'10:00 AM');
+  // Location is only read to label the selected-lesson card.
+  c.location={hash:''};
+  assert.match(c.studentMeeting(2),/https:\/\/example.zoom.us\/j\/123/);
+  assert.match(c.studentMeeting(2),/10:00 AM/);
+  vm.runInContext("role='parent';parentTimezone='Asia/Bangkok'",c);
+  assert.equal(c.courseTime(2),'5:00 PM');
+});
