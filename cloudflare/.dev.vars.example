@@ -1,0 +1,5 @@
+APP_ORIGIN=https://inkwire-education.com
+ACCOUNT_EMAIL=accounts@inkwire-education.com
+ACCOUNTS_ENABLED=true
+# Generate a fresh random value of at least 32 bytes. Never commit the actual secret.
+BETTER_AUTH_SECRET=

@@ -1,22 +1,3 @@
-const dialog=document.querySelector('#signin-dialog');
-const authPanels=[...dialog.querySelectorAll('[data-auth-panel]')];
-const dashboardPreviews=dialog.querySelector('.dashboard-previews');
-function showAuthView(view,focus=true){
-  authPanels.forEach(panel=>{panel.hidden=panel.dataset.authPanel!==view;});
-  const title=dialog.querySelector(`[data-auth-panel="${view}"] h2`);
-  dialog.setAttribute('aria-labelledby',title.id);
-  if(focus)title.focus();
-}
-document.querySelectorAll('[data-signin]').forEach(button=>button.addEventListener('click',()=>{
-  showAuthView('signin',false);
-  dashboardPreviews.open=button.hasAttribute('data-dashboard-preview');
-  dialog.showModal();
-}));
-dialog.querySelectorAll('[data-auth-view]').forEach(button=>button.addEventListener('click',()=>showAuthView(button.dataset.authView)));
-// These disabled design-preview forms never collect credentials or submit requests.
-dialog.querySelectorAll('.auth-form').forEach(form=>form.addEventListener('submit',event=>event.preventDefault()));
-document.querySelector('.dialog-close').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
 const menu=document.querySelector('.menu-toggle'),nav=document.querySelector('#site-nav');
 function closeNavigation(){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');}
 menu.addEventListener('click',()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Close navigation':'Open navigation');});
@@ -39,20 +20,4 @@ location.replace('studio.html?role='+role+'#'+route);
 }
 
 
-if(new URLSearchParams(location.search).get('signin')==='1')dialog.showModal();
 
-// The supplied portrait is kept in the private Site; public source uses the logo fallback.
-const teacherPortrait=document.querySelector('.teacher-portrait');
-if(teacherPortrait){
-  const hideMissingPortrait=()=>{teacherPortrait.hidden=true;};
-  teacherPortrait.addEventListener('error',hideMissingPortrait);
-  if(teacherPortrait.complete&&!teacherPortrait.naturalWidth)hideMissingPortrait();
-}
-
-// Start with the CSS-only gradient; enhance it once the page has finished loading.
-const heroBackground=document.querySelector('#hero-background');
-if(heroBackground){
-  const startBackground=()=>{heroBackground.dataset.motion='running';};
-  if(document.readyState==='complete')startBackground();
-  else window.addEventListener('load',startBackground,{once:true});
-}

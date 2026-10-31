@@ -1,0 +1,27 @@
+@font-face{font-family:Poppins;src:url('assets/fonts/poppins-latin-400.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:Poppins;src:url('assets/fonts/poppins-latin-600.woff2') format('woff2');font-weight:600 800;font-display:swap}
+[data-account-root]{font-family:Poppins,Arial,sans-serif;color:#19294b;line-height:1.65;text-align:left}
+[data-account-root] h2{font-family:inherit;font-size:clamp(1.65rem,5vw,2.15rem);line-height:1.2;margin:0 0 20px;font-weight:600;letter-spacing:-.03em}
+[data-account-root] h3{font-size:1.1rem;margin:30px 0 10px;font-weight:600}
+[data-account-root] p{font-size:.95rem;margin:14px 0;color:#50627d}
+[data-account-root] [hidden]{display:none!important}
+.account-form{margin:24px 0 12px}.account-form fieldset{border:0;padding:0;margin:0;min-width:0}
+.account-form label{font-size:.9rem;font-weight:600;display:block;margin:16px 0 7px}
+.account-form input,.account-form select{box-sizing:border-box;font:inherit;font-size:16px;background:#fff;color:#17264a;min-height:50px;width:100%;border:1px solid #b9c9da;border-radius:10px;padding:12px 14px}
+.account-form input:focus-visible,.account-form select:focus-visible,.account-link:focus-visible,.account-form button:focus-visible{outline:3px solid #8a88cb;outline-offset:3px}
+.account-password{position:relative}.account-password input{padding-right:76px}
+.account-password button{position:absolute;right:8px;top:6px;height:39px;padding:0 12px;border:0;border-radius:6px;background:#f0eef9;font:inherit;font-size:.8rem;color:#26365b;cursor:pointer}
+.account-hint{font-size:.8rem!important;line-height:1.65}
+.account-submit{display:block;width:100%;min-height:50px;margin-top:24px;border:0;border-radius:10px;background:#8bcfcd;color:#102344;padding:13px 20px;font:inherit;font-weight:600;text-align:center;cursor:pointer}
+.account-submit:hover{background:#7dc4c1}.account-form fieldset:disabled{opacity:.65}.account-form fieldset:disabled button{cursor:wait}
+.account-link{border:0;background:none;padding:0;color:#485491;font:inherit;font-size:.9rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.account-message{padding:14px;border-radius:10px;background:#e7f5f2;color:#1c514a!important;font-size:.85rem!important}
+.account-message.is-error{background:#fff0ee;color:#8c3029!important}
+.account-email{overflow-wrap:anywhere}.account-badge{display:inline-block;border-radius:20px;padding:5px 12px;background:#e7f5f2;color:#255a54!important;font-size:.8rem!important}
+.account-retry{display:flex;gap:25px;flex-wrap:wrap}
+[data-account-page]{margin:0;background:#f5f7fa;color:#19294b;font-family:Poppins,Arial,sans-serif;min-height:100vh}
+.account-header{padding:30px 24px;text-align:center;border-bottom:1px solid #dfe7ef;background:#fff}
+.account-header img{width:210px;height:auto}.account-shell{max-width:450px;margin:50px auto;padding:36px;background:#fff;border:1px solid #dbe5ef;border-radius:18px;box-shadow:0 12px 40px #18305308}
+.account-home{display:block;text-align:center;margin:24px 0 0}.account-shell noscript{display:block;padding:16px;background:#fff0ee}
+#signin-dialog{max-height:calc(100dvh - 40px);overflow:auto}#signin-dialog [data-account-root]{margin-top:22px}
+@media(max-width:560px){.account-shell{margin:24px 16px;padding:25px 22px;border-radius:14px}.account-header{padding:23px 16px}.account-header img{width:180px}#signin-dialog{padding:30px 22px}}

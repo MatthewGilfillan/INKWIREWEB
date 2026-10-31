@@ -1,0 +1,56 @@
+/* Approved landing-page composition: seven purposeful sections, one type family. */
+.site-header{border-bottom:1px solid var(--line)}
+.hero{grid-template-columns:1.15fr 1fr;gap:70px;padding-block:66px 76px}
+.hero h1{font-size:clamp(40px,4.9vw,66px);margin-block:26px;line-height:1.16}
+.hero .eyebrow{font-size:10px;letter-spacing:1.6px;flex-wrap:wrap}
+.hero-copy>p{max-width:510px;font-size:16px;line-height:1.85}
+.hero-actions{gap:14px;flex-wrap:wrap;margin-top:32px}
+.hero-actions .button{min-height:52px;justify-content:space-between;background:var(--aqua);border-color:var(--aqua);color:var(--navy)}
+.hero-actions .button:hover{background:#a2dad5;border-color:#a2dad5}
+.hero-actions .button-secondary{background:#b8bfee;border-color:#b8bfee}
+.hero-actions .button-secondary:hover{background:#cbd1f5;border-color:#cbd1f5}
+.reading-photo{margin:0;aspect-ratio:0.91;border-radius:150px 12px 12px 12px;overflow:hidden;box-shadow:14px 14px 0 var(--lavender)}
+.reading-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 43%}
+.learning-support{background:#f0eef8;border-block:1px solid #e7e3f2}
+.support-inner{display:grid;grid-template-columns:1fr 1.1fr;align-items:center;gap:80px;padding-block:75px}
+.support-art{margin:0;align-self:end}
+.support-art img{display:block;width:100%;height:auto}
+.support-copy h2{font-size:clamp(34px,3.6vw,46px);margin-top:0}
+.support-copy>p{font-size:15px;color:#55617b;max-width:510px}
+.support-solution{margin-top:28px;border-left:3px solid #72b9b5;padding-left:24px}
+.support-solution h3{font-size:19px;margin:0 0 12px}
+.support-solution p{font-size:15px;color:#55617b;margin:0}
+.section-heading h2{margin:0}
+.program-body h3{font-size:21px;margin:0 0 12px}
+.program-body p{font-size:14px;margin:0 0 26px}
+.program-body a{font-size:12px}
+.tutoring .student-program-art{background:#e9edf7}
+.tutoring .student-program-art img{object-fit:contain;object-position:center bottom;padding:8px 12px 0}
+.approach{padding-block:72px}
+.approach h2{margin-top:0}
+.teaching-steps{list-style:none;padding:0;margin:40px 0 0;display:grid;grid-template-columns:repeat(4,1fr);gap:32px}
+.teaching-steps li{border-top:1px solid #3c4561;padding-top:22px}
+.teaching-steps li>span{color:var(--aqua);font-size:13px}
+.teaching-steps h3{font-size:18px;margin:16px 0 10px}
+.teaching-steps p{font-size:14px;margin:0}
+.about{margin-top:100px;background:transparent;border-radius:0;padding:0 30px;gap:90px;grid-template-columns:.85fr 1.3fr}
+.teacher-photo{max-width:380px}
+.teacher-photo-frame{aspect-ratio:1.05}
+.teacher-photo .teacher-portrait{transform:scale(1.025);object-position:50% 45%}
+.about-copy>p{font-size:16px;line-height:1.9}
+.about-copy .teacher-qualifications{font-size:19px;font-weight:600;color:var(--periwinkle);margin-top:-8px}
+.about-copy .teacher-author{font-size:13px;color:#526b7e;margin-top:24px}
+.faq-section{padding-top:90px}
+.faqs summary{font-size:14px}
+.faqs details p{font-size:14px}
+.start-inner{gap:75px}
+.start-inner h2{font-size:clamp(32px,3.6vw,46px)}
+.start-inner>div>p{font-size:15px;max-width:380px}
+.contact-address{display:inline-block;margin-top:18px;font-size:13px}
+.enquiry label{font-size:12px}
+.enquiry input,.enquiry select,.enquiry textarea{font-size:13px}
+.form-note{font-size:11px}
+@media(max-width:1050px){.hero{gap:40px}.hero h1{font-size:clamp(39px,5vw,55px)}.hero .eyebrow{font-size:9px}.support-inner{gap:40px}.about{gap:45px;padding-inline:0}.teaching-steps{gap:22px}}
+@media(min-width:761px) and (max-width:900px){.hero{grid-template-columns:1.1fr 1fr}.hero-actions{flex-direction:column;align-items:flex-start;gap:12px}.hero-actions .button{min-width:215px}.hero h1{font-size:42px}}
+@media(max-width:760px){.hero{grid-template-columns:1fr;gap:34px;padding-block:44px 58px}.hero h1{font-size:clamp(39px,8.6vw,62px)}.hero-actions{flex-direction:row;align-items:stretch;gap:12px}.hero-actions .button{white-space:normal;gap:16px}.reading-photo{width:min(470px,calc(100% - 12px));max-height:440px;justify-self:center;border-top-left-radius:120px}.support-inner{grid-template-columns:1fr;gap:34px;padding-block:54px 0}.support-copy{grid-row:1}.support-art{width:min(430px,100%);justify-self:center}.support-copy>p,.support-solution p{font-size:15px}.teaching-steps{grid-template-columns:1fr 1fr;gap:28px}.about{grid-template-columns:1fr;margin-top:65px;gap:32px}.about-copy{grid-row:1}.teacher-photo{width:min(340px,100%)}.about-copy>p{font-size:15px}.faq-section{padding-top:65px}.start-inner{gap:32px}.hero-copy>p{max-width:540px}.site-footer{gap:25px}}
+@media(max-width:420px){.hero-actions{flex-direction:column}.hero-actions .button{width:100%;max-width:300px}.teaching-steps{grid-template-columns:1fr}.reading-photo{max-height:360px}.hero .eyebrow{font-size:8px;letter-spacing:1.2px}}
