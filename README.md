@@ -2,6 +2,8 @@
 
 Landing page and interactive learning-studio prototype for Ink Wire Education.
 
+For the separate public Cloudflare deployment at **inkwire-education.com**, see [CLOUDFLARE.md](CLOUDFLARE.md). Hosting is being prepared first; email services and real student accounts are deferred.
+
 ## Run
 Serve the dist directory with any static server, for example:
 `python3 -m http.server 8000 --directory dist`
@@ -95,3 +97,9 @@ Open either notebook and select **Shared demo**, then **Open teacher/student vie
 Editing waits for the shared document to load and pauses when disconnected. Liveblocks warns on closing the tab with unsynchronized changes, and internal navigation waits for pending changes. Keep the page open during reconnecting; download the current page if needed. Offline editing/recovery after forcibly closing the tab is not supported. Destroying an editor removes listeners and leaves its room using the provider's documented lifecycle.
 
 Before using with real students: connect verified accounts, replace `publicApiKey` with a server authentication endpoint, validate assigned learner/teacher enrollment on the server, and enforce room permissions. Restrict linked parents to intended reports or read-only content. Keep private teacher notes outside shared documents. Migrate local drafts only after authorization, with a one-time migration marker. Test unauthorized access, concurrent edits, reconnection and durable storage. Comments, version history, account authentication, and parent notebook access are not implemented.
+
+## Compact classroom navigation
+
+The teacher dashboard opens with expandable active classes. Assessment forms are available under `#assessment`; transcript import, preparation and lesson settings expand on demand. The shared course timeline in all three workspaces uses twelve wide downward-arrow week blocks. The illustrative schedule now begins October 30, 2026 at 18:00 Asia/Shanghai, with two 90-minute lessons each week; these dates are not confirmed bookings.
+
+Past scheduled lessons are muted and show the saved class recap and assignment status. A recorded presence marks a lesson completed; rescheduled records are labeled separately. Missing observations are displayed as unrecorded. Reading and homework checklists remain distinguishable from teacher assessments, and student/parent projections exclude private notes and other learners. Lesson settings accept optional HTTPS meeting links. All account/record limitations described above still apply. Liveblocks text comments, reusable feedback snippets, and freehand drawing are not implemented by this navigation update.

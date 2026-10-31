@@ -1,0 +1,112 @@
+/* A complete, static first frame. JavaScript only enables the motion. */
+.hero-band {
+  margin: 8px 16px 0;
+  border-radius: 28px 28px 0 0;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0b1335;
+  background-image:
+    radial-gradient(ellipse at 78% 52%, rgb(0 71 171 / 48%), rgb(0 71 171 / 14%) 45%, transparent 76%),
+    linear-gradient(115deg, #0b1335 15%, #12234b);
+  color: #fff;
+}
+
+/* Broad, faint bands move a little, like a slow ripple across still water. */
+.hero-band::before,
+.hero-band::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  transform-origin: 72% 55%;
+  transform: translate3d(0, 0, 0) scale(1);
+  background: radial-gradient(ellipse at 72% 55%,
+    transparent 24%, rgb(111 160 255 / 7%) 30%, transparent 37%,
+    rgb(111 160 255 / 4%) 44%, transparent 52%,
+    rgb(111 160 255 / 2%) 61%, transparent 70%);
+}
+
+.hero-band::after {
+  background: radial-gradient(ellipse at 68% 58%,
+    transparent 32%, rgb(0 71 171 / 12%) 43%, transparent 55%);
+}
+
+/* The first keyframe is identical to the static state above: no loading jump. */
+.hero-band[data-motion]::before {
+  animation: pool-ripple 30s ease-in-out infinite alternate;
+}
+.hero-band[data-motion]::after {
+  animation: pool-ripple-soft 38s ease-in-out infinite alternate;
+}
+@keyframes pool-ripple {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(1.5%, -1%, 0) scale(1.09); }
+}
+@keyframes pool-ripple-soft {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-1%, 1%, 0) scale(1.07); }
+}
+
+.hero-band .hero { padding-block: 0; align-items: end; }
+.hero-band .hero-copy { padding-block: 56px 32px; }
+.hero-band .hero-copy > p { max-width: 520px; }
+.hero-band .hero-note { margin-top: 18px; line-height: 1.5; }
+.hero-band .mini-mark { line-height: 1; }
+.hero-band .hero-actions { gap: 18px; }
+.hero-band .hero-actions .button { min-width: 212px; justify-content: space-between; }
+
+.hero-band .hero h1 { color: #fff; }
+.hero-band .hero h1 em { color: #c8cef5; }
+.hero-band .hero-copy > .eyebrow { color: #b8dedf; }
+.hero-band .hero-copy > p,
+.hero-band .hero-note { color: #d9e2f2; }
+.hero-band .hero-actions .button {
+  background: var(--aqua);
+  border-color: var(--aqua);
+  color: var(--navy);
+}
+.hero-band .hero-actions .button:hover { background: #a2dad5; }
+.hero-band .hero-actions .button-secondary {
+  background: #b8bfee;
+  border-color: #b8bfee;
+  color: var(--navy);
+}
+.hero-band .hero-actions .button-secondary:hover { background: #cbd1f5; border-color: #cbd1f5; }
+.hero-band .art-halo { background: rgb(194 204 255 / 9%); }
+.hero-band .hero-photo { box-shadow: 10px 14px 0 rgb(155 177 238 / 15%); }
+.hero-band .photo-note { color: var(--ink); }
+.hero-band :focus-visible { outline-color: #c8cef5; }
+.student-collage {
+  position: relative;
+  width: calc(100% + 120px);
+  max-width: none;
+  aspect-ratio: 745 / 700;
+  margin: 0 -70px 0 0;
+  align-self: end;
+  justify-self: end;
+  overflow: hidden;
+}
+/* The WebP keeps the supplied artwork and trims only its transparent margins. */
+.student-collage img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tutoring .student-program-art { background: #e9edf7; }
+.tutoring .student-program-art img {
+  object-fit: contain;
+  object-position: center bottom;
+  padding: 8px 12px 0;
+}
+@media (max-width: 900px) {
+  .hero-band { margin-inline: 8px; border-radius: 20px 20px 0 0; }
+  .hero-band .hero { padding-block: 0; }
+  .hero-band .hero-copy { padding-block: 36px 12px; }
+  .student-collage { width: calc(100% + 40px); max-width: 620px; margin: 0 -20px; justify-self: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-band[data-motion]::before,
+  .hero-band[data-motion]::after { animation: none; }
+}

@@ -18,8 +18,11 @@ dialog.querySelectorAll('.auth-form').forEach(form=>form.addEventListener('submi
 document.querySelector('.dialog-close').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
 const menu=document.querySelector('.menu-toggle'),nav=document.querySelector('#site-nav');
+function closeNavigation(){nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');}
 menu.addEventListener('click',()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Close navigation':'Open navigation');});
-nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');}));
+nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeNavigation));
+document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeNavigation();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&nav.classList.contains('open')){closeNavigation();menu.focus();}});
 document.querySelectorAll('[data-interest]').forEach(a=>a.addEventListener('click',()=>{document.querySelector('#interest').value=a.dataset.interest;}));
 document.querySelector('#enquiry').addEventListener('submit',event=>{
 event.preventDefault();const d=new FormData(event.target);
@@ -44,4 +47,12 @@ if(teacherPortrait){
   const hideMissingPortrait=()=>{teacherPortrait.hidden=true;};
   teacherPortrait.addEventListener('error',hideMissingPortrait);
   if(teacherPortrait.complete&&!teacherPortrait.naturalWidth)hideMissingPortrait();
+}
+
+// Start with the CSS-only gradient; enhance it once the page has finished loading.
+const heroBackground=document.querySelector('#hero-background');
+if(heroBackground){
+  const startBackground=()=>{heroBackground.dataset.motion='running';};
+  if(document.readyState==='complete')startBackground();
+  else window.addEventListener('load',startBackground,{once:true});
 }

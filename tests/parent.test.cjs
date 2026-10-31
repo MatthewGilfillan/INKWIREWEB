@@ -43,9 +43,9 @@ test('changed family feedback becomes unread, private edits do not affect the re
   assert.ok(!context.familyReadKey(base,'saved').includes('Secret'));
 });
 test('sample dates stay consistent across week boundaries and time zones',()=>{
-  assert.equal(context.familySampleDate(1).toISOString(),'2026-11-05T10:00:00.000Z');
-  assert.equal(context.familySampleDate(2).toISOString(),'2026-11-07T10:00:00.000Z');
-  assert.equal(context.familySampleDate(3).toISOString(),'2026-11-12T10:00:00.000Z');
+  assert.equal(context.familySampleDate(1).toISOString(),'2026-10-30T10:00:00.000Z');
+  assert.equal(context.familySampleDate(2).toISOString(),'2026-11-01T10:00:00.000Z');
+  assert.equal(context.familySampleDate(3).toISOString(),'2026-11-06T10:00:00.000Z');
   assert.equal(context.familyTime(1),'6:00 PM');
   vm.runInContext("parentTimezone='Asia/Bangkok'",context);
   assert.equal(context.familyTime(1),'5:00 PM');
