@@ -4,6 +4,10 @@ A portable starter using Tiptap, Yjs, a Cloudflare Worker and one SQLite-backed 
 
 Included: rich text, headings, lists, links, quotes, undo/redo, live shared editing, connected-user count, durable server saving, browser offline recovery, editing links, iframe embedding, plain-text import, HTML export and browser print/PDF.
 
+Shared notebooks also support student submission, private general feedback drafts, teacher return/resubmission, optional deadlines with late acceptance, and supported rich-text or plain-text paste. These are capability-based experiment workflows, not authenticated classroom assignments.
+
+The **PDF worksheet** tab now supports locked PDF pages, free-positioned text and emoji, pressure-aware pen strokes, highlighting, arrows and shapes, lasso selection/movement, whole-stroke erasing, local undo/redo, separate teacher/student layers, role-enforced sharing, offline annotation recovery, flattened PDF export and editable worksheet copies. See [WORKSHEETS.md](WORKSHEETS.md) for the workflow, tests and integration limits.
+
 ## Run locally
 
 Requires Node.js 22+ and pnpm 11.25.0 (or a compatible version).
@@ -48,7 +52,7 @@ After creating a shared document, click **Embed** for the complete iframe code. 
 ></iframe>
 ```
 
-Anyone who can see the editing link or iframe source can edit that document. For members-only documents, replace capability authorization with your website's signed, document-scoped authorization. User roles, revocation, comments, cursor labels, revision history and DOCX import/export are not implemented. A public page containing an editing iframe grants editing access to its visitors.
+Anyone who can see a link or iframe source receives that link's access. Teacher and student links permit rich-text editing; read-only links do not. Worksheet teacher/student layer permissions are enforced separately on the server. For members-only documents, replace capability authorization with your website's signed, document-scoped authorization. Account roles, revocation, comment threads, cursor labels, revision history and DOCX import/export are not implemented. A public page containing an editing iframe grants editing access to its visitors.
 
 ## Architecture
 
