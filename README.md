@@ -106,4 +106,4 @@ Past scheduled lessons are muted and show the saved class recap and assignment s
 
 ## Signed-in teacher course planner
 
-The authenticated teacher dashboard now includes a reusable course overview builder with Rivendell full-course, summer, upper-primary and Custom formats, editable lesson frequency/duration, prepared course-file import/export, outline paste, course copying and class-scoped D1 draft storage. See [COURSE-PLANNING.md](COURSE-PLANNING.md) for the workflow, migration and checks. This is separate from the static demonstration timeline described above.
+The authenticated teacher dashboard now includes a reusable course overview builder with Rivendell full-course, summer, upper-primary and Custom formats, editable lesson frequency/duration, prepared course-file import/export, outline paste, course copying and class-scoped D1 draft storage, a teacher month/agenda calendar, and owner-only class deletion with Trash/restore. See [COURSE-PLANNING.md](COURSE-PLANNING.md) for the workflow, migration and checks. This is separate from the static demonstration timeline described above.

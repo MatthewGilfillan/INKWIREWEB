@@ -6,7 +6,7 @@ const cleanCode = code => typeof code === 'string' ? code.replace(/[\s-]/g, '').
 const validCode = (kind, code) => new RegExp(`^[A-HJ-NP-Z2-9]{${kind === 'class' ? 8 : 12}}$`).test(code);
 const validName = value => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 80;
 const uuid = '[a-f0-9-]{36}';
-const classAccess = (env, user, classId) => env.DB.prepare(`SELECT id, name, subject FROM classes c WHERE c.id = ?
+const classAccess = (env, user, classId) => env.DB.prepare(`SELECT id, name, subject FROM classes c WHERE c.id = ? AND c.deleted_at IS NULL
   AND (c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id = c.id AND t.user_id = ?))`)
   .bind(classId, user.id, user.id).first();
 const learnerInClass = (env, classId, learnerId) => env.DB.prepare(`SELECT l.id, l.display_name AS name, l.user_id AS userId
@@ -50,15 +50,15 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
   if (request.method === 'GET') {
     if (path === '/mine' && user.requestedRole === 'student') {
       const learner = await env.DB.prepare('SELECT id, display_name AS name FROM learners WHERE user_id = ?').bind(user.id).first();
-      const rows = learner ? await env.DB.prepare(`SELECT c.id, c.name, c.subject FROM classes c JOIN class_students s ON s.class_id = c.id WHERE s.learner_id = ? ORDER BY c.created_at DESC`).bind(learner.id).all() : {results:[]};
+      const rows = learner ? await env.DB.prepare(`SELECT c.id, c.name, c.subject FROM classes c JOIN class_students s ON s.class_id = c.id WHERE s.learner_id = ? AND c.deleted_at IS NULL ORDER BY c.created_at DESC`).bind(learner.id).all() : {results:[]};
       return json({learner, classes:rows.results});
     }
     if (path === '/mine' && user.requestedRole === 'parent') {
       const children = (await env.DB.prepare(`SELECT l.id, l.display_name AS name FROM learners l JOIN learner_parents p ON p.learner_id = l.id WHERE p.parent_id = ? ORDER BY l.display_name, l.id`).bind(user.id).all()).results;
-      for (const child of children) child.classes = (await env.DB.prepare(`SELECT c.id, c.name, c.subject FROM classes c JOIN class_students s ON s.class_id = c.id WHERE s.learner_id = ? ORDER BY c.created_at DESC`).bind(child.id).all()).results;
+      for (const child of children) child.classes = (await env.DB.prepare(`SELECT c.id, c.name, c.subject FROM classes c JOIN class_students s ON s.class_id = c.id WHERE s.learner_id = ? AND c.deleted_at IS NULL ORDER BY c.created_at DESC`).bind(child.id).all()).results;
       return json({children});
     }
-    if (path === '/learners' && teacher) return json({learners:(await env.DB.prepare(`SELECT DISTINCT l.id, l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id JOIN classes c ON c.id=s.class_id WHERE c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?) ORDER BY l.display_name, l.id`).bind(user.id,user.id).all()).results});
+    if (path === '/learners' && teacher) return json({learners:(await env.DB.prepare(`SELECT DISTINCT l.id, l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id JOIN classes c ON c.id=s.class_id WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ORDER BY l.display_name, l.id`).bind(user.id,user.id).all()).results});
     const roster = path.match(new RegExp(`^/classes/(${uuid})/roster$`));
     if (teacher && roster && await classAccess(env,user,roster[1])) {
       const students = (await env.DB.prepare(`SELECT l.id, l.display_name AS name, l.user_id IS NOT NULL AS connected FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(roster[1]).all()).results;
@@ -78,7 +78,7 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
     if (user.requestedRole !== expectedRole) return fail(`This invitation is for a ${expectedRole} account. Sign in with the correct account.`,409,'ROLE_MISMATCH');
     const invite = await env.DB.prepare(`SELECT i.*, c.name AS class_name, c.subject, l.display_name AS student_name, l.user_id AS student_user
       FROM learning_invites i JOIN classes c ON c.id=i.class_id LEFT JOIN learners l ON l.id=i.learner_id
-      WHERE i.code_hash=? AND i.kind=? AND i.expires_at>?
+      WHERE c.deleted_at IS NULL AND i.code_hash=? AND i.kind=? AND i.expires_at>?
       AND (i.learner_id IS NULL OR EXISTS (SELECT 1 FROM class_students s WHERE s.class_id=i.class_id AND s.learner_id=i.learner_id))`)
       .bind(await digest(code),kind,Date.now()).first();
     if (!invite || (invite.redeemed_by && invite.redeemed_by !== user.id)) return fail('This invitation is invalid, expired, or already used.',400,'INVALID_INVITE');
@@ -91,14 +91,14 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
         await env.DB.prepare('INSERT INTO learners (id,display_name,user_id,created_at) VALUES (?,?,?,?) ON CONFLICT(user_id) DO NOTHING').bind(crypto.randomUUID(),input.name.trim(),user.id,now).run();
         learner = await env.DB.prepare('SELECT id FROM learners WHERE user_id=?').bind(user.id).first();
       }
-      await env.DB.prepare(`INSERT OR IGNORE INTO class_students (class_id,learner_id,joined_at) SELECT class_id,?,? FROM learning_invites WHERE id=? AND code_hash=? AND expires_at>?`)
+      await env.DB.prepare(`INSERT OR IGNORE INTO class_students (class_id,learner_id,joined_at) SELECT class_id,?,? FROM learning_invites WHERE id=? AND code_hash=? AND expires_at>? AND EXISTS (SELECT 1 FROM classes c WHERE c.id=learning_invites.class_id AND c.deleted_at IS NULL)`)
         .bind(learner.id,now,invite.id,invite.code_hash,now).run();
       if (!await learnerInClass(env,invite.class_id,learner.id)) return fail('This invitation is no longer available.',400,'INVALID_INVITE');
     } else if (kind === 'student') {
       const existing = await env.DB.prepare('SELECT id FROM learners WHERE user_id=?').bind(user.id).first();
       if (existing && existing.id !== invite.learner_id) return fail('Your account is already connected to a student. Ask your teacher to add that student to this class, or use the class join code.',409,'ALREADY_CONNECTED');
       await env.DB.prepare(`UPDATE learners SET user_id=? WHERE id=? AND (user_id IS NULL OR user_id=?) AND EXISTS
-        (SELECT 1 FROM learning_invites i JOIN class_students s ON s.class_id=i.class_id AND s.learner_id=i.learner_id WHERE i.id=? AND i.code_hash=? AND i.expires_at>? AND (i.redeemed_by IS NULL OR i.redeemed_by=?))`)
+        (SELECT 1 FROM learning_invites i JOIN class_students s ON s.class_id=i.class_id AND s.learner_id=i.learner_id WHERE i.id=? AND i.code_hash=? AND i.expires_at>? AND EXISTS (SELECT 1 FROM classes c WHERE c.id=i.class_id AND c.deleted_at IS NULL) AND (i.redeemed_by IS NULL OR i.redeemed_by=?))`)
         .bind(user.id,invite.learner_id,user.id,invite.id,invite.code_hash,now,user.id).run();
       const linked = await env.DB.prepare('SELECT user_id FROM learners WHERE id=?').bind(invite.learner_id).first();
       if (linked?.user_id !== user.id) return fail('This student invitation has already been used.',400,'INVALID_INVITE');
@@ -107,7 +107,7 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
       if (!validName(input.name)) return fail('Enter your name (up to 80 characters).',400,'INVALID_NAME');
       // Claim atomically. Repeating the same request is safe; a second parent needs a new code.
       const claimed = await env.DB.prepare(`UPDATE learning_invites SET redeemed_by=? WHERE id=? AND code_hash=? AND expires_at>? AND (redeemed_by IS NULL OR redeemed_by=?)
-        AND EXISTS (SELECT 1 FROM class_students s WHERE s.class_id=learning_invites.class_id AND s.learner_id=learning_invites.learner_id) RETURNING learner_id`)
+        AND EXISTS (SELECT 1 FROM classes c WHERE c.id=learning_invites.class_id AND c.deleted_at IS NULL) AND EXISTS (SELECT 1 FROM class_students s WHERE s.class_id=learning_invites.class_id AND s.learner_id=learning_invites.learner_id) RETURNING learner_id`)
         .bind(user.id,invite.id,invite.code_hash,now,user.id).first();
       if (!claimed) return fail('This parent invitation has already been used or closed.',400,'INVALID_INVITE');
       await env.DB.prepare('INSERT OR IGNORE INTO learner_parents (learner_id,parent_id,parent_name,connected_at) VALUES (?,?,?,?)').bind(invite.learner_id,user.id,input.name.trim(),now).run();
@@ -121,7 +121,7 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
     let learnerId=input.learnerId;
     if (learnerId) {
       const accessible=await env.DB.prepare(`SELECT l.id FROM learners l JOIN class_students s ON s.learner_id=l.id JOIN classes c ON c.id=s.class_id
-        WHERE l.id=? AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) LIMIT 1`).bind(learnerId,user.id,user.id).first();
+        WHERE l.id=? AND c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) LIMIT 1`).bind(learnerId,user.id,user.id).first();
       if (!accessible) return fail('Student not found.',404,'NOT_FOUND');
     } else {
       if (!validName(input.name) || !new RegExp(`^${uuid}$`).test(input.requestId || '')) return fail('Enter a student name.',400,'INVALID_INPUT');

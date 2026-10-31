@@ -1,7 +1,7 @@
 import { validateCourse } from '../dist/course-model.mjs';
 
 export async function handleCourseOverview(request, env, user, classId, { json, fail, readJSON }) {
-  const classroom = await env.DB.prepare(`SELECT c.id FROM classes c WHERE c.id = ? AND
+  const classroom = await env.DB.prepare(`SELECT c.id FROM classes c WHERE c.id = ? AND c.deleted_at IS NULL AND
     (c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id = c.id AND t.user_id = ?))`).bind(classId, user.id, user.id).first();
   if (!classroom) return fail('Class not found.', 404, 'NOT_FOUND');
   const read = () => env.DB.prepare('SELECT revision, content, updated_at AS updatedAt FROM course_overviews WHERE class_id = ?').bind(classId).first();

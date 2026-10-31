@@ -1,10 +1,12 @@
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
+import {createTeacherCalendar} from './teacher-calendar.js';
 import {courseSummary} from './course-model.mjs';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
 const rosters=new Map();
+let currentView='classes',deletingClass='';
 function problem(error) {status.textContent=error.message;if(error.status===401){list.replaceChildren();location.replace('/account');}}
 function openDialog(id,button){returnFocus=button;document.getElementById(id).showModal();}
 document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openDialog(button.dataset.open,button)));
@@ -14,9 +16,34 @@ document.querySelectorAll('dialog').forEach(dialog=>{
 });
 function renderClasses(){
   const opened=new Set([...list.querySelectorAll('details.class-card[open]')].map(card=>card.dataset.classId));
-  list.innerHTML=classrooms.length ? classrooms.map(c=>`<details class="class-card" data-class-id="${escape(c.id)}" ${opened.has(c.id)?'open':''}><summary><span><h2>${escape(c.name)}</h2><small>${escape(c.subject || 'Class details')}</small></span></summary><div class="class-details"><section class="class-course"><div><p class="teacher-eyebrow">COURSE OVERVIEW</p><h3>Plan the term</h3><p data-course-status="${escape(c.id)}">${c.overviewRevision?escape(courseSummary({weeks:c.courseWeeks,lessonsPerWeek:c.courseFrequency,lessonMinutes:c.courseMinutes,pacing:c.coursePacing,lessonCount:c.courseLessonCount ?? undefined})):'Start with a 15-week Rivendell format, paste an outline, or reuse another class.'}</p></div><button type="button" class="teacher-button" data-plan-course="${escape(c.id)}">${c.overviewRevision?'Edit course overview':'Build course overview'}</button></section><div class="roster-heading"><h3>Students &amp; families</h3><span class="class-badge">${c.membership==='owner'?'Class owner':'Teacher'}</span></div><div class="teacher-actions"><button type="button" class="teacher-button" data-add-student="${escape(c.id)}">+ Add student</button><button type="button" class="teacher-button secondary" data-share-kind="class" data-class="${escape(c.id)}">Invite students</button></div><div data-roster="${escape(c.id)}" class="roster"><p>Loading students…</p></div>${c.membership==='owner'?`<details class="invite-settings"><summary>Teacher access</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" data-invite="${escape(c.id)}">Create teacher invite</button></details>`:''}</div></details>`).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div>';
+  list.innerHTML=classrooms.length ? classrooms.map(c=>`<details class="class-card" data-class-id="${escape(c.id)}" ${opened.has(c.id)?'open':''}><summary><span><h2>${escape(c.name)}</h2><small>${escape(c.subject || 'Class details')}</small></span></summary><div class="class-details"><section class="class-course"><div><p class="teacher-eyebrow">COURSE OVERVIEW</p><h3>Plan the term</h3><p data-course-status="${escape(c.id)}">${c.overviewRevision?escape(courseSummary({weeks:c.courseWeeks,lessonsPerWeek:c.courseFrequency,lessonMinutes:c.courseMinutes,pacing:c.coursePacing,lessonCount:c.courseLessonCount ?? undefined})):'Start with a 15-week Rivendell format, paste an outline, or reuse another class.'}</p></div><button type="button" class="teacher-button" data-plan-course="${escape(c.id)}">${c.overviewRevision?'Edit course overview':'Build course overview'}</button></section><div class="roster-heading"><h3>Students &amp; families</h3><span class="class-badge">${c.membership==='owner'?'Class owner':'Teacher'}</span></div><div class="teacher-actions"><button type="button" class="teacher-button" data-add-student="${escape(c.id)}">+ Add student</button><button type="button" class="teacher-button secondary" data-share-kind="class" data-class="${escape(c.id)}">Invite students</button></div><div data-roster="${escape(c.id)}" class="roster"><p>Loading students…</p></div>${c.membership==='owner'?`<details class="invite-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" data-invite="${escape(c.id)}">Create teacher invite</button><button type="button" class="text-button danger-text" data-delete-class="${escape(c.id)}">Delete class</button></details>`:''}</div></details>`).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div>';
 }
-const coursePlanner=createCoursePlanner({list,getClasses:()=>classrooms,status,problem});
+const coursePlanner=createCoursePlanner({list,getClasses:()=>classrooms,status,problem,onSaved:()=>calendar.refresh()});
+const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:(...args)=>coursePlanner.open(...args),problem});
+async function loadTrash(){
+  $('#retry-trash').hidden=true;$('#trash-list').textContent='Loading deleted classes…';
+  try{
+    const result=await api('/api/classes/trash');
+    $('#trash-list').innerHTML=result.classes.length?result.classes.map(c=>`<article class="trash-class"><div><h2>${escape(c.name)}</h2><p>${escape(c.subject)}</p></div><button type="button" class="teacher-button secondary" data-restore-class="${escape(c.id)}">Restore class</button></article>`).join(''):'<div class="calendar-empty">Trash is empty.</div>';
+  }catch(error){$('#trash-list').textContent=error.message;$('#retry-trash').hidden=false;if(error.status===401)problem(error);}
+}
+function showView(view){
+  $('.teacher-heading h1').textContent=view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':'My classes';
+  currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
+  document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
+  if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();
+}
+document.querySelectorAll('[data-teacher-view]').forEach(b=>b.onclick=()=>showView(b.dataset.teacherView));
+$('#retry-trash').onclick=loadTrash;
+$('#class-trash').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-restore-class]');if(!button||button.disabled)return;button.disabled=true;
+  try{await api('/api/classes/'+button.dataset.restoreClass+'/restore',{});await loadClasses();status.textContent='Class restored with its course plan and roster.';}catch(error){problem(error);}finally{button.disabled=false;}
+});
+$('#delete-class-form').addEventListener('submit',async event=>{
+  event.preventDefault();const button=event.target.querySelector('[type=submit]'),error=event.target.querySelector('.form-error');if(button.disabled)return;button.disabled=true;error.hidden=true;
+  try{await api('/api/classes/'+deletingClass+'/delete',{});rosters.delete(deletingClass);$('#delete-class').close();await loadClasses();status.textContent='Class moved to Trash. You can restore it from Trash.';}
+  catch(e){error.textContent=e.message;error.hidden=false;}finally{button.disabled=false;}
+});
 async function loadRoster(classId){
   const target=list.querySelector(`[data-roster="${classId}"]`);if(!target)return;
   try{
@@ -28,7 +55,7 @@ async function loadRoster(classId){
 list.addEventListener('toggle',event=>{if(event.target.matches('details.class-card')&&event.target.open)loadRoster(event.target.dataset.classId);},true);
 async function loadClasses(){
   if(loading||coursePlanner.isOpen())return;loading=true;retry.hidden=true;status.textContent='Loading your classes…';
-  try{classrooms=(await api('/api/classes')).classes;renderClasses();status.textContent='';}
+  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();if(currentView==='trash')await loadTrash();status.textContent='';}
   catch(error){problem(error);retry.hidden=false;}finally{loading=false;}
 }
 for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes/join']]){
@@ -57,6 +84,7 @@ async function generateShare(reset=false){
 list.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button||button.disabled)return;button.disabled=true;
   try{
+    if(button.dataset.deleteClass){deletingClass=button.dataset.deleteClass;$('#delete-class-name').textContent=classrooms.find(c=>c.id===deletingClass)?.name||'';$('#delete-class-form .form-error').hidden=true;openDialog('delete-class',button);}
     if(button.dataset.retryRoster)await loadRoster(button.dataset.retryRoster);
     if(button.dataset.addStudent){
       addingClass=button.dataset.addStudent;addRequestId='';$('#add-student-form').reset();$('#new-student-name').hidden=false;$('#student-name').required=true;$('#add-student-form .form-error').hidden=true;
@@ -91,6 +119,6 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',loadClasses);window.addEventListener('pageshow',loadClasses);window.addEventListener('pagehide',()=>{list.replaceChildren();rosters.clear();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',loadClasses);window.addEventListener('pageshow',loadClasses);window.addEventListener('pagehide',()=>{list.replaceChildren();rosters.clear();calendar.clear();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();

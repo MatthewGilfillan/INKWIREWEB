@@ -2,7 +2,7 @@ import { formats, useFormat } from './course-formats.mjs';
 import { api, escape } from './workspace-shared.js';
 import { presets, defaults, generateLessons, validateCourse, courseSummary, lessonDate, readCourseFile } from './course-model.mjs';
 
-export function createCoursePlanner({ list, getClasses, status, problem }) {
+export function createCoursePlanner({ list, getClasses, status, problem, onSaved }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'course-planner'; dialog.setAttribute('aria-labelledby', 'planner-title');
   dialog.innerHTML = `<button class="teacher-close" type="button" data-planner-close aria-label="Close course overview">×</button>
@@ -162,11 +162,12 @@ export function createCoursePlanner({ list, getClasses, status, problem }) {
         message('Course overview saved.'); status.textContent = 'Course overview saved for ' + getClasses().find(c => c.id === currentId)?.name + '.';
         list.querySelector(`[data-course-status="${currentId}"]`).textContent = courseSummary(course);
         list.querySelector(`[data-plan-course="${currentId}"]`).textContent = 'Edit course overview';
+        onSaved?.();
       } finally { controls.forEach((el, i) => { el.disabled = disabled[i]; }); refreshScheduleControls(); }
     } catch (e) { error(e.message); message('Your draft has not been saved.'); }
     finally { saving = false; form.querySelector('button[type=submit]').disabled = false; }
   });
-  async function open(classId, button) {
+  async function open(classId, button, lessonIndex) {
     trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation;
     form.hidden = true; error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
@@ -180,9 +181,13 @@ export function createCoursePlanner({ list, getClasses, status, problem }) {
       fill(initial); form.hidden = false;
       message(result.course ? 'Saved teacher draft. Make changes below.' : 'Rivendell starting format · 15 weeks · one 120-minute lesson each week.');
       if (result.course) list.querySelector(`[data-course-status="${classId}"]`).textContent = courseSummary(result.course);
+      if (Number.isInteger(lessonIndex)) {
+        const row = $('#course-lessons').querySelector(`[data-plan-lesson="${lessonIndex}"]`);
+        if (row) { row.open = true; row.querySelector('input').focus(); row.scrollIntoView({ block: 'start' }); }
+      }
     } catch (e) { message(e.message + ' Close and reopen to try again.'); if (e.status === 401) problem(e); }
   }
   list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
   window.addEventListener('beforeunload', event => { if (dirty && dialog.open) { event.preventDefault(); event.returnValue = ''; } });
-  return { isOpen: () => dialog.open };
+  return { isOpen: () => dialog.open, open };
 }
