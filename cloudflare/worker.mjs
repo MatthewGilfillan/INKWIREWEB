@@ -68,8 +68,10 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
       if (url.pathname === '/account' || url.pathname === '/account.html') {
-        if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN) return Response.redirect(`${env.APP_ORIGIN}/account.html`, 302);
-        if (url.pathname === '/account') return Response.redirect(`${url.origin}/account.html`, 302);
+        if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN) return Response.redirect(`${env.APP_ORIGIN}/account`, 302);
+        // Static Assets serves account.html at /account and redirects the extension.
+        // Keep that canonical direction so email links cannot enter a redirect loop.
+        if (url.pathname === '/account.html') return Response.redirect(`${url.origin}/account`, 302);
         const response = await env.ASSETS.fetch(request);
         const result = new Response(response.body, response);
         for (const [key, value] of Object.entries(secureHeaders)) result.headers.set(key, value);

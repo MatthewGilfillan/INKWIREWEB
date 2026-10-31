@@ -53,7 +53,8 @@ test('account creation, one-use activation, secure sign in, and sign out', async
     assert.notEqual(f.db.prepare('SELECT password FROM account').get().password, PASSWORD);
     assert.equal((await f.post('signin', { email: EMAIL, password: PASSWORD })).status, 403);
     const activation = decodeURIComponent(f.token());
-    assert.equal((await f.request('/account.html')).status, 200);
+    assert.equal((await f.request('/account.html')).headers.get('Location'), ORIGIN + '/account');
+    assert.equal((await f.request('/account')).status, 200);
     assert.equal(f.db.prepare('SELECT emailVerified FROM user').get().emailVerified, 0);
     assert.equal((await f.post('activate', { token: activation })).status, 200);
     assert.equal((await f.post('activate', { token: activation })).status, 400);
@@ -105,6 +106,22 @@ test('account type is required and duplicate signup cannot change an existing pr
     assert.equal((await f.post('signup', { email: EMAIL, password: PASSWORD, accountType: 'teacher' })).status, 200);
     assert.equal(f.db.prepare('SELECT requestedRole FROM user').get().requestedRole, 'parent');
     assert.equal(f.db.prepare('SELECT count(*) AS n FROM user').get().n, 1);
+  } finally { f.db.close(); }
+});
+
+test('account links follow the Static Assets canonical URL without a redirect loop', async () => {
+  const f = await fixture();
+  try {
+    f.env.ASSETS.fetch = async request => new URL(request.url).pathname === '/account.html'
+      ? Response.redirect(ORIGIN + '/account', 307)
+      : new Response('<title>Your account</title>');
+    const entry = await f.request('/account.html');
+    assert.equal(entry.status, 302);
+    assert.equal(entry.headers.get('Location'), ORIGIN + '/account');
+    const canonical = await f.request('/account');
+    assert.equal(canonical.status, 200);
+    assert.equal(canonical.headers.get('Cache-Control'), 'no-store');
+    assert.match(canonical.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
   } finally { f.db.close(); }
 });
 
