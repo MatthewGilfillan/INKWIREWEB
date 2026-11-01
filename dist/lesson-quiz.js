@@ -24,10 +24,13 @@ export function createLessonQuiz(){
     const quiz=data.quiz;
     if(data.active && !data.cancelled){
       $('[data-quiz-body]').replaceChildren();const holder=document.createElement('div');$('[data-quiz-body]').append(holder);
-      player=createQuizPlayer({root:holder,quiz,onDirty:()=>dirty=true,onSubmit:async({answers,reflection})=>save({action:'submit',attemptId:data.active,answers,reflection},true)});
+      const attemptId=data.active;
+      player=createQuizPlayer({root:holder,quiz,progress:data.progress,onDirty:value=>dirty=value,
+        onAnswer:async answer=>{const result=await saveProgress({action:'answer',attemptId,...answer});return result.feedback;},
+        onFinish:async({reflection})=>{if(quiz.reflectionPrompt)await saveProgress({action:'reflection',attemptId,reflection});render();$('[data-quiz-status]').textContent='Quiz complete. Your first score is saved on the course timeline.';}});
       return;
     }
-    $('[data-quiz-body]').innerHTML=`<div class="quiz-result-panel">${data.result.latest?`<h3 class="quiz-completion">✦ Preparation complete</h3>${quizScoreHTML(data.result)}`:`<h3>Ready for your reading check?</h3><p>${quiz.questions.length} questions · Use your book and take your time.</p>`}${data.cancelled?'<p>This lesson is cancelled. Saved results are available below.</p>':data.result.attemptCount>=20?'<p>You have completed all 20 available attempts.</p>':`<button type="button" class="teacher-button" data-start-quiz>${data.result.latest?'Try again':'Start quiz'}</button>`}</div>${data.review?'<button type="button" class="teacher-button secondary" data-student-flashcards>Practise flashcards</button><div data-flashcard-practice></div>':''}${data.attempts.map((a,i)=>`<details class="quiz-attempt-review" ${i===0?'open':''}><summary>Attempt ${data.attempts.length-i} · ${a.score}/${a.total} · ${a.percentage}%</summary><ol>${quiz.questions.map((q,n)=>`<li><h4>${escape(q.prompt)}</h4><p>${a.answers[n]===data.review[n].correctIndex?'✓ Correct':'Review this answer'} · Your answer: ${escape(q.options[a.answers[n]])}</p>${a.answers[n]!==data.review[n].correctIndex?`<p>Correct answer: ${escape(q.options[data.review[n].correctIndex])}</p>`:''}${data.review[n].explanation?`<p>${escape(data.review[n].explanation)}</p>`:''}</li>`).join('')}</ol>${a.reflection?`<h4>Your question for class</h4><p class="feedback-homework">${escape(a.reflection)}</p>`:''}</details>`).join('')}`;
+    $('[data-quiz-body]').innerHTML=`<div class="quiz-result-panel">${data.result.latest?`<h3 class="quiz-completion">✦ Preparation complete</h3>${quizScoreHTML(data.result)}`:`<h3>Ready for your reading check?</h3><p>${quiz.questions.length} questions · Use your book and take your time. Your first completed score will be recorded.</p>`}${data.cancelled?'<p>This lesson is cancelled. Saved results are available below.</p>':data.result.attemptCount>=20?'<p>You have completed all 20 available attempts.</p>':`<button type="button" class="teacher-button" data-start-quiz>${data.result.latest?'Replay quiz':'Start quiz'}</button>`}</div>${data.review?'<button type="button" class="teacher-button secondary" data-student-flashcards>Practise flashcards</button><div data-flashcard-practice></div>':''}${data.attempts.map((a,i)=>`<details class="quiz-attempt-review" ${i===0?'open':''}><summary>Attempt ${data.attempts.length-i} · ${a.score}/${a.total} · ${a.percentage}%</summary><ol>${quiz.questions.map((q,n)=>`<li><h4>${escape(q.prompt)}</h4><p>${a.answers[n]===data.review[n].correctIndex?'✓ Correct':'Review this answer'} · Your answer: ${escape(q.options[a.answers[n]])}</p>${a.answers[n]!==data.review[n].correctIndex?`<p>Correct answer: ${escape(q.options[data.review[n].correctIndex])}</p>`:''}${data.review[n].explanation?`<p>${escape(data.review[n].explanation)}</p>`:''}</li>`).join('')}</ol>${a.reflection?`<h4>Your question for class</h4><p class="feedback-homework">${escape(a.reflection)}</p>`:''}</details>`).join('')}`;
   }
   function error(message=''){$('[data-quiz-error]').textContent=message;$('[data-quiz-error]').hidden=!message;}
   async function save(body,rethrow=false){
@@ -37,6 +40,12 @@ export function createLessonQuiz(){
       data=result;dirty=false;changed=true;render();$('[data-quiz-status]').textContent=body.action==='save'?'Quiz assigned to this lesson.':body.action==='submit'?'Quiz submitted. Your score is saved on the course timeline.':'';
     }catch(e){if(version===epoch){error(e.message);$('[data-quiz-status]').textContent='Your entries are still here. Try again when ready.';}if(rethrow)throw e;}
     finally{if(version===epoch){busy=false;controls.forEach((el,i)=>el.disabled=disabled[i]);$('.teacher-close').disabled=false;}}
+  }
+  async function saveProgress(body){
+    if(busy)throw Error('Please wait for your answer to save.');
+    busy=true;$('.teacher-close').disabled=true;error();const version=epoch;
+    try{const result=await api(route,{...body,revision:data.revision});if(version===epoch){data=result;dirty=false;changed=true;}return result;}
+    finally{if(version===epoch){busy=false;$('.teacher-close').disabled=false;}}
   }
   function close(){if(busy)return;if(dirty && !confirm('Close without submitting your unsaved quiz entries?'))return;dialog.close();}
   $('.teacher-close').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});

@@ -1,8 +1,8 @@
 import {escape} from './workspace-shared.js';
 export function quizScoreHTML(result){
   if(!result?.latest)return `<p class="quiz-score quiz-score-pending">${result?.inProgress?'In progress · not submitted':'Not submitted'}</p>`;
-  const {latest,best,attemptCount}=result;
-  return `<div class="quiz-score"><strong>${latest.score}/${latest.total} <span>· ${latest.percentage}%</span></strong><p>Latest score${attemptCount>1?` · ${attemptCount} attempts · Best: ${best.score}/${best.total} (${best.percentage}%)`:''}${result.inProgress?' · Retry in progress':''}</p></div>`;
+  const {latest,best,attemptCount}=result,first=result.first || latest;
+  return `<div class="quiz-score"><strong>${first.score}/${first.total} <span>· ${first.percentage}%</span></strong><p>First score${attemptCount>1?` · ${attemptCount-1} replay${attemptCount>2?'s':''} · Latest: ${latest.score}/${latest.total} (${latest.percentage}%) · Best: ${best.score}/${best.total} (${best.percentage}%)`:''}${result.inProgress?' · Replay in progress':''}</p></div>`;
 }
 export function teacherStudentHTML(lesson,assessmentHTML){
   const students=new Map((lesson.quiz?.results || []).map(s=>[s.learnerId,{learnerId:s.learnerId,name:s.name,quiz:s}]));
