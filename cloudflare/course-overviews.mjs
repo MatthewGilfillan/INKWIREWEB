@@ -19,7 +19,8 @@ export async function handleCourseOverview(request, env, user, classId, { json, 
   } catch (error) { return fail(error.message === 'BODY_TOO_LARGE' ? 'This overview is too long. Shorten it before saving.' : error.message || 'Check the course overview.', 400, 'INVALID_INPUT'); }
   const reports = (await env.DB.prepare('SELECT lesson_id,published FROM lesson_feedback WHERE class_id = ?').bind(classId).all()).results;
   const ids = new Set(course.lessons.map(lessonKey));
-  if (reports.some(row => !ids.has(row.lesson_id))) return fail('Lessons with saved feedback cannot be removed or replaced. Edit those lessons in place, or copy the plan into a new class.', 409, 'LESSON_HAS_FEEDBACK');
+  const quizzes=(await env.DB.prepare('SELECT lesson_id FROM lesson_quizzes WHERE class_id=?').bind(classId).all()).results;
+  if ([...reports,...quizzes].some(row => !ids.has(row.lesson_id))) return fail('Lessons with saved feedback or quizzes cannot be removed or replaced. Edit those lessons in place, or copy the plan into a new class.', 409, 'LESSON_HAS_FEEDBACK');
   const previous = await read(), priorCourse = previous ? JSON.parse(previous.content) : null;
   for (const report of reports.filter(r=>r.published)) {
     const before=priorCourse?.lessons.find((l,i)=>lessonKey(l,i)===report.lesson_id), after=course.lessons.find((l,i)=>lessonKey(l,i)===report.lesson_id);
@@ -30,12 +31,13 @@ export async function handleCourseOverview(request, env, user, classId, { json, 
   const saved = input.revision === 0
     ? await env.DB.prepare(`INSERT INTO course_overviews(class_id, revision, content, updated_by, updated_at) VALUES (?,1,?,?,?) ON CONFLICT(class_id) DO NOTHING RETURNING revision`).bind(classId, content, user.id, now).first()
     : await env.DB.prepare(`UPDATE course_overviews SET content = ?, revision = revision + 1, updated_by = ?, updated_at = ? WHERE class_id = ? AND revision = ? AND NOT EXISTS (SELECT 1 FROM lesson_feedback f WHERE f.class_id=? AND f.lesson_id NOT IN (SELECT COALESCE(json_extract(value,'$.id'),'legacy-'||(key+1)) FROM json_each(?,'$.lessons')))
+      AND NOT EXISTS (SELECT 1 FROM lesson_quizzes q WHERE q.class_id=? AND q.lesson_id NOT IN (SELECT COALESCE(json_extract(value,'$.id'),'legacy-'||(key+1)) FROM json_each(?,'$.lessons')))
       AND NOT EXISTS (SELECT 1 FROM lesson_feedback f, json_each(?,'$.lessons') n, json_each(course_overviews.content,'$.lessons') old
         WHERE f.class_id=course_overviews.class_id AND f.published IS NOT NULL
         AND f.lesson_id=COALESCE(json_extract(n.value,'$.id'),'legacy-'||(n.key+1)) AND f.lesson_id=COALESCE(json_extract(old.value,'$.id'),'legacy-'||(old.key+1))
         AND (json_extract(n.value,'$.status')='cancelled' OR json_extract(n.value,'$.date')!=json_extract(old.value,'$.date')
           OR COALESCE(json_extract(n.value,'$.startTime'),json_extract(?,'$.startTime'))!=COALESCE(json_extract(old.value,'$.startTime'),json_extract(course_overviews.content,'$.startTime'))
-          OR COALESCE(json_extract(n.value,'$.lessonMinutes'),json_extract(?,'$.lessonMinutes'))!=COALESCE(json_extract(old.value,'$.lessonMinutes'),json_extract(course_overviews.content,'$.lessonMinutes')))) RETURNING revision`).bind(content, user.id, now, classId, input.revision, classId, content, content, content, content).first();
+          OR COALESCE(json_extract(n.value,'$.lessonMinutes'),json_extract(?,'$.lessonMinutes'))!=COALESCE(json_extract(old.value,'$.lessonMinutes'),json_extract(course_overviews.content,'$.lessonMinutes')))) RETURNING revision`).bind(content, user.id, now, classId, input.revision, classId, content, classId, content, content, content, content).first();
   if (!saved) {
     const latest = await read();
     // Retrying the same saved content is safe, including after a lost response.

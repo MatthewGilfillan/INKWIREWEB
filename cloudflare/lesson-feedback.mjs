@@ -1,3 +1,4 @@
+import {quizTimeline} from './lesson-quizzes.mjs';
 import {lessonTiming,billingSchedule} from '../dist/schedule-model.mjs';
 import { lessonKey, lessonEnd, validateAssessment } from '../dist/lesson-feedback-model.mjs';
 import { formatSummaryText } from '../dist/summary-format.mjs';
@@ -27,13 +28,14 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
   const course=JSON.parse(linked.content), rows=(await env.DB.prepare('SELECT lesson_id,published FROM lesson_feedback WHERE class_id=? AND published IS NOT NULL').bind(classId).all()).results;
   const reports=new Map(rows.map(r=>[r.lesson_id,JSON.parse(r.published)])),billing=billingSchedule(course);
   const roster=teacherTimeline?await getRoster(env,classId):[],names=new Map(roster.map(s=>[s.id,s.name]));
-  return json({demo,teacher:teacherTimeline,serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
+  const quizzes=await quizTimeline(env,classId,teacherTimeline?{roster}:{learnerId:linked.id});
+  return json({demo,teacher:teacherTimeline,canTakeQuiz:user.requestedRole==='student',serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
     lessons:course.lessons.map((lesson,i)=>{
       const report=reports.get(lessonKey(lesson,i)), own=report?.students[linked.id];
       // Project fields on the server: never send roster, drafts, speaker labels,
       // private planning notes, or another learner's assessment to a family.
       let endsAt=null;try{endsAt=lessonEnd(course,lesson);}catch{}
-      return {endsAt,...lessonTiming(course,lesson),status:lesson.status || 'scheduled',rescheduledFrom:lesson.rescheduledFrom || null,billing:teacherTimeline || course.billingMode==='packs'?billing.get(lessonKey(lesson,i))?.label || '':'',id:lessonKey(lesson,i),number:i+1,title:lesson.title,date:lesson.date,section:lesson.section || '',goal:lesson.goal,reading:lesson.reading,
+      return {quiz:quizzes.get(lessonKey(lesson,i)) || null,endsAt,...lessonTiming(course,lesson),status:lesson.status || 'scheduled',rescheduledFrom:lesson.rescheduledFrom || null,billing:teacherTimeline || course.billingMode==='packs'?billing.get(lessonKey(lesson,i))?.label || '':'',id:lessonKey(lesson,i),number:i+1,title:lesson.title,date:lesson.date,section:lesson.section || '',goal:lesson.goal,reading:lesson.reading,
         homework:report?.homework ?? lesson.homework,homeworkUpdated:report?.homework!==null && report?.homework!==undefined,
         report:report?{summary:report.summary,publishedAt:report.publishedAt,assessment:own?{attendance:own.attendance,ratings:own.ratings,quote:own.quote,...(user.requestedRole==='parent' || demo?{parentComment:own.parentComment}:{})}:null,
           ...(teacherTimeline?{assessments:Object.entries(report.students || {}).map(([learnerId,assessment])=>({learnerId,name:assessment.name || names.get(learnerId) || 'Former student',attendance:assessment.attendance,ratings:assessment.ratings})).sort((a,b)=>a.name.localeCompare(b.name))}:{})}:null};
