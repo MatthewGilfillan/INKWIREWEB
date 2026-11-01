@@ -1,0 +1,120 @@
+/* Ink Wire's LearnWorlds palette, sampled in sRGB from the supplied screenshots.
+   Shared by the public site and every signed-in workspace. */
+:root {
+  --brand-navy: #032b62;
+  --brand-dark: #071c40;
+  --brand-mint: #64e6be;
+  --brand-mint-hover: #89edcf;
+  --brand-mint-soft: #e8faf3;
+  --brand-green: #137b5d;
+  --brand-lavender: #e9d7e9;
+  --brand-lavender-hover: #dfc6df;
+  --brand-lavender-soft: #f7eff7;
+  --brand-body: #455c85;
+  --navy: var(--brand-dark);
+  --ink: var(--brand-navy);
+  --muted: var(--brand-body);
+  --aqua: var(--brand-mint);
+  --green: var(--brand-navy);
+  --lavender: var(--brand-lavender);
+  --periwinkle: var(--brand-navy);
+  --violet-ink: var(--brand-navy);
+  --paper: #fff;
+  --line: #dcdfea;
+  --gold: #c8a15a;
+}
+body, body[data-account-page] { background: var(--paper); color: var(--ink); }
+.site-header, .teacher-header, .account-header { border-top: 4px solid var(--brand-green); }
+
+/* The new artwork has its own tight transparent frame; no CSS cropping. */
+.wordmark { position: static; aspect-ratio: auto; overflow: visible; }
+.wordmark img { position: static; display: block; width: 100%; max-width: 100%; height: auto; }
+.site-header .brand { width: 210px; }
+.brand-caption, .brand small { color: var(--brand-body); }
+.account-header img, .teacher-header img { height: auto; }
+.footer-brand img { background: transparent; }
+
+/* Public website */
+.hero h1, h1 em, h2 em, .about-copy .teacher-qualifications { color: var(--brand-navy); }
+.hero-copy > p, .support-copy > p, .support-solution p, .about-copy > p,
+.faqs details p, .start-inner > div > p { color: var(--brand-body); }
+.hero-actions .button, .header-signin { background: var(--brand-mint); border-color: var(--brand-mint); color: var(--brand-dark); }
+.hero-actions .button:hover, .header-signin:hover { background: var(--brand-mint-hover); border-color: var(--brand-mint-hover); }
+.hero-actions .button-secondary { background: var(--brand-lavender); border-color: var(--brand-lavender); }
+.hero-actions .button-secondary:hover { background: var(--brand-lavender-hover); border-color: var(--brand-lavender-hover); }
+.learning-support, .start-section { background: var(--brand-lavender); border-color: #ddc6dd; }
+.support-solution { border-left-color: var(--brand-green); }
+.reading-photo { box-shadow: 14px 14px 0 var(--brand-lavender); }
+.tutoring .student-program-art { background: var(--brand-mint-soft); }
+.program-body { background: var(--brand-dark); color: #fff; }
+.program-body h3 { color: #fff; }
+.program-body p { color: #dae3f3; }
+.program-body a { color: var(--brand-lavender); border-top-color: #405373; }
+.program-body a:hover { color: var(--brand-mint); }
+.approach { background: var(--brand-dark); color: #fff; }
+.approach h2, .approach h3 { color: #fff; }
+.approach h2 em, .teaching-steps li > span { color: var(--brand-mint); }
+.approach p { color: #dae3f3; }
+.teaching-steps li { border-color: #405373; }
+.teacher-photo figcaption { background: var(--brand-dark); }
+.teacher-photo figcaption span { color: var(--brand-mint); }
+
+/* Account controls and shared actions. Keep destructive actions distinct. */
+[data-account-root], [data-account-root] h2, .account-tabs button[aria-pressed=true] { color: var(--brand-navy); }
+[data-account-root] p { color: var(--brand-body); }
+.account-submit, .teacher-button:not(.danger), .btn, .btn.light {
+  background: var(--brand-mint); color: var(--brand-dark); border-color: var(--brand-mint);
+}
+.account-submit:hover, .teacher-button:not(.danger):hover, .btn:hover {
+  background: var(--brand-mint-hover); border-color: var(--brand-mint-hover);
+}
+.teacher-button.secondary, .btn.secondary, .account-password button {
+  background: var(--brand-lavender); border-color: #dcc5dc; color: var(--brand-navy);
+}
+.teacher-button.secondary:hover, .btn.secondary:hover { background: var(--brand-lavender-hover); border-color: #d3b6d3; }
+.account-tabs, .account-availability { background: var(--brand-lavender-soft); border-color: #ddcddd; }
+.account-link, .text-button, .student-row-actions summary, .link { color: var(--brand-navy); }
+.account-message:not(.is-error), .account-badge { background: var(--brand-mint-soft); color: #17634f; }
+.account-form .account-remember input, .schedule-date input, .quiz-choice input { accent-color: var(--brand-navy); }
+
+/* Class navigation, rosters, planning, calendar, quizzes and feedback. */
+.teacher-eyebrow, .class-workspace-heading label, .timeline-details > summary,
+.quiz-score strong, .roster-rate, .plan-lesson summary b { color: var(--brand-navy); }
+.class-tab-list button[aria-selected=true] { background: var(--brand-mint); border-color: var(--brand-navy); color: var(--brand-dark); }
+.class-tab-list button:hover { background: var(--brand-mint-soft); }
+.class-tab-list button[aria-selected=true]:hover { background: var(--brand-mint-hover); }
+.teacher-view-nav button[aria-pressed=true], .sidebar nav a.active { background: var(--brand-lavender); color: var(--brand-navy); }
+.class-badge, .course-tag, .course-assistant .class-badge, .datebox, .pill { background: var(--brand-lavender); color: var(--brand-navy); }
+.student-table thead th, .calendar-weekdays { background: var(--brand-lavender); color: var(--brand-navy); }
+.student-table thead small { color: var(--brand-body); }
+.connection-pill.linked, .class-course, .billing-months > div, .quiz-result-panel { background: var(--brand-mint-soft); color: var(--brand-navy); }
+.planner-intro, .course-assistant, .quiz-ai-tools, .timeline-quiz,
+.student-quiz-score, .feedback-parent, .notice { background: var(--brand-lavender-soft); border-color: #ddcddd; color: var(--brand-navy); }
+.lesson-billing { background: var(--brand-lavender); color: var(--brand-navy)!important; }
+.timeline-number { background: var(--brand-navy); }
+.timeline-content, .feedback-student, .timeline-student-assessment { background: #fff; border-color: var(--line); }
+.feedback-metric { background: var(--brand-mint-soft); border-color: #c2e8d9; }
+.feedback-metric strong { color: var(--brand-navy); }
+.calendar-day.is-today h3 time { background: var(--brand-navy); }
+.calendar-event:not(.is-cancelled) { background: var(--brand-mint-soft); border-color: #bfe9d9; border-left-color: var(--brand-green); color: var(--brand-navy); }
+.calendar-event:not(.is-cancelled):hover { background: #d2f5e8; }
+.calendar-event time { color: #17634f; }
+.calendar-event small { color: var(--brand-navy); }
+.outside-month { background: #faf8fc; }
+.quiz-choice { background: #fff; border-color: #c3cbdc; }
+.quiz-choice:has(input:checked) { background: var(--brand-mint-soft); border-color: var(--brand-green); }
+.lesson-quiz, .lesson-feedback, .member-course { color: var(--brand-navy); }
+.quiz-choice:focus-within { outline: 2px solid var(--brand-navy); outline-offset: 3px; }
+
+/* Demonstration workspaces share the same visual identity. */
+.dashboard-next { background: linear-gradient(135deg,var(--brand-mint-soft),#fff 75%); border-top-color: var(--brand-mint); }
+.tabs button.active, .weekdot.current { background: var(--brand-navy); color: #fff; }
+.progress span { background: var(--brand-green); }
+.timeline .card.selected { border-color: var(--brand-green); }
+.hero:not(.section-width) { background: var(--brand-dark); }
+.hero:not(.section-width) .eyebrow { color: var(--brand-mint); }
+
+:is(button,a,input,select,textarea,summary):focus-visible { outline-color: var(--brand-navy); }
+.approach :focus-visible, .program-body :focus-visible { outline-color: var(--brand-mint); }
+@media(max-width:900px) { .site-header .brand { width: 180px; } }
+@media(max-width:520px) { .site-header .brand { width: 175px; } }
