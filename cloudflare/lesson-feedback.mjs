@@ -10,7 +10,7 @@ const access = (env,user,classId) => env.DB.prepare(`SELECT c.id, o.content, o.r
 const getRoster = async(env,classId) => (await env.DB.prepare(`SELECT l.id, l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.id`).bind(classId).all()).results;
 const read = (env,classId,lessonId) => env.DB.prepare('SELECT * FROM lesson_feedback WHERE class_id=? AND lesson_id=?').bind(classId,lessonId).first();
 const view = row => ({revision:row?.revision || 0,draft:row?JSON.parse(row.draft):null,published:row?.published?JSON.parse(row.published):null,busy:!!row && row.job_until>Date.now()});
-const personal = (draft,extras={}) => Object.fromEntries(draft.assessments.map(a=>[a.learnerId,{attendance:a.attendance,ratings:a.ratings,quote:a.attendance==='present'?(extras[a.learnerId]?.quote || null):null,parentComment:a.parentNote || extras[a.learnerId]?.parentComment || null}]));
+const personal = (draft,extras={},roster=[]) => Object.fromEntries(draft.assessments.map(a=>[a.learnerId,{name:roster.find(s=>s.id===a.learnerId)?.name,attendance:a.attendance,ratings:a.ratings,quote:a.attendance==='present'?(extras[a.learnerId]?.quote || null):null,parentComment:a.parentNote || extras[a.learnerId]?.parentComment || null}]));
 
 async function familyOverview(request,env,user,classId,{json,fail},teacherTimeline=false) {
   if(request.method!=='GET')return fail('Use GET.',405);
@@ -26,6 +26,7 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
   if(!linked.content)return json({demo,teacher:teacherTimeline,serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:null});
   const course=JSON.parse(linked.content), rows=(await env.DB.prepare('SELECT lesson_id,published FROM lesson_feedback WHERE class_id=? AND published IS NOT NULL').bind(classId).all()).results;
   const reports=new Map(rows.map(r=>[r.lesson_id,JSON.parse(r.published)])),billing=billingSchedule(course);
+  const roster=teacherTimeline?await getRoster(env,classId):[],names=new Map(roster.map(s=>[s.id,s.name]));
   return json({demo,teacher:teacherTimeline,serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
     lessons:course.lessons.map((lesson,i)=>{
       const report=reports.get(lessonKey(lesson,i)), own=report?.students[linked.id];
@@ -34,7 +35,8 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
       let endsAt=null;try{endsAt=lessonEnd(course,lesson);}catch{}
       return {endsAt,...lessonTiming(course,lesson),status:lesson.status || 'scheduled',rescheduledFrom:lesson.rescheduledFrom || null,billing:teacherTimeline || course.billingMode==='packs'?billing.get(lessonKey(lesson,i))?.label || '':'',id:lessonKey(lesson,i),number:i+1,title:lesson.title,date:lesson.date,section:lesson.section || '',goal:lesson.goal,reading:lesson.reading,
         homework:report?.homework ?? lesson.homework,homeworkUpdated:report?.homework!==null && report?.homework!==undefined,
-        report:report?{summary:report.summary,publishedAt:report.publishedAt,assessment:own?{attendance:own.attendance,ratings:own.ratings,quote:own.quote,...(user.requestedRole==='parent' || demo?{parentComment:own.parentComment}:{})}:null}:null};
+        report:report?{summary:report.summary,publishedAt:report.publishedAt,assessment:own?{attendance:own.attendance,ratings:own.ratings,quote:own.quote,...(user.requestedRole==='parent' || demo?{parentComment:own.parentComment}:{})}:null,
+          ...(teacherTimeline?{assessments:Object.entries(report.students || {}).map(([learnerId,assessment])=>({learnerId,name:assessment.name || names.get(learnerId) || 'Former student',attendance:assessment.attendance,ratings:assessment.ratings})).sort((a,b)=>a.name.localeCompare(b.name))}:{})}:null};
     })}});
 }
 
@@ -98,11 +100,11 @@ export async function handleLessonFeedback(request,env,user,helpers) {
     if(input.action==='publish'){
       if(!await reserveRequest(env,user.id))throw Error('AI request limit reached. Your ratings are saved. Allow one minute between requests; up to 5 requests per teacher per UTC day.');
       const result=await generateLessonFeedback(env,file,draft,roster,lesson);
-      report={summary:result.summary,homework:result.homework,students:personal(draft,result.extras),provider:result.provider,model:result.model,requestId:result.requestId,requestToken:token};
+      report={summary:result.summary,homework:result.homework,students:personal(draft,result.extras,roster),provider:result.provider,model:result.model,requestId:result.requestId,requestToken:token};
     }else{
       const extras=input.extras?Object.fromEntries(input.extras.map(x=>[x.learnerId,{quote:x.quote.trim() || null,parentComment:x.parentComment.trim() || null}])):state.published.students;
       const corrected=input.extras?{...draft,assessments:draft.assessments.map(a=>({...a,parentNote:extras[a.learnerId].parentComment || ''}))}:draft;
-      report={...state.published,summary:formatSummaryText(input.summary),homework:input.homework.trim(),students:personal(corrected,extras)};
+      report={...state.published,summary:formatSummaryText(input.summary),homework:input.homework.trim(),students:personal(corrected,extras,roster)};
     }
     const current=await access(env,user,classId), newRoster=await getRoster(env,classId);
     if(!current || current.revision!==classroom.revision || JSON.stringify(newRoster)!==JSON.stringify(roster))throw Error('The schedule, course or roster changed during generation. Your ratings are saved; reopen the lesson before publishing.');

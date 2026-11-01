@@ -8,7 +8,7 @@ export function createLessonFeedback() {
   const dialog=document.createElement('dialog');dialog.className='lesson-feedback';dialog.setAttribute('aria-labelledby','lesson-feedback-title');
   dialog.innerHTML=`<button type="button" class="teacher-close" aria-label="Close Summary & Feedback">×</button><p class="teacher-eyebrow">AFTER CLASS</p><h2 id="lesson-feedback-title">Summary &amp; Feedback</h2><p data-feedback-lesson></p><p data-feedback-status role="status" aria-live="polite"></p><p data-feedback-error role="alert" hidden></p><form hidden><div data-feedback-roster></div><section class="feedback-upload"><h3>Lesson transcript</h3><label for="feedback-teacher-speaker">Your speaker label in the transcript <span>(optional)</span></label><input id="feedback-teacher-speaker" maxlength="80" placeholder="For example: Matthew"><p class="planner-hint">Use the exact label to identify your homework instructions and comments for parents. Leave it blank if speakers are unclear; the saved homework will stay in place.</p><label for="feedback-transcript">Upload transcript (.txt or .vtt, up to 512 KiB)</label><input id="feedback-transcript" type="file" accept=".txt,.vtt,text/plain,text/vtt"><p>The full transcript and the speaker labels you enter are sent to OpenAI. The transcript is not stored in Ink Wire. Your ratings are saved exactly as entered.</p></section><div class="teacher-actions"><button type="button" class="teacher-button secondary" data-feedback-save>Save ratings draft</button><button type="submit" class="teacher-button">Generate &amp; publish feedback</button></div><p class="planner-hint">Publishes the recap, each student’s own assessment and any explicit homework update to their connected student and parent dashboards. Optional parent comments appear only to that student’s parents.</p><section data-feedback-published hidden><h3>Published lesson report</h3><label for="feedback-preview-student">Preview a student’s report</label><select id="feedback-preview-student"></select><div data-feedback-preview></div><details class="feedback-corrections"><summary>Correct the published summary or homework</summary><label for="feedback-correct-summary">Shared class summary</label><textarea id="feedback-correct-summary" rows="12" maxlength="14000"></textarea><label for="feedback-correct-homework">Homework</label><textarea id="feedback-correct-homework" rows="4" maxlength="4000"></textarea><div data-feedback-correct-students></div><p>Corrections publish the ratings above and the quotes and parent notes in this section. No new AI request is made.</p><button type="button" class="teacher-button secondary" data-feedback-correct>Publish corrections</button></details></section></form>`;
   document.body.append(dialog);const $=selector=>dialog.querySelector(selector),form=$('form');
-  let route='',data=null,trigger=null,busy=false,dirty=false,epoch=0,attemptId='',timer;
+  let route='',data=null,trigger=null,busy=false,dirty=false,epoch=0,attemptId='',timer,publishedChange=false,activeClassId='',activeLessonId='';
   function setError(message=''){$('[data-feedback-error]').textContent=message;$('[data-feedback-error]').hidden=!message;}
   function readDraft(){return {teacherSpeaker:$('#feedback-teacher-speaker').value,assessments:[...dialog.querySelectorAll('[data-feedback-student]')].map(row=>({learnerId:row.dataset.feedbackStudent,attendance:row.querySelector('[data-attendance]').value,speaker:row.querySelector('[data-speaker]').value,parentNote:row.querySelector('[data-parent-note]').value,ratings:Object.fromEntries(Object.keys(ratingFields).map(key=>[key,Number(row.querySelector(`input[name="${row.dataset.feedbackStudent}-${key}"]:checked`)?.value) || null]))}))};}
   function status(text){$('[data-feedback-status]').textContent=text;}
@@ -36,7 +36,7 @@ export function createLessonFeedback() {
   $('#feedback-preview-student').onchange=preview;
   function close(){if(busy)return;if(dirty && !confirm('Close without saving your latest ratings?'))return;dialog.close();}
   $('.teacher-close').onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
-  dialog.addEventListener('close',()=>{epoch++;clearTimeout(timer);data=null;dirty=false;form.reset();$('[data-feedback-roster]').replaceChildren();$('[data-feedback-preview]').replaceChildren();trigger?.focus();});
+  dialog.addEventListener('close',()=>{epoch++;clearTimeout(timer);data=null;dirty=false;form.reset();$('[data-feedback-roster]').replaceChildren();$('[data-feedback-preview]').replaceChildren();trigger?.focus();if(publishedChange){publishedChange=false;document.dispatchEvent(new CustomEvent('inkwire:feedback-published',{detail:{classId:activeClassId,lessonId:activeLessonId}}));}});
   form.addEventListener('input',event=>{if(event.target.id==='feedback-preview-student')return;dirty=true;attemptId='';const row=event.target.closest('[data-feedback-student]');if(row && event.target.matches('[data-attendance]'))for(const field of row.querySelectorAll('fieldset'))field.disabled=event.target.value==='absent';});
   async function submit(action){
     if(busy || !data)return;busy=true;setError();const version=epoch;let draft;
@@ -55,12 +55,12 @@ export function createLessonFeedback() {
       try{
         const result=await api(route,body,{timeoutMs:110000});if(version!==epoch)return;
         Object.assign(data,result);dirty=false;showPublished();status(action==='save'?'Ratings draft saved. Students and parents cannot see this draft.':'Published to the connected student and parent dashboards.');
-        if(action!=='save')$('[data-feedback-published]').scrollIntoView({block:'start'});
+        if(action!=='save'){publishedChange=true;$('[data-feedback-published]').scrollIntoView({block:'start'});}
       }catch(error){
         if(version!==epoch)return;
         // Recover the server revision after a provider failure or lost response.
         // Never advance past someone else’s edits silently.
-        try{const current=await api(route);if(JSON.stringify(current.draft)===JSON.stringify(draft)){Object.assign(data,current,{loadedAt:performance.now()});if(current.published?.requestToken===attemptId){dirty=false;showPublished();status('Published to the connected student and parent dashboards.');return;}}}catch{}
+        try{const current=await api(route);if(JSON.stringify(current.draft)===JSON.stringify(draft)){Object.assign(data,current,{loadedAt:performance.now()});if(current.published?.requestToken===attemptId){dirty=false;publishedChange=true;showPublished();status('Published to the connected student and parent dashboards.');return;}}}catch{}
         setError(error.message);status(data.busy?'A report is still being generated. Close and reopen shortly to check the result.':'Your form is still here. Resolve the problem and try again.');
       }finally{if(version===epoch){busy=false;controls.forEach((el,i)=>el.disabled=disabled[i]);$('.teacher-close').disabled=false;updateAvailability();}}
     }catch(error){setError(error.message);}
@@ -69,7 +69,7 @@ export function createLessonFeedback() {
   form.onsubmit=event=>{event.preventDefault();submit('publish');};$('[data-feedback-save]').onclick=()=>submit('save');$('[data-feedback-correct]').onclick=()=>submit('correct');
   window.addEventListener('beforeunload',event=>{if(dialog.open && (dirty || busy)){event.preventDefault();event.returnValue='';}});
   return sharedFeedback={async open(classId,lessonId,button){
-    trigger=button;const version=++epoch;route=`/api/lesson-feedback/classes/${classId}/lessons/${lessonId}`;data=null;dirty=false;attemptId='';form.hidden=true;setError();status('Loading lesson feedback…');dialog.showModal();
+    trigger=button;activeClassId=classId;activeLessonId=lessonId;publishedChange=false;const version=++epoch;route=`/api/lesson-feedback/classes/${classId}/lessons/${lessonId}`;data=null;dirty=false;attemptId='';form.hidden=true;setError();status('Loading lesson feedback…');dialog.showModal();
     try{
       const result=await api(route);if(version!==epoch)return;data={...result,loadedAt:performance.now()};
       $('[data-feedback-lesson]').textContent=data.lesson.title;

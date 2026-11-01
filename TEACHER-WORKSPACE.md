@@ -4,6 +4,8 @@ Each class has inline Students, Course overview, Calendar and Timeline tabs. Cha
 
 The roster endpoint returns published attendance only (present / recorded lessons), linked-account status, and the learner's courses accessible to the current teacher. Missing attendance is unknown, not absent. The live class system does not yet have class-linked homework submission records; the table explicitly shows “Not tracked yet.” Demo parent previews are distinct from connected parent accounts.
 
+Published lesson reports in the teacher timeline include named student assessment cards with attendance and all four star ratings. The timeline refreshes when the teacher closes a newly published or corrected report. Only the teacher endpoint includes the full assessment list; family endpoints remain scoped to their own child. New reports retain student display names for historical assessments, with current-roster names used for older reports.
+
 ## Scheduling
 
 Course JSON optionally carries `endDate`, `weeklySlots` (weekday 0–6, local `startTime`, `lessonMinutes`) and `skippedSlots` (`YYYY-MM-DD|HH:mm`). The date checklist includes both endpoints. Without an end date it proposes the required number of lessons. Applying the checklist requires exactly one selected date per existing lesson, preserves lesson identifiers and teaching content, and maps the content onto the selected dates. Crossed-out dates are calendar gaps, not deleted lesson content.
