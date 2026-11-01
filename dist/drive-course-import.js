@@ -18,9 +18,9 @@ export async function boundedDriveBlob(response){
   return new Blob(chunks);
 }
 let scriptPromise;
-function loadGoogle(){
+export function loadGoogle(){
   if(window.google?.accounts?.oauth2)return Promise.resolve();
-  if(!scriptPromise)scriptPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=resolve;script.onerror=()=>{scriptPromise=null;script.remove();reject(Error('Google sign-in could not load. Check your connection and retry.'));};document.head.append(script);});
+  if(!scriptPromise)scriptPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');const fail=()=>{clearTimeout(timer);scriptPromise=null;script.remove();reject(Error('Google sign-in could not load. Check your connection and retry.'));},timer=setTimeout(fail,20000);script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=()=>{clearTimeout(timer);window.google?.accounts?.oauth2?resolve():fail();};script.onerror=fail;document.head.append(script);});
   return scriptPromise;
 }
 export function createDriveCourseImport({root,getClassId,getResources,onImported,onBusy}){
