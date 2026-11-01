@@ -140,6 +140,8 @@ test('account creation, one-use activation, secure sign in, and sign out', async
     assert.equal(f.mail[0].to, EMAIL);
     assert.equal(f.mail[0].from.email, 'accounts@inkwire-education.com');
     assert.ok(f.mail[0].text.includes(ORIGIN + '/account.html#activate='));
+    assert.ok(f.mail[0].html.includes('reading-student.jpg'));
+    assert.ok(f.mail[0].html.includes(ORIGIN + '/account.html#activate='));
     assert.ok(!f.mail[0].text.includes('evil.invalid'));
     const user = f.db.prepare('SELECT * FROM user').get();
     assert.equal(user.name, 'Ink Wire member');
@@ -178,6 +180,8 @@ test('password reset is single-use, invalidates old sessions, and replaces the p
     assert.equal(forgot.status, 200, await forgot.clone().text());
     const token = decodeURIComponent(f.token());
     assert.ok(f.mail.at(-1).text.includes('#reset='));
+    assert.ok(f.mail.at(-1).html.includes('#reset='));
+    assert.ok(!f.mail.at(-1).html.includes('reading-student.jpg'));
     assert.ok(!JSON.stringify(f.db.prepare('SELECT * FROM verification').all()).includes(token));
     const newPassword = 'A completely different test password 99!';
     assert.equal((await f.post('reset', { token, newPassword })).status, 200);
@@ -697,4 +701,49 @@ test('profile pages and APIs use the authenticated account and reject large or c
   assert.equal((await(await f.request('/api/profiles/me',undefined,owner)).json()).avatar.head,'bear');
   assert.equal((await(await f.request('/api/profiles/me',undefined,other)).json()).kind,'none');
  }finally{f.db.close();}
+});
+
+test('teachers email scoped student and parent invitations; untrusted input cannot change the recipient role or join link',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'invite-owner@example.invalid'),stranger=await signInAs(f,'invite-other@example.invalid');
+    const student=await signInAs(f,'invite-student@example.invalid','student');
+    const {classroom}=await(await newClass(f,teacher,'Books & Writing')).json();
+    const learnerId=await addLearner(f,teacher,classroom.id,'Jamie <Example>');
+    const route='/classes/'+classroom.id+'/invite';
+    for(const kind of ['class','student','family']){
+      const invitation=await inviteLearner(f,teacher,classroom.id,kind,kind==='class'?undefined:learnerId);
+      const input={kind,learnerId:kind==='class'?undefined:learnerId,code:invitation.code,action:'send-email',email:'  INVITED@example.invalid  ',url:'https://evil.invalid',html:'<script>evil</script>'};
+      const before=f.mail.length;
+      assert.equal((await enroll(f,route,input,stranger)).status,404);
+      assert.equal((await enroll(f,route,input,student)).status,404);
+      assert.equal((await enroll(f,route,input,{...teacher,Origin:'https://evil.invalid'})).status,403);
+      assert.equal((await enroll(f,route,{...input,email:'a@example.invalid,b@example.invalid'},teacher)).status,400);
+      assert.equal(f.mail.length,before);
+      const sent=await enroll(f,route,input,teacher);assert.equal(sent.status,200,await sent.clone().text());
+      assert.equal(f.mail.length,before+1);const mail=f.mail.at(-1);
+      assert.equal(mail.to,'invited@example.invalid');assert.ok(mail.html.includes('young-readers.jpg'));
+      assert.ok(mail.html.includes(invitation.link));assert.ok(!mail.html.includes('evil.invalid'));
+      assert.ok(mail.text.includes('Books & Writing'));
+      if(kind!=='class')assert.ok(mail.html.includes('Jamie &lt;Example&gt;'));
+    }
+    const invite=await inviteLearner(f,teacher,classroom.id,'family',learnerId),body={kind:'family',learnerId,action:'send-email',email:'invited@example.invalid',code:invite.code};
+    assert.equal((await enroll(f,route,body,teacher)).status,429);
+    await inviteLearner(f,teacher,classroom.id,'family',learnerId,'reset');
+    assert.equal((await enroll(f,route,{...body,email:'another@example.invalid'},teacher)).status,409);
+    await enroll(f,route,{kind:'family',learnerId,action:'disable'},teacher);
+    assert.equal((await enroll(f,route,{...body,email:'another@example.invalid'},teacher)).status,409);
+  }finally{f.db.close();}
+});
+
+test('invitation delivery errors are visible and deleted classes cannot send mail',async()=>{
+  const f=await fixture();try{
+    const teacher=await signInAs(f,'mail-outage@example.invalid');
+    const {classroom}=await(await newClass(f,teacher)).json();
+    const invite=await inviteLearner(f,teacher,classroom.id,'class');
+    const route='/classes/'+classroom.id+'/invite',body={kind:'class',code:invite.code,action:'send-email',email:'recipient@example.invalid'};
+    f.env.EMAIL.send=async()=>{throw new Error('Private provider diagnostic');};
+    const failed=await enroll(f,route,body,teacher);assert.equal(failed.status,503);assert.ok(!(await failed.text()).includes('Private provider'));
+    f.db.prepare('UPDATE classes SET deleted_at=? WHERE id=?').run(Date.now(),classroom.id);
+    assert.equal((await enroll(f,route,body,teacher)).status,404);
+  }finally{f.db.close();}
 });

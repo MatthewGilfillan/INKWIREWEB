@@ -151,6 +151,10 @@ function showInvitation(invitation){
   $('#learning-expiry').textContent='Expires '+new Date(invitation.expiresAt).toLocaleString()+'.'+(kind==='class'?'':' One account per invitation.');
   $('#learning-copy-status').textContent='';$('#download-qr').href=window.InkWireQR($('#invite-qr'),invitation.link);
   $('#download-qr').download='inkwire-'+kind+'-invitation.png';
+  $('#invite-email-form').reset();$('#invite-email-status').textContent='';$('#send-invite-email').disabled=false;
+  $('#invite-email-preview').href='/email-preview?kind='+(kind==='family'?'parent':'student');
+  $('#invite-email-context').textContent=(kind==='family'?'Parent invitation for ':kind==='student'?'Student invitation for ':'Class invitation for ')+(invitation.studentName || classrooms.find(c=>c.id===sharing.classId)?.name || '')+'.';
+
 }
 async function generateShare(reset=false){
   const invitation=await api('/api/enrollment/classes/'+sharing.classId+'/invite',{kind:sharing.kind,learnerId:sharing.learnerId,action:reset?'reset':'open'});showInvitation(invitation);
@@ -198,3 +202,14 @@ signOut($('[data-session-signout]'),status);
 retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();
+
+$('#invite-email-form').addEventListener('submit',async event=>{
+  event.preventDefault();const button=$('#send-invite-email'),output=$('#invite-email-status'),context=sharing;
+  if(button.disabled || !context?.invitation)return;
+  const email=$('#invite-email-address').value.trim();button.disabled=true;output.textContent='Sending invitation…';
+  try{
+    const result=await api('/api/enrollment/classes/'+context.classId+'/invite',{kind:context.kind,learnerId:context.learnerId,action:'send-email',code:context.invitation.code,email});
+    if(sharing===context)output.textContent='Invitation sent to '+result.email+'.';
+  }catch(error){if(sharing===context)output.textContent=error.message;}
+  finally{if(sharing===context)button.disabled=false;}
+});

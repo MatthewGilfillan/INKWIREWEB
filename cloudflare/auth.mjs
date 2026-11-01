@@ -1,4 +1,6 @@
 import { betterAuth } from 'better-auth';
+import { renderAccountEmail } from './account-emails.mjs';
+import { deliverEmail } from './email-delivery.mjs';
 
 export const normalizeEmail = value => typeof value === 'string' ? value.trim().toLowerCase() : '';
 export async function digest(value) {
@@ -28,7 +30,7 @@ export function authOptions(env, deliver, context = {}) {
       resetPasswordTokenExpiresIn: 1800,
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, token }) => {
-        await deliver(user.email, 'Reset your Ink Wire password', accountLink('reset', token), 'Reset password', '30 minutes');
+        await deliver(user.email, 'reset', accountLink('reset', token));
       },
     },
     emailVerification: {
@@ -40,7 +42,7 @@ export function authOptions(env, deliver, context = {}) {
         await env.DB.prepare('DELETE FROM activation_links WHERE expires_at < ?').bind(Date.now()).run();
         await env.DB.prepare('INSERT OR IGNORE INTO activation_links (token_hash, email, expires_at) VALUES (?, ?, ?)')
           .bind(await digest(token), normalizeEmail(user.email), Date.now() + 3600000).run();
-        await deliver(user.email, 'Activate your Ink Wire account', accountLink('activate', token), 'Activate account', '1 hour');
+        await deliver(user.email, 'activate', accountLink('activate', token));
       },
     },
     verification: { storeIdentifier: 'hashed' },
@@ -68,17 +70,8 @@ export function authOptions(env, deliver, context = {}) {
 }
 
 export function createAuth(env, delivery = {}) {
-  const options = authOptions(env, async (to, subject, url, action, expiry) => {
-    const day = new Date().toISOString().slice(0, 10);
-    const budget = await env.DB.prepare(`INSERT INTO email_delivery_budget (day, count) VALUES (?, 1)
-      ON CONFLICT(day) DO UPDATE SET count = count + 1 WHERE count < 250 RETURNING count`).bind(day).first();
-    if (!budget) throw new Error('Account email daily limit reached');
-    await env.EMAIL.send({
-      from: { email: env.ACCOUNT_EMAIL, name: 'Ink Wire Education' },
-      to,
-      subject,
-      text: `${action}\n\n${url}\n\nThis link expires in ${expiry}. If you did not request this, you can ignore this email.\n\nInk Wire Education`,
-    });
+  const options = authOptions(env, async (to, kind, url) => {
+    await deliverEmail(env, to, renderAccountEmail({ origin: env.APP_ORIGIN, kind, url }));
   }, delivery);
   // Better Auth deliberately catches notification failures. Surface a safe failure
   // to our form instead of telling the visitor to expect mail that was not accepted.

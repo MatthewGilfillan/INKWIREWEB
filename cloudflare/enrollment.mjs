@@ -1,4 +1,6 @@
-import { digest } from './auth.mjs';
+import { digest, normalizeEmail } from './auth.mjs';
+import { renderInvitationEmail } from './account-emails.mjs';
+import { deliverEmail } from './email-delivery.mjs';
 import { isTeacher, limitClassAction } from './classes.mjs';
 import { addRosterProgress } from './roster-progress.mjs';
 
@@ -117,7 +119,8 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
     return json({status:true,dashboardPath:expectedRole === 'parent' ? '/parent' : '/student'});
   }
   const route = path.match(new RegExp(`^/classes/(${uuid})/(students|invite|remove|disconnect)$`));
-  if (!teacher || !route || !await classAccess(env,user,route[1])) return fail('Class not found.',404,'NOT_FOUND');
+  const classroom=teacher && route ? await classAccess(env,user,route[1]) : null;
+  if (!classroom) return fail('Class not found.',404,'NOT_FOUND');
   const classId=route[1], action=route[2];
   if (action === 'students') {
     let learnerId=input.learnerId;
@@ -144,6 +147,23 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
       return json({status:true});
     }
     if (kind === 'student' && learner.userId) return fail('This student account is already connected.',409,'ALREADY_CONNECTED');
+    if (input.action === 'send-email') {
+      const email=normalizeEmail(input.email);
+      if (email.length>254 || !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/u.test(email)) return fail('Enter one valid recipient email address.',400,'INVALID_EMAIL');
+      if (!env.EMAIL || !env.ACCOUNT_EMAIL) return fail('Email delivery is temporarily unavailable. You can copy the invitation link instead.',503,'EMAIL_UNAVAILABLE');
+      // Send only the invitation currently displayed to the teacher. Never silently
+      // reactivate a closed/used invitation or create a different link while sending.
+      const current=await storedInvite(env,classId,kind,learnerId);
+      if (!current || current.redeemed_by || current.expires_at<=Date.now() || current.code_hash!==await digest(cleanCode(input.code))) return fail('This invitation changed, expired or was used. Reopen the invitation before sending.',409,'INVITE_CHANGED');
+      if (!await limitClassAction(env,user.id,'invitation-email',20) || !await limitClassAction(env,email,'invitation-recipient',3)) return fail('Too many invitation emails. Please wait 15 minutes before trying again.',429,'RATE_LIMITED');
+      try {
+        const message=renderInvitationEmail({origin:env.APP_ORIGIN,kind,code:await unseal(env,current.code_cipher,current.id),className:classroom.name,studentName:learner?.name || '',expiresAt:current.expires_at});
+        await deliverEmail(env,email,message);
+        return json({status:true,email});
+      } catch {
+        return fail('We could not confirm email delivery. Check with the recipient before trying again, or copy the invitation link.',503,'EMAIL_UNAVAILABLE');
+      }
+    }
     const invitation=await createLearningInvite(env,classId,kind,learnerId,input.action === 'reset');
     return json({...invitation,studentName:learner?.name || null,link:`${env.APP_ORIGIN}/join#${kind}=${invitation.code}`});
   }

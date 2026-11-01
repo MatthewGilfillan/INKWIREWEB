@@ -121,3 +121,5 @@ dialog{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overfl
 
 /* Quiet dashboard utility, separate from everyday teaching tasks. */
 .teacher-trash-utility{position:fixed;left:20px;bottom:20px;z-index:15;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #d6e2ec;border-radius:12px;background:#fff;color:#50627d;box-shadow:0 2px 8px #17264a0a;cursor:pointer}.teacher-trash-utility:hover{background:#f3f5f8;color:#032b62}.teacher-trash-utility[aria-pressed=true]{background:#e9d7e9;border-color:#c8b3cf;color:#032b62}.teacher-trash-utility:focus-visible{outline:3px solid #032b62;outline-offset:3px}.teacher-footer{padding-bottom:84px}@media(max-width:720px){.teacher-trash-utility{left:16px;bottom:16px}}
+
+.invite-email-form{margin:22px 0;padding:20px;background:#e8faf3;border:1px solid #c2e8d9;border-radius:12px}.invite-email-form h3{margin:0 0 10px;font-size:1rem}.invite-email-form p{overflow-wrap:anywhere}.invite-email-form .teacher-actions{align-items:center;margin-top:14px}.invite-email-form a{font-size:.82rem}.invite-email-form [role=status]:empty{display:none}
