@@ -1,4 +1,5 @@
 .overview-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 28px}
+.course-planner .planner-checkbox[hidden]{display:none!important}
 .overview-toolbar .teacher-button{display:inline-flex;align-items:center;gap:9px}
 .course-icon{display:block;flex:none;width:24px;height:24px}
 .overview-intro{padding:10px 0 36px;border-bottom:1px solid var(--line,#dcdfea)}
