@@ -647,3 +647,30 @@ test('calendar includes only accessible active classes, converts course times an
     assert.equal((await(await f.request(route,undefined,guest)).json()).events.length,1);
   }finally{f.db.close();}
 });
+
+test('transcript summary sends the entire file to OpenAI only for a verified teacher and never persists it',async()=>{
+  const f=await fixture(),originalFetch=global.fetch;let calls=0;
+  try{
+    const teacher=await signInAs(f,'transcript-teacher@example.invalid'),student=await signInAs(f,'transcript-student@example.invalid','student');
+    f.env.OPENAI_API_KEY='fake-test-key';f.env.OPENAI_PLANNING_ENABLED='true';
+    const source='19:00:00 --> 19:01:00\nTeacher: A fictional lesson about language.\n'.repeat(2000);
+    const body={filename:'Fictional Transcript.txt',fileData:'data:text/plain;base64,'+Buffer.from(source).toString('base64')};
+    global.fetch=async(url,init)=>{
+      calls++;assert.equal(url,'https://api.openai.com/v1/responses');const payload=JSON.parse(init.body);assert.equal(payload.store,false);
+      const file=payload.input[0].content.find(c=>c.type==='input_file');assert.equal(Buffer.from(file.file_data.split(',')[1],'base64').toString(),source);
+      assert.ok(!JSON.stringify(payload).includes('transcript-teacher'));
+      return Response.json({id:'resp_test',model:'gpt-6-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:'# Class summary\nA fictional lesson.'}]}],usage:{input_tokens:40,output_tokens:12,total_tokens:52}},{headers:{'x-request-id':'req_test'}});
+    };
+    const route='/api/teacher/transcript-summary';
+    assert.equal((await f.request(route,body)).status,401);assert.equal((await f.request(route,body,student)).status,403);
+    assert.equal((await f.request(route,body,{...teacher,Origin:'https://evil.invalid'})).status,403);
+    assert.equal((await f.request(route,{...body,filename:'../../private.txt'},teacher)).status,400);
+    assert.equal((await f.request(route,{...body,fileData:'bad'},teacher)).status,400);assert.equal(calls,0);
+    const response=await f.request(route,body,teacher);assert.equal(response.status,200,await response.clone().text());const result=await response.json();
+    assert.equal(result.summary,'# Class summary\nA fictional lesson.');assert.equal(result.inputBytes,Buffer.byteLength(source));assert.equal(result.requestId,'req_test');assert.equal(result.usage.totalTokens,52);
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM course_overviews').get().n,0);
+    assert.equal((await f.request(route,body,teacher)).status,429);assert.equal(calls,1);
+    f.db.prepare('DELETE FROM ai_planning_limits').run();global.fetch=async()=>Response.json({error:{code:'model_not_found',message:'Sensitive provider diagnostic'}},{status:404,headers:{'x-request-id':'req_failure'}});
+    const failed=await f.request(route,body,teacher);assert.equal(failed.status,502);const error=await failed.json();assert.equal(error.providerCode,'model_not_found');assert.ok(!JSON.stringify(error).includes('Sensitive'));
+  }finally{global.fetch=originalFetch;f.db.close();}
+});

@@ -1,6 +1,7 @@
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
 import { isTeacher, handleClasses } from './classes.mjs';
 import { handleEnrollment } from './enrollment.mjs';
+import { handleTranscriptSummary } from './transcript-summary.mjs';
 
 const actions = new Map([
   ['signup', '/sign-up/email'], ['signin', '/sign-in/email'], ['signout', '/sign-out'],
@@ -113,6 +114,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname === '/api/teacher/transcript-summary') {
+        const session = await auth.api.getSession({headers:request.headers});
+        return await handleTranscriptSummary(request,env,session?.user,{json,fail,readJSON});
+      }
       if (url.pathname === '/api/account' && request.method === 'GET') {
         const session = await auth.api.getSession({ headers: request.headers });
         if (!session?.user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
