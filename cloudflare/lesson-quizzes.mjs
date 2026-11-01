@@ -1,21 +1,9 @@
+import {readQuizDraft} from './quiz-assistant.mjs';
+import {planningAvailable} from './planning-assistant.mjs';
 import {lessonKey} from '../dist/lesson-feedback-model.mjs';
-const text=(value,max,label,optional=false)=>{
-  if(typeof value!=='string' || value.length>max || (!optional && !value.trim()))throw Error(`Check ${label}.`);
-  return value.trim();
-};
-export function validateQuiz(input){
-  const title=text(input.title,160,'the quiz title'),reflectionPrompt=text(input.reflectionPrompt,500,'the reflection prompt',true);
-  if(!Array.isArray(input.questions) || !input.questions.length || input.questions.length>20)throw Error('Add 1–20 questions.');
-  const questions=input.questions.map((q,i)=>{
-    const prompt=text(q.prompt,1000,`question ${i+1}`),explanation=text(q.explanation,1500,`the explanation for question ${i+1}`,true);
-    if(!Array.isArray(q.options) || q.options.length<2 || q.options.length>4)throw Error('Each question needs 2–4 answers.');
-    const options=q.options.map(o=>text(o,500,`the answers for question ${i+1}`));
-    if(new Set(options).size!==options.length)throw Error('Use different answers within each question.');
-    if(!Number.isInteger(q.correctIndex) || q.correctIndex<0 || q.correctIndex>=options.length)throw Error('Choose the correct answer for every question.');
-    return {prompt,options,correctIndex:q.correctIndex,explanation};
-  });
-  return {title,questions,reflectionPrompt};
-}
+import {validateQuiz} from './quiz-model.mjs';
+export {validateQuiz} from './quiz-model.mjs';
+const text=(v,max,label)=>{if(typeof v!=='string' || v.length>max)throw Error(`Check ${label}.`);return v.trim();};
 const result=row=>({score:row.score,total:row.total,percentage:Math.round(row.score/row.total*100),submittedAt:row.submitted_at,durationSeconds:Math.max(0,Math.round((row.submitted_at-row.started_at)/1000))});
 export function quizResult(rows){
   const finished=rows.filter(r=>r.submitted_at!==null).sort((a,b)=>b.submitted_at-a.submitted_at || b.started_at-a.started_at || b.id.localeCompare(a.id));
@@ -52,10 +40,11 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
   let quiz=await read();
   const attempts=()=>env.DB.prepare('SELECT * FROM quiz_attempts WHERE class_id=? AND lesson_id=? AND learner_id=? ORDER BY started_at DESC,id DESC').bind(classId,lessonId,learner.id).all();
   const output=async()=>{
-    if(!quiz)return {teacher,lessonTitle:lesson.title,quiz:null,revision:0};
+    const ai=teacher?{courseRevision:classroom.revision,aiAvailable:planningAvailable(env),aiDraft:await readQuizDraft(env,classId,lessonId)}:{};
+    if(!quiz)return {teacher,lessonTitle:lesson.title,quiz:null,revision:0,...ai};
     const questions=JSON.parse(quiz.questions),definition={title:quiz.title,reflectionPrompt:quiz.reflection_prompt,questions:teacher?questions:questions.map(q=>({prompt:q.prompt,options:q.options}))};
     const base={teacher,lessonTitle:lesson.title,quiz:definition,revision:quiz.revision,cancelled:lesson.status==='cancelled'};
-    if(teacher)return {...base,locked:Boolean(await env.DB.prepare('SELECT 1 FROM quiz_attempts WHERE class_id=? AND lesson_id=? LIMIT 1').bind(classId,lessonId).first())};
+    if(teacher)return {...base,...ai,locked:Boolean(await env.DB.prepare('SELECT 1 FROM quiz_attempts WHERE class_id=? AND lesson_id=? LIMIT 1').bind(classId,lessonId).first())};
     const rows=(await attempts()).results;
     return {...base,result:quizResult(rows),active:rows.find(r=>r.submitted_at===null)?.id || null,attempts:rows.filter(r=>r.submitted_at!==null).map(r=>({id:r.id,...result(r),answers:JSON.parse(r.answers),reflection:r.reflection})),...(rows.some(r=>r.submitted_at!==null)?{review:questions.map(q=>({correctIndex:q.correctIndex,explanation:q.explanation}))}:{})};
   };
@@ -65,6 +54,10 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
   let input;try{input=await readJSON(request,90000);}catch{return fail('Check the quiz data.',400,'INVALID_INPUT');}
   const now=Date.now();
   if(teacher){
+    if(input.draftRevision!==undefined){
+      const draft=await readQuizDraft(env,classId,lessonId);
+      if(!draft || draft.revision!==input.draftRevision || draft.courseRevision!==classroom.revision || draft.quizRevision!==(quiz?.revision || 0))return fail('The AI draft or course changed. Reopen the quiz and generate a fresh draft before assigning.',409,'CONFLICT');
+    }
     let definition;try{
       if(input.action!=='save' || !Number.isSafeInteger(input.revision) || input.revision<0)throw Error('Refresh the quiz before saving.');
       definition=validateQuiz(input.quiz);
@@ -75,6 +68,7 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
       ON CONFLICT(class_id,lesson_id) DO UPDATE SET revision=lesson_quizzes.revision+1,title=excluded.title,questions=excluded.questions,reflection_prompt=excluded.reflection_prompt,updated_by=excluded.updated_by,updated_at=excluded.updated_at
       WHERE lesson_quizzes.revision=? AND NOT EXISTS(SELECT 1 FROM quiz_attempts WHERE class_id=? AND lesson_id=?) RETURNING revision`).bind(classId,lessonId,definition.title,JSON.stringify(definition.questions),definition.reflectionPrompt,user.id,now,classId,classroom.revision,input.revision,classId,lessonId,input.revision,classId,lessonId).first();
     if(!saved)return fail('The quiz or course changed, or a student has already started. Refresh before editing. Started quizzes keep their original questions and answer key.',409,'CONFLICT');
+    if(input.draftRevision!==undefined)await env.DB.prepare('DELETE FROM quiz_drafts WHERE class_id=? AND lesson_id=? AND revision=?').bind(classId,lessonId,input.draftRevision).run();
     quiz=await read();return json(await output());
   }
   if(!quiz)return fail('No quiz has been assigned to this lesson.',404,'NOT_FOUND');

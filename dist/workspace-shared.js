@@ -1,6 +1,7 @@
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export async function api(path, body, { timeoutMs = 20000 } = {}) {
-  const response=await fetch(path,{method:body === undefined ? 'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body === undefined ? {Accept:'application/json'}:{'Content-Type':'application/json',Accept:'application/json'},...(body === undefined ? {}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(timeoutMs)});
+  const multipart=body instanceof FormData;
+  const response=await fetch(path,{method:body === undefined ? 'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body === undefined ? {Accept:'application/json'}:{...(multipart?{}:{'Content-Type':'application/json'}),Accept:'application/json'},...(body === undefined ? {}:{body:multipart?body:JSON.stringify(body)}),signal:AbortSignal.timeout(timeoutMs)});
   const result=await response.json().catch(()=>({}));
   if (!response.ok) throw Object.assign(new Error(result.message || 'Could not complete this request. Please try again.'),{status:response.status,code:result.code});
   return result;

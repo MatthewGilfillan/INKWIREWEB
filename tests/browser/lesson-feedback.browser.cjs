@@ -16,10 +16,10 @@ test('teacher timeline unlocks after class, publishes ratings and transcript, an
   if(p.endsWith('/lessons/legacy-1')){
    if(route.request().method()==='POST'){
     const body=route.request().postDataJSON();draft=body.draft;revision++;
-    if(body.action==='publish'){posted++;assert.equal(draft.assessments[0].ratings.attitude,5);assert.equal(draft.assessments[1].attendance,'absent');assert.match(Buffer.from(body.fileData.split(',')[1],'base64').toString(),/Fictional transcript/);published={summary:'**Lesson overview**\nThe class explored allegory. <img src=x onerror=alert(1)>',homework:'Read chapter two.',students:{a:assessment,b:{attendance:'absent',ratings:{},quote:null,parentComment:null}}};}
+    if(body.action==='publish'){posted++;assert.equal(body.draftNextQuiz,true);assert.equal(draft.assessments[0].ratings.attitude,5);assert.equal(draft.assessments[1].attendance,'absent');assert.match(Buffer.from(body.fileData.split(',')[1],'base64').toString(),/Fictional transcript/);published={summary:'**Lesson overview**\nThe class explored allegory. <img src=x onerror=alert(1)>',homework:'Read chapter two.',students:{a:assessment,b:{attendance:'absent',ratings:{},quote:null,parentComment:null}}};}
     if(body.action==='correct')published={...published,summary:body.summary,homework:body.homework,students:Object.fromEntries(draft.assessments.map(s=>[s.learnerId,{...published.students[s.learnerId],attendance:s.attendance,ratings:s.ratings}]))};
    }
-   return route.fulfill({json:{revision,draft,published,busy:false,courseRevision:1,endsAt:now-1,serverNow:now,timeZone:'Asia/Shanghai',aiAvailable:true,roster,lesson:{title:'Introducing Animal Farm',homework:'Original homework'}}});
+   return route.fulfill({json:{revision,draft,published,busy:false,courseRevision:1,endsAt:now-1,serverNow:now,timeZone:'Asia/Shanghai',aiAvailable:true,nextQuizLesson:{id:'legacy-2',title:'Evidence and interpretation'},roster,lesson:{title:'Introducing Animal Farm',homework:'Original homework'}}});
   }
   return route.fulfill({status:404,json:{}});
  });

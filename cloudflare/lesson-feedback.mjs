@@ -1,3 +1,4 @@
+import {nextQuizLesson,quizContext,saveQuizDraft} from './quiz-assistant.mjs';
 import {quizTimeline} from './lesson-quizzes.mjs';
 import {lessonTiming,billingSchedule} from '../dist/schedule-model.mjs';
 import { lessonKey, lessonEnd, validateAssessment } from '../dist/lesson-feedback-model.mjs';
@@ -28,6 +29,7 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
   const course=JSON.parse(linked.content), rows=(await env.DB.prepare('SELECT lesson_id,published FROM lesson_feedback WHERE class_id=? AND published IS NOT NULL').bind(classId).all()).results;
   const reports=new Map(rows.map(r=>[r.lesson_id,JSON.parse(r.published)])),billing=billingSchedule(course);
   const roster=teacherTimeline?await getRoster(env,classId):[],names=new Map(roster.map(s=>[s.id,s.name]));
+  const quizDrafts=teacherTimeline?(await env.DB.prepare('SELECT lesson_id FROM quiz_drafts WHERE class_id=?').bind(classId).all()).results:[];
   const quizzes=await quizTimeline(env,classId,teacherTimeline?{roster}:{learnerId:linked.id});
   return json({demo,teacher:teacherTimeline,canTakeQuiz:user.requestedRole==='student',serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
     lessons:course.lessons.map((lesson,i)=>{
@@ -35,7 +37,7 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
       // Project fields on the server: never send roster, drafts, speaker labels,
       // private planning notes, or another learner's assessment to a family.
       let endsAt=null;try{endsAt=lessonEnd(course,lesson);}catch{}
-      return {quiz:quizzes.get(lessonKey(lesson,i)) || null,endsAt,...lessonTiming(course,lesson),status:lesson.status || 'scheduled',rescheduledFrom:lesson.rescheduledFrom || null,billing:teacherTimeline || course.billingMode==='packs'?billing.get(lessonKey(lesson,i))?.label || '':'',id:lessonKey(lesson,i),number:i+1,title:lesson.title,date:lesson.date,section:lesson.section || '',goal:lesson.goal,reading:lesson.reading,
+      return {...(teacherTimeline?{hasQuizDraft:quizDrafts.some(d=>d.lesson_id===lessonKey(lesson,i))}:{}),quiz:quizzes.get(lessonKey(lesson,i)) || null,endsAt,...lessonTiming(course,lesson),status:lesson.status || 'scheduled',rescheduledFrom:lesson.rescheduledFrom || null,billing:teacherTimeline || course.billingMode==='packs'?billing.get(lessonKey(lesson,i))?.label || '':'',id:lessonKey(lesson,i),number:i+1,title:lesson.title,date:lesson.date,section:lesson.section || '',goal:lesson.goal,reading:lesson.reading,
         homework:report?.homework ?? lesson.homework,homeworkUpdated:report?.homework!==null && report?.homework!==undefined,
         report:report?{summary:report.summary,publishedAt:report.publishedAt,assessment:own?{attendance:own.attendance,ratings:own.ratings,quote:own.quote,...(user.requestedRole==='parent' || demo?{parentComment:own.parentComment}:{})}:null,
           ...(teacherTimeline?{assessments:Object.entries(report.students || {}).map(([learnerId,assessment])=>({learnerId,name:assessment.name || names.get(learnerId) || 'Former student',attendance:assessment.attendance,ratings:assessment.ratings})).sort((a,b)=>a.name.localeCompare(b.name))}:{})}:null};
@@ -66,8 +68,9 @@ export async function handleLessonFeedback(request,env,user,helpers) {
   const course=JSON.parse(classroom.content), lesson=course.lessons.find((l,i)=>lessonKey(l,i)===lessonId);
   if(!lesson)return fail('Lesson not found. Reopen the course outline.',404,'NOT_FOUND');
   let endsAt=null;try{endsAt=lessonEnd(course,lesson);}catch{}
+  const nextLesson=nextQuizLesson(course,lessonId);
   const roster=await getRoster(env,classId), row=await read(env,classId,lessonId), state=view(row);
-  if(request.method==='GET')return json({...state,roster,lesson:{title:lesson.title,homework:lesson.homework},endsAt,timeZone:course.timeZone,serverNow:Date.now(),courseRevision:classroom.revision,aiAvailable:planningAvailable(env)});
+  if(request.method==='GET')return json({...state,nextQuizLesson:nextLesson?{id:nextLesson.id,title:nextLesson.lesson.title}:null,roster,lesson:{title:lesson.title,homework:lesson.homework},endsAt,timeZone:course.timeZone,serverNow:Date.now(),courseRevision:classroom.revision,aiAvailable:planningAvailable(env)});
   if(request.method!=='POST')return fail('Use GET or POST.',405);
   if(request.headers.get('Origin')!==env.APP_ORIGIN || request.headers.get('Sec-Fetch-Site')==='cross-site')return fail('Invalid origin.',403,'INVALID_ORIGIN');
   if(endsAt===null || Date.now()<endsAt)return fail('Summary & Feedback opens at the scheduled end of this lesson. Save a valid lesson date and time first.',409,'LESSON_NOT_ENDED');
@@ -97,11 +100,14 @@ export async function handleLessonFeedback(request,env,user,helpers) {
       .bind(JSON.stringify(draft),token,token?now+120000:0,user.id,now,classId,lessonId,input.revision,now,classId,classroom.revision).first();
   if(!updated)return fail('Another teacher changed this feedback or a report is still being generated. Close and reopen to load the latest version.',409,'CONFLICT');
   if(input.action==='save')return json(view(await read(env,classId,lessonId)));
-  let report;
+  let report,nextDraft=null,nextDraftNote='';
   try{
     if(input.action==='publish'){
       if(!await reserveRequest(env,user.id))throw Error('AI request limit reached. Your ratings are saved. Allow one minute between requests; up to 5 requests per teacher per UTC day.');
-      const result=await generateLessonFeedback(env,file,draft,roster,lesson);
+      const next=input.draftNextQuiz===true && nextLesson?quizContext(course,nextLesson.lesson):null;
+      const result=await generateLessonFeedback(env,file,draft,roster,lesson,next);
+      nextDraft=result.nextQuiz;nextDraftNote=result.nextQuizNote || '';
+      if(next && !nextDraft && !nextDraftNote)nextDraftNote='No next-lesson quiz was drafted: the transcript did not provide enough reliable source material.';
       report={summary:result.summary,homework:result.homework,students:personal(draft,result.extras,roster),provider:result.provider,model:result.model,requestId:result.requestId,requestToken:token};
     }else{
       const extras=input.extras?Object.fromEntries(input.extras.map(x=>[x.learnerId,{quote:x.quote.trim() || null,parentComment:x.parentComment.trim() || null}])):state.published.students;
@@ -117,6 +123,11 @@ export async function handleLessonFeedback(request,env,user,helpers) {
       AND EXISTS(SELECT 1 FROM classes c WHERE c.id=? AND c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?))) RETURNING revision`)
       .bind(JSON.stringify(report),report.publishedAt,classId,lessonId,updated.revision,token,token,classId,classroom.revision,classId,user.id,user.id).first();
     if(!saved)throw Error('The lesson changed before publication. Reopen it to see the latest report.');
+    if(input.action==='publish' && input.draftNextQuiz===true && nextLesson){
+      let savedDraft=false;
+      if(nextDraft){try{savedDraft=await saveQuizDraft(env,user,classId,nextLesson.id,classroom.revision,0,-1,nextDraft,'Previous class transcript');}catch{nextDraftNote='Feedback published. The next quiz draft could not be saved; use AI quiz setup to try again.';}}
+      return json({...view(await read(env,classId,lessonId)),nextQuiz:{lessonId:nextLesson.id,title:nextLesson.lesson.title,saved:savedDraft,message:savedDraft?'Next-lesson quiz drafted. Review it on the timeline before assigning.':nextDraftNote || 'Feedback published. An existing quiz or draft was kept, or the course changed.'}});
+    }
     return json(view(await read(env,classId,lessonId)));
   }catch(error){
     await env.DB.prepare('UPDATE lesson_feedback SET job_token=NULL,job_until=0 WHERE class_id=? AND lesson_id=? AND revision=?').bind(classId,lessonId,updated.revision).run();
