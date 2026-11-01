@@ -1,3 +1,4 @@
+import {mountWorksheet} from './worksheets.js';
 import './notebook-editor.js';
 import * as Y from 'yjs';
 import {escape,requestId} from '../dist/workspace-shared.js';
@@ -6,7 +7,7 @@ import {inspectPrintout,validatePrintout,uploadPrintout} from './pdf-printout.mj
 import {recoverDraft} from './notebook-recovery.mjs';
 const $=s=>document.querySelector(s),query=new URLSearchParams(location.search);
 const practice=query.get('preview')==='1'&&!['inkwire-education.com','www.inkwire-education.com'].includes(location.hostname);
-let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null;
+let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null,worksheetMount=null,worksheetLoading=false;
 const colors=['#9d89be','#67a7a3','#ccaa70','#7c9fc1','#b38ba4'];
 async function request(path,body) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(20000)});
@@ -20,7 +21,7 @@ let adapter={
 };
 function problem(error){$('#hub-error').textContent=error?.message||String(error);$('#hub-error').hidden=false;}
 function clearProblem(){$('#hub-error').hidden=true;}
-function pending(){return !!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
+function pending(){return worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
 function mayNavigate(){if(!pending())return true;problem(Error('Your changes are still saving. Keep this page open, or download your draft before leaving.'));return false;}
 function row(value,current,icon,subtitle='',extra='') {return `<button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>`;}
 function updateLinks(){
@@ -53,7 +54,7 @@ function renderLists(){
 }
 function closePage(){
   openEpoch++;if(active){clearTimeout(active.timer);active.doc.destroy();active=null;}window.InkWireEditor?.destroy();embeddedDirty=false;
-  $('#pdf-attachment').hidden=true;const frame=$('#worksheet-frame');frame.hidden=true;frame.removeAttribute('src');$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
+  $('#pdf-attachment').hidden=true;worksheetMount?.destroy();worksheetMount=null;const frame=$('#worksheet-embed');frame.hidden=true;frame.replaceChildren();$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
 }
 async function openBook(id,{initial=false}={}) {
   if(!initial&&!mayNavigate())return;const next=library.notebooks.find(b=>b.id===id);if(!next)return;
@@ -78,8 +79,11 @@ async function openPage(id){
     else{link.onclick=null;link.href='/api/worksheets/'+page.id+'/pdf?'+new URLSearchParams({learnerId:book.learnerId,notebook:'1',download:'1'});}return;
   }
   if(page.kind==='worksheet'){
-    const url=new URL(practice?'worksheets.html':'/worksheets',location.href);for(const [k,v] of Object.entries({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'}))url.searchParams.set(k,v);if(practice){url.searchParams.set('preview','1');url.searchParams.set('role',library.role);}$('#worksheet-frame').src=url;$('#worksheet-frame').hidden=false;$('#page-status').textContent='PDF background locked · '+(library.role==='parent'?'live read-only view':'type and draw over the page');return;
+    const root=$('#worksheet-embed');root.innerHTML=__WORKSHEET_MARKUP__;root.hidden=false;worksheetLoading=true;$('#page-status').textContent='Opening PDF printout…';
+    const params=new URLSearchParams({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'});if(practice){params.set('preview','1');params.set('role',library.role);}
+    try{worksheetMount=await mountWorksheet(root,{query:params,onDirty:dirty=>{embeddedDirty=dirty;},onPdfDrop:offerPrintout});$('#page-status').textContent='PDF background locked · '+(library.role==='parent'?'live read-only view':'type and draw over the page');}catch(error){problem(error);}finally{worksheetLoading=false;}return;
   }
+
   $('#page-status').textContent='Loading page…';
   try{
     const {page:latest}=await adapter.page(book.id,id);if(epoch!==openEpoch)return;if(!latest?.syncState)throw Error('The page could not be loaded.');
@@ -107,7 +111,7 @@ $('#name-form').onsubmit=async e=>{e.preventDefault();const title=$('#new-name')
   catch(e){$('#name-error').textContent=e.message;}finally{submit.disabled=false;}};
 $('#move-page').onchange=async e=>{const previous=selection.sectionId;if(!mayNavigate()){e.target.value=previous;return;}try{await adapter.move(book.id,selection.pageId,e.target.value);const id=selection.pageId,data=await adapter.book(book.id);selection={...data,sectionId:e.target.value,pageId:id};renderLists();clearProblem();}catch(error){e.target.value=previous;problem(error);}};
 $('#download-page').onclick=()=>{if(!active)return;const bytes=JSON.stringify({notebook:book.learnerName,page:$('#page-title').textContent,savedAt:new Date().toISOString(),syncState:encodeState(Y.encodeStateAsUpdate(active.doc)),text:window.InkWireEditor.getText()},null,2);const u=URL.createObjectURL(new Blob([bytes],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='folio-page-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
-window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('#worksheet-frame').contentWindow)return;if(e.data?.type==='inkwire:worksheet-status')embeddedDirty=!!e.data.dirty;if(e.data?.type==='inkwire:pdf-drop'&&e.data.file instanceof File)offerPrintout(e.data.file);});
+
 window.addEventListener('beforeunload',e=>{if(pending()){e.preventDefault();e.returnValue='';}});
 window.addEventListener('online',()=>{if(active)flush(active);poll();});
 async function poll(){if(refreshing||!book||!selection||document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;

@@ -1,13 +1,15 @@
 import {fontName} from './text-format.mjs';
 import * as pdfjs from 'pdfjs-dist';
 import {escape,requestId} from '../dist/workspace-shared.js';
+export async function mountWorksheet(root=document,options={}){
+const controller=new AbortController();const listen=(target,type,handler)=>target.addEventListener(type,handler,{signal:controller.signal});
 pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
-const $=selector=>document.querySelector(selector);
-const query=new URLSearchParams(location.search);
+const $=selector=>root.querySelector(selector);
+const query=options.query||new URLSearchParams(location.search);
 const demo=query.get('preview')==='1'&&location.hostname!=='inkwire-education.com'&&location.hostname!=='www.inkwire-education.com';
 const classId=query.get('class')||'',requestedLearner=query.get('learner')||'';
 const notebookContext=query.get('notebook')==='1',embedded=notebookContext&&query.get('embed')==='1';
-if(embedded)document.body.classList.add('notebook-embed');
+if(embedded)(root===document?document.body:root).classList.add('notebook-embed');
 const pdfOptions={cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/',isEvalSupported:false};
 const hints={select:'Select your text or ink to move it. Double-click your text to type.',text:'Click anywhere on a page to add a text box.',pen:'Draw with your mouse or stylus. Choose Select to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
 let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='select',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
@@ -18,7 +20,7 @@ const raw=m=>{if(!m)return null;const {id,ownerId,layer,version,deleted,...data}
 const clone=m=>m?structuredClone(m):null;
 function error(message=''){ $('#workspace-error').textContent=message;$('#workspace-error').hidden=!message; }
 function status(message){$('#save-status').textContent=message;}
-function updateStatus(){if(embedded)window.parent.postMessage({type:'inkwire:worksheet-status',dirty:!!(pending.size||conflicts.size)},location.origin);if(conflicts.size)status('Needs review');else if(pending.size)status(navigator.onLine?'Saving…':'Offline · changes in this tab');else status(meta?.role==='parent'?'Read-only copy':'All changes saved');$('#download-recovery').hidden=!pending.size&&!conflicts.size;$('#publish-parent').disabled=!!pending.size||!!conflicts.size||saving||!meta?.learnerId;}
+function updateStatus(){if(embedded){if(options.onDirty)options.onDirty(!!(pending.size||conflicts.size));else window.parent.postMessage({type:'inkwire:worksheet-status',dirty:!!(pending.size||conflicts.size)},location.origin);}if(conflicts.size)status('Needs review');else if(pending.size)status(navigator.onLine?'Saving…':'Offline · changes in this tab');else status(meta?.role==='parent'?'Read-only copy':'All changes saved');$('#download-recovery').hidden=!pending.size&&!conflicts.size;$('#publish-parent').disabled=!!pending.size||!!conflicts.size||saving||!meta?.learnerId;}
 async function request(path,options={}) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,signal:AbortSignal.timeout(options.body instanceof File?90000:20000)});
   if(!response.ok){const data=await response.json().catch(()=>({}));throw Object.assign(new Error(data.message||'Unable to complete this request.'),{status:response.status,code:data.code,current:data.current});}
@@ -93,7 +95,7 @@ async function renderPage(i){
 }
 function applyZoom(){for(let i=0;i<pageNodes.length;i++){const {width,height}=meta.pages[i],n=pageNodes[i];n.stage.style.transform=`scale(${zoom})`;n.wrap.style.width=width*zoom+'px';n.wrap.style.height=height*zoom+'px';}$('#zoom-value').textContent=Math.round(zoom*100)+'%';}
 function fitWidth(){if(!meta)return;const width=Math.max(200,$('#page-scroll').clientWidth-70);zoom=Math.min(1.4,width/Math.max(...meta.pages.map(p=>p.width)));fit=true;applyZoom();}
-$('#zoom-in').onclick=()=>{zoom=Math.min(2.5,zoom+.15);fit=false;applyZoom();};$('#zoom-out').onclick=()=>{zoom=Math.max(.25,zoom-.15);fit=false;applyZoom();};$('#fit-page').onclick=fitWidth;new ResizeObserver(()=>{if(fit&&meta&&!printing)fitWidth();}).observe($('#page-scroll'));
+$('#zoom-in').onclick=()=>{zoom=Math.min(2.5,zoom+.15);fit=false;applyZoom();};$('#zoom-out').onclick=()=>{zoom=Math.max(.25,zoom-.15);fit=false;applyZoom();};$('#fit-page').onclick=fitWidth;const resizeObserver=new ResizeObserver(()=>{if(fit&&meta&&!printing)fitWidth();});resizeObserver.observe($('#page-scroll'));
 $('#page-navigation').onclick=event=>{const b=event.target.closest('[data-page]');if(b){activePage=Number(b.dataset.page);pageNodes[activePage].wrap.scrollIntoView({block:'start',behavior:'smooth'});$('#page-navigation .active')?.classList.remove('active');b.classList.add('active');}};
 function setTool(next){if(editing)document.activeElement?.blur();tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);document.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
 $('#drawing-tools').onclick=event=>{const b=event.target.closest('button[data-tool]');if(b)setTool(b.dataset.tool);};
@@ -166,7 +168,7 @@ function textAppearance(){let family='Calibri';try{family=fontName($('#text-font
 for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=styleSelection;
 for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).onclick=()=>{$('#'+id).setAttribute('aria-pressed',String($('#'+id).getAttribute('aria-pressed')!=='true'));styleSelection();};
 $('#feedback-select').onchange=event=>{queuedFeedback=event.target.value;if(queuedFeedback){setTool('text');$('#tool-hint').textContent='Click on the page to place this feedback. You can edit its wording.';}};
-window.addEventListener('keydown',event=>{if(!meta||!editable()||event.target.matches('input,textarea,select')||event.target.isContentEditable)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey?'redo':'undo');}else if(['Delete','Backspace'].includes(event.key)&&selected){event.preventDefault();remove(selected);}});
+listen(window,'keydown',event=>{if(!meta||!editable()||event.target.matches('input,textarea,select')||event.target.isContentEditable)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey?'redo':'undo');}else if(['Delete','Backspace'].includes(event.key)&&selected){event.preventDefault();remove(selected);}});
 async function flush(){
   if(saving||!meta||!editable()||!pending.size||conflicts.size)return;saving=true;updateStatus();const token=openToken;
   try{
@@ -184,16 +186,16 @@ async function poll(){
   catch(problem){if(token!==openToken)return;if(problem.status===401||problem.status===403||problem.status===404){error('This worksheet is no longer accessible. Download unsaved work before returning to your dashboard.');conflicts.set('access',true);$('#drawing-tools').hidden=true;$('#style-tools').hidden=true;return;}status('Reconnecting…');}
   finally{if(token===openToken&&!conflicts.has('access'))pollTimer=setTimeout(poll,document.hidden?12000:2000);}
 }
-window.addEventListener('online',()=>{flush();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&meta&&!conflicts.has('access')){clearTimeout(pollTimer);poll();}});
-window.addEventListener('beforeunload',event=>{if(pending.size||conflicts.size){event.preventDefault();event.returnValue='';}});
+listen(window,'online',()=>{flush();});listen(document,'visibilitychange',()=>{if(!document.hidden&&meta&&!conflicts.has('access')){clearTimeout(pollTimer);poll();}});
+listen(window,'beforeunload',event=>{if(pending.size||conflicts.size){event.preventDefault();event.returnValue='';}});
 $('#download-recovery').onclick=()=>{const data=JSON.stringify({title:meta.title,worksheetId:meta.id,learnerId:meta.learnerId,savedAt:new Date().toISOString(),marks:[...marks.values()].filter(m=>own(m)&&!m.deleted)},null,2);const url=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='inkwire-unsaved-annotations.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
 function publishedLabel(time){$('#published-label').textContent=time?'Shared with parent '+new Date(time).toLocaleString(undefined,{timeZone:'Asia/Shanghai',dateStyle:'medium',timeStyle:'short'})+' (Beijing / Shanghai)':'';}
 $('#publish-parent').onclick=async()=>{if(editing)document.activeElement?.blur();await flush();if(pending.size||conflicts.size)return;const b=$('#publish-parent');b.disabled=true;try{const result=await adapter.publish();publishedLabel(result.publishedAt);status('Shared with parent');}catch(problem){error(problem.message);}finally{updateStatus();}};
 $('#print-worksheet').onclick=async()=>{if(!pdf)return;if(editing)document.activeElement?.blur();const button=$('#print-worksheet'),previousZoom=zoom;button.disabled=true;printing=true;status('Preparing pages…');try{await document.fonts.ready;for(let i=0;i<meta.pages.length;i++)await renderPage(i);zoom=Math.min(700/Math.max(...meta.pages.map(p=>p.width)),950/Math.max(...meta.pages.map(p=>p.height)));applyZoom();window.print();}catch(problem){error(problem.message);}finally{zoom=previousZoom;applyZoom();printing=false;button.disabled=false;updateStatus();}};
 function chooseFile(file){fileToUpload=file;uploadRequestId=requestId();$('#pdf-file-name').textContent=file?file.name:'Up to 10 MB · 60 pages';if(file&&!$('#upload-name').value)$('#upload-name').value=file.name.replace(/\.pdf$/i,'').slice(0,120);}
 $('#upload-open').onclick=()=>{$('#upload-error').hidden=true;$('#upload-dialog').showModal();};for(const id of ['upload-close','upload-cancel'])$('#'+id).onclick=()=>$('#upload-dialog').close();$('#pdf-input').onchange=e=>chooseFile(e.target.files[0]);
-document.addEventListener('dragover',e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();if(library?.role==='teacher')e.dataTransfer.dropEffect='copy';}});
-document.addEventListener('drop',e=>{if(!Array.from(e.dataTransfer?.types||[]).includes('Files'))return;e.preventDefault();if(library?.role!=='teacher'){error('Only teachers can add PDF printouts.');return;}const files=e.dataTransfer.files;if(files.length!==1){error('Drop one PDF at a time.');return;}if(embedded){window.parent.postMessage({type:'inkwire:pdf-drop',file:files[0]},location.origin);return;}$('#upload-error').hidden=true;$('#upload-dialog').showModal();chooseFile(files[0]);$('#pdf-input').required=false;});
+listen(embedded?root:document,'dragover',e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();if(library?.role==='teacher')e.dataTransfer.dropEffect='copy';}});
+listen(embedded?root:document,'drop',e=>{if(!Array.from(e.dataTransfer?.types||[]).includes('Files'))return;e.preventDefault();if(library?.role!=='teacher'){error('Only teachers can add PDF printouts.');return;}const files=e.dataTransfer.files;if(files.length!==1){error('Drop one PDF at a time.');return;}if(embedded){if(options.onPdfDrop){e.stopPropagation();options.onPdfDrop(files[0]);}else window.parent.postMessage({type:'inkwire:pdf-drop',file:files[0]},location.origin);return;}$('#upload-error').hidden=true;$('#upload-dialog').showModal();chooseFile(files[0]);$('#pdf-input').required=false;});
 $('#upload-form').onsubmit=async event=>{
   event.preventDefault();const file=fileToUpload,button=$('#upload-submit'),title=$('#upload-name').value.trim();if(!file||file.size>10*1024*1024||!title){$('#upload-error').textContent='Choose a PDF of up to 10 MB and enter a title.';$('#upload-error').hidden=false;return;}
   button.disabled=true;button.textContent='Checking PDF…';$('#upload-error').hidden=true;let task;
@@ -202,3 +204,6 @@ $('#upload-form').onsubmit=async event=>{
   finally{await task?.destroy();button.disabled=false;button.textContent='Add worksheet';}
 };
 await loadLibrary();
+return {destroy(){resetWorkspace();controller.abort();resizeObserver.disconnect();}};
+}
+if(document.body.classList.contains('worksheet-app'))await mountWorksheet();

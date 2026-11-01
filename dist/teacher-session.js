@@ -2,7 +2,6 @@ import {createMemberCourse} from './member-course.js';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
 import {createTeacherCalendar} from './teacher-calendar.js';
-import {createTranscriptSummary} from './transcript-summary.js';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
@@ -24,7 +23,6 @@ list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classe
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
 const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onSaved:()=>{calendar.refresh();classCalendar.refresh();}});
-createTranscriptSummary();
 const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-timeline'),onEditLesson:openCourseTab});
 const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
