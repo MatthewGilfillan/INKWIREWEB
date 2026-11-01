@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build": "esbuild src/notebook-editor.js --bundle --minify --format=iife --target=es2020 --outfile=dist/notebook-editor.js --legal-comments=linked && node scripts/notebook-licenses.mjs && node scripts/build-invitations.mjs && node scripts/build-worksheets.mjs && node scripts/build-notebooks.mjs",
+    "build": "esbuild src/notebook-editor.js --bundle --minify --format=iife --target=es2020 --outfile=dist/notebook-editor.js --legal-comments=linked && node scripts/notebook-licenses.mjs && node scripts/build-invitations.mjs && node scripts/build-worksheets.mjs && node scripts/build-notebooks.mjs && node scripts/build-email-previews.mjs",
     "test": "node --test tests/*.test.cjs",
     "test:browser": "node --test tests/browser/*.browser.cjs"
   },
