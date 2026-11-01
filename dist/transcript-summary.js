@@ -1,4 +1,5 @@
 import {api} from './workspace-shared.js';
+import {formatSummaryText,renderSummary} from './summary-format.mjs';
 
 export function createTranscriptSummary() {
   const button=document.createElement('button');button.type='button';button.className='teacher-button secondary';button.textContent='Summarise a transcript';
@@ -22,7 +23,8 @@ export function createTranscriptSummary() {
       if(token!==epoch)return;
       const response=await api('/api/teacher/transcript-summary',{filename:file.name,fileData:'data:text/plain;base64,'+encoded},{timeoutMs:100000});
       if(token!==epoch)return;result=response;
-      $('.transcript-summary-output').textContent=result.summary;
+      result.summary=formatSummaryText(result.summary);
+      renderSummary($('.transcript-summary-output'),result.summary);
       $('[data-transcript-metadata]').textContent=`${result.provider} · ${result.model} · full file: ${result.inputBytes.toLocaleString()} bytes${result.usage?' · '+result.usage.totalTokens.toLocaleString()+' tokens':''} · Request: ${result.requestId || result.responseId || 'completed'}`;
       $('[data-transcript-result]').hidden=false;$('[data-transcript-status]').textContent='Real OpenAI API response received. Review the summary before using it.';
       $('[data-transcript-result]').scrollIntoView({block:'start'});
