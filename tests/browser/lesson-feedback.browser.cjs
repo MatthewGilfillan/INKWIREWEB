@@ -1,0 +1,40 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {chromium}=require('playwright');
+const cid='11111111-1111-4111-8111-111111111111';
+test('teacher timeline unlocks after class, publishes ratings and transcript, and opens the private demo parent infographic',async()=>{
+ const {defaults,generateLessons}=await import('../../dist/course-model.mjs');const course={...defaults('Animal Farm'),weeks:2,startDate:'2026-10-31',startTime:'16:00',timeZone:'Asia/Shanghai'};course.lessons=generateLessons(course);let published=null,draft=null,revision=0,posted=0,demo=false;const now=Date.parse('2026-11-01T11:00:00Z');
+ const roster=[{id:'a',name:'Alice DEMO',connected:false,parents:[]},{id:'b',name:'Bob DEMO',connected:false,parents:[]}];
+ const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROME_CHANNEL?{channel:process.env.PLAYWRIGHT_CHROME_CHANNEL}:{})});const page=await browser.newPage({viewport:{width:1280,height:1000}}),errors=[];await page.clock.install({time:now});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
+ const assessment={attendance:'present',ratings:{attitude:5,prepared:4,effort:3,learning:4},quote:'Promises are different from proof.',parentComment:'Please bring the reading journal.'};
+ const overview=(teacher=false,isDemo=false)=>({teacher,demo:isDemo,serverNow:now,className:'Animal Farm DEMO',learnerName:teacher?undefined:'Alice DEMO',course:{...course,lessons:course.lessons.map((l,i)=>({...l,id:'legacy-'+(i+1),number:i+1,endsAt:i===0?now-1:now+60000,report:i===0&&published?{summary:published.summary,assessment:teacher?null:assessment}:null}))}});
+ await page.route('**/api/**',async route=>{const p=new URL(route.request().url()).pathname;
+  if(p==='/api/classes')return route.fulfill({json:{classes:[{id:cid,name:'Animal Farm DEMO',membership:'owner',overviewRevision:1,courseWeeks:2,courseFrequency:1,courseMinutes:120}]}});
+  if(p.endsWith('/roster'))return route.fulfill({json:{students:roster.map(s=>({...s,demoParent:demo}))}});
+  if(p.endsWith('/demo-parents')){demo=true;return route.fulfill({json:{created:true}});}
+  if(p.endsWith('/timeline'))return route.fulfill({json:overview(true)});
+  if(p.startsWith('/api/lesson-feedback/')&&p.endsWith('/overview'))return route.fulfill({json:overview(false,true)});
+  if(p.endsWith('/overview'))return route.fulfill({json:{course,revision:1,serverNow:now}});
+  if(p.endsWith('/lessons/legacy-1')){
+   if(route.request().method()==='POST'){
+    const body=route.request().postDataJSON();draft=body.draft;revision++;
+    if(body.action==='publish'){posted++;assert.equal(draft.assessments[0].ratings.attitude,5);assert.equal(draft.assessments[1].attendance,'absent');assert.match(Buffer.from(body.fileData.split(',')[1],'base64').toString(),/Fictional transcript/);published={summary:'**Lesson overview**\nThe class explored allegory. <img src=x onerror=alert(1)>',homework:'Read chapter two.',students:{a:assessment,b:{attendance:'absent',ratings:{},quote:null,parentComment:null}}};}
+   }
+   return route.fulfill({json:{revision,draft,published,busy:false,courseRevision:1,endsAt:now-1,serverNow:now,timeZone:'Asia/Shanghai',aiAvailable:true,roster,lesson:{title:'Introducing Animal Farm',homework:'Original homework'}}});
+  }
+  return route.fulfill({status:404,json:{}});
+ });
+ try{
+  await page.goto('http://127.0.0.1:8788/teacher.html');await page.locator(`[data-class-id="${cid}"]>summary`).click();await page.getByRole('button',{name:'Course timeline',exact:true}).click();await page.locator('.timeline-lesson').first().waitFor();
+  assert.equal(await page.locator('[data-timeline-feedback]').first().isEnabled(),true);assert.equal(await page.locator('[data-timeline-feedback]').nth(1).isEnabled(),false);await page.clock.runFor(60020);assert.equal(await page.locator('[data-timeline-feedback]').nth(1).isEnabled(),true);
+  await page.locator('[data-timeline-feedback]').first().click();await page.locator('[data-feedback-student]').first().waitFor();assert.equal(await page.locator('#lesson-feedback-title').count(),1);
+  const a=page.locator('[data-feedback-student="a"]');for(const [label,score]of[['Attitude',5],['Prepared for class',4],['Effort / focus',3],['Learning outcomes',4]])await a.getByRole('radio',{name:`${label}: ${score} out of 5`,exact:true}).check();
+  await page.locator('[data-feedback-student="b"] [data-attendance]').selectOption('absent');await page.locator('#feedback-teacher-speaker').fill('Matthew');
+  await page.getByRole('button',{name:'Save ratings draft',exact:true}).click();await page.getByText('Ratings draft saved.',{exact:false}).waitFor();assert.equal(posted,0);
+  await page.locator('#feedback-transcript').setInputFiles({name:'Fictional.txt',mimeType:'text/plain',buffer:Buffer.from('Matthew: Fictional transcript for the demonstration class.\n')});
+  await page.getByRole('button',{name:'Generate & publish feedback',exact:true}).click();await page.getByText('Published to the connected student and parent dashboards.',{exact:true}).waitFor();assert.equal(posted,1);assert.equal(await page.locator('[data-feedback-preview] img').count(),0);assert.equal(await page.locator('.feedback-metric').count(),4);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.locator('.lesson-feedback').evaluate(el=>el.scrollWidth<=el.clientWidth),true);await page.locator('.lesson-feedback').screenshot({path:'/tmp/inkwire-feedback-mobile.png'});
+  await page.getByRole('button',{name:'Close Summary & Feedback',exact:true}).click();await page.getByRole('button',{name:'Refresh timeline',exact:true}).click();await page.getByText('The class explored allegory.',{exact:false}).waitFor();
+  await page.locator('.member-course').screenshot({path:'/tmp/inkwire-teacher-timeline-mobile.png'});await page.getByRole('button',{name:'Close course timeline',exact:true}).click();await page.getByRole('button',{name:'Set up demo parent profiles',exact:true}).click();await page.getByRole('button',{name:'Open demo parent dashboard',exact:true}).first().click();
+  await page.getByText('DEMO PARENT DASHBOARD · TEACHER ONLY',{exact:true}).waitFor();assert.equal(await page.locator('.member-course .feedback-metric').count(),4);assert.match(await page.locator('.member-course').innerText(),/Please bring the reading journal/);assert.equal(await page.locator('.member-course').evaluate(el=>el.scrollWidth<=el.clientWidth),true);await page.locator('.member-course').screenshot({path:'/tmp/inkwire-demo-parent-mobile.png'});
+  await page.setViewportSize({width:1280,height:1000});await page.locator('.member-course .feedback-infographic').scrollIntoViewIfNeeded();await page.locator('.member-course').screenshot({path:'/tmp/inkwire-demo-parent.png'});assert.deepEqual(errors,[]);
+ }finally{if(errors.length)console.error(errors);await browser.close();}
+});

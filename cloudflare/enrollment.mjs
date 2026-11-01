@@ -61,7 +61,7 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
     if (path === '/learners' && teacher) return json({learners:(await env.DB.prepare(`SELECT DISTINCT l.id, l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id JOIN classes c ON c.id=s.class_id WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ORDER BY l.display_name, l.id`).bind(user.id,user.id).all()).results});
     const roster = path.match(new RegExp(`^/classes/(${uuid})/roster$`));
     if (teacher && roster && await classAccess(env,user,roster[1])) {
-      const students = (await env.DB.prepare(`SELECT l.id, l.display_name AS name, l.user_id IS NOT NULL AS connected FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(roster[1]).all()).results;
+      const students = (await env.DB.prepare(`SELECT l.id, l.display_name AS name, l.user_id IS NOT NULL AS connected, EXISTS(SELECT 1 FROM demo_parent_profiles d WHERE d.learner_id=l.id AND d.class_id=s.class_id) AS demoParent FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(roster[1]).all()).results;
       for (const student of students) student.parents=(await env.DB.prepare('SELECT parent_id AS id, parent_name AS name FROM learner_parents WHERE learner_id=? ORDER BY connected_at').bind(student.id).all()).results;
       return json({students});
     }

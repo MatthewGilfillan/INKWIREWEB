@@ -1,3 +1,4 @@
+import { handleLessonFeedback } from './lesson-feedback.mjs';
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
 import { isTeacher, handleClasses } from './classes.mjs';
 import { handleEnrollment } from './enrollment.mjs';
@@ -114,6 +115,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname.startsWith('/api/lesson-feedback/')) {
+        const session = await auth.api.getSession({headers:request.headers});
+        return await handleLessonFeedback(request,env,session?.user,{json,fail,readJSON});
+      }
       if (url.pathname === '/api/teacher/transcript-summary') {
         const session = await auth.api.getSession({headers:request.headers});
         return await handleTranscriptSummary(request,env,session?.user,{json,fail,readJSON});
