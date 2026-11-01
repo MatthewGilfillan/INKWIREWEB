@@ -1,3 +1,4 @@
+import {handleLessonQuiz} from './lesson-quizzes.mjs';
 import { handleLessonFeedback } from './lesson-feedback.mjs';
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
 import { isTeacher, handleClasses } from './classes.mjs';
@@ -115,6 +116,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname.startsWith('/api/lesson-quizzes/')) {
+        const session = await auth.api.getSession({headers:request.headers});
+        return await handleLessonQuiz(request,env,session?.user,{json,fail,readJSON});
+      }
       if (url.pathname.startsWith('/api/lesson-feedback/')) {
         const session = await auth.api.getSession({headers:request.headers});
         return await handleLessonFeedback(request,env,session?.user,{json,fail,readJSON});
