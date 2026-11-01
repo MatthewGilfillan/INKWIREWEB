@@ -1,6 +1,7 @@
 import { formats, useFormat } from './course-formats.mjs';
 import { api, escape } from './workspace-shared.js';
 import { presets, defaults, generateLessons, validateCourse, courseSummary, lessonDate, readCourseFile } from './course-model.mjs';
+import { createCourseAssistant } from './course-assistant.js';
 
 export function createCoursePlanner({ list, getClasses, status, problem, onSaved }) {
   const dialog = document.createElement('dialog');
@@ -19,6 +20,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     <details class="planner-source"><summary>Paste an existing outline</summary><label for="course-outline" id="outline-label">One line per week</label><textarea id="course-outline" rows="6" maxlength="30000" placeholder="Week 1: Introducing the novel&#10;Week 2: Character and motivation"></textarea><p>Paste from a document or spreadsheet. Spreadsheet columns: topic, goals, reading, homework. Choose “Generate weekly plan” to apply it.</p></details>
     <details class="planner-source"><summary>Copy from another class</summary><label for="copy-course">Source class</label><select id="copy-course"></select><button type="button" class="teacher-button secondary" id="copy-course-button">Use this overview</button><p>This copies the plan into this class. You can change its dates and content before saving.</p></details>
     <div class="teacher-actions"><button type="button" class="teacher-button" id="generate-course">Generate weekly plan</button><button type="button" class="teacher-button secondary" id="reschedule-course">Update lesson dates</button></div></div>
+    <div id="course-ai-planning"></div>
     <div class="planner-review-heading"><div><h3>Lesson plan</h3><p id="course-summary"></p></div><span class="class-badge">Teacher draft</span></div>
     <p class="planner-hint">Suggested topics are editable starting points. Add the actual text, chapters and assignments for your students.</p><div id="course-lessons"></div>
     <p class="form-error" role="alert" hidden></p><div class="planner-save"><button type="button" class="teacher-button secondary" id="download-course-file">Save course file</button><button type="button" class="teacher-button secondary" id="download-course">Download outline</button><button type="submit" class="teacher-button">Save course overview</button></div><p class="planner-hint">Saved for this class and its teachers. Student publication is not connected yet.</p></form>`;
@@ -29,6 +31,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   const message = value => { $('#planner-message').textContent = value; };
   const error = value => { $('.form-error').textContent = value; $('.form-error').hidden = !value; };
   const setDirty = () => { dirty = true; message('Unsaved changes'); };
+  const assistant = createCourseAssistant({ root: $('#course-ai-planning'), form, getClassId: () => currentId,
+    getDraft: () => currentDraft(), applyDraft: value => { fill(value); setDirty(); } });
   function settings() {
     const next = { ...course, ...Object.fromEntries(new FormData(form)), lessonCount: Number(field('lessonCount').value), lessonsPerWeek: field('pacing').value === 'lessons' ? 1 : Number(field('lessonsPerWeek').value), lessonMinutes: Number(field('lessonMinutes').value), includeWritingActivity: field('includeWritingActivity').checked };
     next.weeks = Math.ceil(next.lessonCount / next.lessonsPerWeek);
@@ -65,8 +69,9 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   $('[data-planner-close]').onclick = close;
   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-  dialog.addEventListener('close', () => { generation++; if (trigger?.isConnected) trigger.focus(); });
+  dialog.addEventListener('close', () => { generation++; assistant.reset(); if (trigger?.isConnected) trigger.focus(); });
   form.addEventListener('input', event => {
+    if (event.target.closest('.course-assistant')) return;
     if (event.target.id === 'copy-course' || event.target.id === 'course-file') return;
     setDirty();
     const row = event.target.closest('[data-plan-lesson]');
@@ -146,7 +151,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   $('#download-course').onclick = download;
   form.addEventListener('submit', async event => {
-    event.preventDefault(); if (saving) return;
+    event.preventDefault(); if (saving || assistant.isBusy()) return;
     try {
       const next = validateCourse(currentDraft());
       saving = true; error(''); message('Saving course overview…');
@@ -168,6 +173,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     finally { saving = false; form.querySelector('button[type=submit]').disabled = false; }
   });
   async function open(classId, button, lessonIndex) {
+    assistant.reset();
     trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation;
     form.hidden = true; error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
@@ -179,6 +185,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       const initial = result.course || useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full');
       if (!result.course) initial.lessons = generateLessons(initial);
       fill(initial); form.hidden = false;
+      assistant.open();
       message(result.course ? 'Saved teacher draft. Make changes below.' : 'Rivendell starting format · 15 weeks · one 120-minute lesson each week.');
       if (result.course) list.querySelector(`[data-course-status="${classId}"]`).textContent = courseSummary(result.course);
       if (Number.isInteger(lessonIndex)) {
