@@ -17,7 +17,7 @@ export function createClassSetup({root,onChange=()=>{},onReady=()=>{}}){
   function settings(){return {format:field('format').value,lessonCount:Number(field('lessonCount').value),lessonMinutes:Number(field('lessonMinutes').value),startDate:field('startDate').value,endDate:field('endDate').value,timeZone:field('timeZone').value,billingMode:field('billingMode').value,billTo:field('billTo').value,weeklySlots:[...root.querySelectorAll('[data-day]:checked')].map(el=>{const row=el.closest('[data-setup-day]');return {day:Number(el.dataset.day),startTime:row.querySelector('[data-day-time]').value,lessonMinutes:Number(row.querySelector('[data-day-minutes]').value)};})};}
   function invalidate(){preview=null;$('[data-setup-calendar]').replaceChildren();$('.setup-review').hidden=true;dirty=true;onReady(false);onChange();message('Review the calendar after changing the timetable.');}
   function draw(){
-    preview=scheduleSelection(settings(),[...skipped]);const {candidates,chosen,extra}=preview;
+    preview=scheduleSelection(settings(),[...skipped]);const {candidates,chosen,extra}=preview,teachingDays=new Set(settings().weeklySlots.map(s=>s.day));$('[data-setup-calendar]').dataset.teachingDays=String(teachingDays.size);
     $('.setup-review').hidden=false;$('[data-setup-count]').textContent=`${chosen.length} of ${field('lessonCount').value} classes selected. `+(extra>0?`Cross out ${extra} more ${extra===1?'class':'classes'}.`:extra<0?`Select ${-extra} more ${extra===-1?'class':'classes'}, or extend the finish date.`:'Ready to save your timetable.');
     const byDate=new Map();for(const slot of candidates){if(!byDate.has(slot.date))byDate.set(slot.date,[]);byDate.get(slot.date).push(slot);}
     const labels=new Map(chosen.map((s,i)=>[slotKey(s),sessionName(i,settings().weeklySlots.length)]));
@@ -26,10 +26,10 @@ export function createClassSetup({root,onChange=()=>{},onReady=()=>{}}){
       const week=candidates.filter(s=>teachingWeek(s.date)===monday),allSkipped=week.length&&week.every(s=>skipped.has(slotKey(s)));
       rows+=`<div class="setup-week"><div class="setup-week-action">${week.length?`<button type="button" data-skip-week="${monday}" aria-pressed="${Boolean(allSkipped)}" aria-label="${allSkipped?'Restore':'Skip'} week of ${monday}">${allSkipped?'Restore week':'Skip week'}</button>`:''}</div>${Array.from({length:7},(_,n)=>{
         const date=addDays(monday,n),label=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
-        return `<div class="setup-calendar-day"><span>${escape(label)}</span>${(byDate.get(date)||[]).map(s=>{const key=slotKey(s),off=skipped.has(key);return `<button type="button" data-skip-date="${key}" class="${off?'is-skipped':''}" aria-pressed="${off}" aria-label="${off?'Restore':'Cross out'} ${date} at ${s.startTime}"><strong>${s.startTime}</strong><small>${s.lessonMinutes} min</small><span>${off?'Crossed out':escape(labels.get(key))}</span></button>`;}).join('')}</div>`;
+        return `<div class="setup-calendar-day ${teachingDays.has(new Date(date+'T12:00:00Z').getUTCDay())?'is-teaching-day':''}"><span>${escape(label)}</span>${(byDate.get(date)||[]).map(s=>{const key=slotKey(s),off=skipped.has(key);return `<button type="button" data-skip-date="${key}" class="${off?'is-skipped':''}" aria-pressed="${off}" aria-label="${off?'Restore':'Cross out'} ${date} at ${s.startTime}"><strong>${s.startTime}</strong><small>${s.lessonMinutes} min</small><span>${off?'Crossed out':escape(labels.get(key))}</span></button>`;}).join('')}</div>`;
       }).join('')}</div>`;
     }
-    $('[data-setup-calendar]').innerHTML=`<div class="setup-calendar-days"><span>Week</span>${[1,2,3,4,5,6,0].map(d=>`<span>${weekdays[d].slice(0,3)}</span>`).join('')}</div>${rows}`;
+    $('[data-setup-calendar]').innerHTML=`<div class="setup-calendar-days"><span>Week</span>${[1,2,3,4,5,6,0].map(d=>`<span class="setup-weekday ${teachingDays.has(d)?'is-teaching-day':''}">${weekdays[d].slice(0,3)}</span>`).join('')}</div>${rows}`;
     message('');onReady(extra===0);
   }
   function review(){try{draw();}catch(e){preview=null;onReady(false);message(e.message);}}
@@ -41,7 +41,7 @@ export function createClassSetup({root,onChange=()=>{},onReady=()=>{}}){
     if(el===field('billingMode')||el===field('billTo')){dirty=true;onChange();return;}
     invalidate();
   });
-  root.addEventListener('input',event=>{if(event.target.matches('input:not([type=checkbox])')){if(event.target===field('billTo')){dirty=true;onChange();}else invalidate();}});
+  root.addEventListener('input',event=>{if(event.target===field('lessonCount')||event.target===field('lessonMinutes'))field('format').value='custom';if(event.target.matches('input:not([type=checkbox])')){if(event.target===field('billTo')){dirty=true;onChange();}else invalidate();}});
   $('[data-preview-schedule]').onclick=review;
   $('[data-suggest-end]').onclick=()=>{try{const s=settings(),rows=scheduleCandidates({...s,endDate:'',lessonCount:s.lessonCount});field('endDate').value=rows.at(-1).date;skipped.clear();dirty=true;onChange();review();}catch(e){message(e.message);}};
   root.addEventListener('click',event=>{const day=event.target.closest('[data-skip-date]'),week=event.target.closest('[data-skip-week]');if(!day&&!week)return;
