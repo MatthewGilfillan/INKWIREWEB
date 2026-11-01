@@ -1,3 +1,4 @@
+import {quizDraftSchema,quizInstructions,validateAIDraft} from './quiz-assistant.mjs';
 import { formatSummaryText } from '../dist/summary-format.mjs';
 const object = properties => ({type:'object', properties, required:Object.keys(properties), additionalProperties:false});
 const string = maxLength => ({type:'string', maxLength});
@@ -52,21 +53,22 @@ export function verifyFeedback(value, transcript, draft, roster) {
   }
   return {summary,homework,extras};
 }
-export async function generateLessonFeedback(env,file,draft,roster,lesson) {
+export async function generateLessonFeedback(env,file,draft,roster,lesson,nextLesson=null) {
   const controller = new AbortController(), timer=setTimeout(()=>controller.abort(),90000);
   try {
     const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,
       headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},
-      body:JSON.stringify({model:env.OPENAI_PLANNING_MODEL || 'gpt-6-sol',reasoning:{effort:'low'},store:false,max_output_tokens:8000,
-        instructions,text:{format:{type:'json_schema',name:'inkwire_lesson_feedback',strict:true,schema:feedbackSchema}},
-        input:[{role:'user',content:[{type:'input_file',filename:file.filename,file_data:file.fileData},{type:'input_text',text:JSON.stringify({lesson:lesson.title,teacherSpeaker:draft.teacherSpeaker,students:draft.assessments.map((a,i)=>({number:i+1,speaker:a.attendance==='present'?a.speaker:''}))})}]}]})});
+      body:JSON.stringify({model:env.OPENAI_PLANNING_MODEL || 'gpt-6-sol',reasoning:{effort:'low'},store:false,max_output_tokens:nextLesson?12000:8000,
+        instructions:instructions+(nextLesson?'\nAlso draft 5 questions for nextLesson. Return nextQuiz=null if the transcript cannot support a reliable quiz. '+quizInstructions:''),text:{format:{type:'json_schema',name:'inkwire_lesson_feedback',strict:true,schema:nextLesson?object({...feedbackSchema.properties,nextQuiz:nullable(quizDraftSchema)}):feedbackSchema}},
+        input:[{role:'user',content:[{type:'input_file',filename:file.filename,file_data:file.fileData},{type:'input_text',text:JSON.stringify({...(nextLesson?{nextLesson}:{}),lesson:lesson.title,teacherSpeaker:draft.teacherSpeaker,students:draft.assessments.map((a,i)=>({number:i+1,speaker:a.attendance==='present'?a.speaker:''}))})}]}]})});
     if (!response.ok) {await response.body?.cancel();throw Error(response.status===429?'OpenAI is at its usage limit. Your ratings are saved; try again later.':'OpenAI could not complete this report. Your ratings are saved; try again later.');}
     const data=await response.json(),content=(data.output || []).filter(x=>x.type==='message').flatMap(x=>x.content || []);
     if (data.status!=='completed' || content.some(x=>x.type==='refusal')) throw Error('OpenAI did not return a complete report. Your ratings are saved; try again later.');
-    let result;
-    try {result=verifyFeedback(JSON.parse(content.filter(x=>x.type==='output_text').map(x=>x.text).join('')),new TextDecoder().decode(Uint8Array.from(atob(file.fileData.split(',')[1]),c=>c.charCodeAt(0))),draft,roster);}
+    let result,raw,nextQuiz=null,nextQuizNote='';
+    try {raw=JSON.parse(content.filter(x=>x.type==='output_text').map(x=>x.text).join(''));result=verifyFeedback(raw,new TextDecoder().decode(Uint8Array.from(atob(file.fileData.split(',')[1]),c=>c.charCodeAt(0))),draft,roster);}
     catch {throw Error('OpenAI returned an unusable report. Your ratings are saved; nothing new was published.');}
-    return {...result,provider:'OpenAI',model:typeof data.model==='string'?data.model:null,requestId:response.headers.get('x-request-id')};
+    if(nextLesson && raw.nextQuiz){try{nextQuiz=validateAIDraft(raw.nextQuiz);}catch{nextQuizNote='Feedback published. The suggested quiz failed validation; use AI quiz setup to generate another draft.';}}
+    return {...result,nextQuiz,nextQuizNote,provider:'OpenAI',model:typeof data.model==='string'?data.model:null,requestId:response.headers.get('x-request-id')};
   } catch(error) {if(controller.signal.aborted) throw Error('OpenAI took too long. Your ratings are saved; try again later.'); if(error.message.startsWith('OpenAI')) throw error; throw Error('The OpenAI request failed. Your ratings are saved; try again later.');}
   finally {clearTimeout(timer);}
 }

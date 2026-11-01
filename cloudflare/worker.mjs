@@ -1,3 +1,5 @@
+import {handleCourseResources} from './course-resources.mjs';
+import {handleQuizAssistant} from './quiz-assistant.mjs';
 import {handleLessonQuiz} from './lesson-quizzes.mjs';
 import { handleLessonFeedback } from './lesson-feedback.mjs';
 import { createAuth, digest, normalizeEmail } from './auth.mjs';
@@ -116,6 +118,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname.startsWith('/api/course-resources/') || url.pathname.startsWith('/api/quiz-assistant/')) {
+        const session = await auth.api.getSession({headers:request.headers});
+        return await (url.pathname.startsWith('/api/course-resources/') ? handleCourseResources : handleQuizAssistant)(request,env,session?.user,{json,fail,readJSON});
+      }
       if (url.pathname.startsWith('/api/lesson-quizzes/')) {
         const session = await auth.api.getSession({headers:request.headers});
         return await handleLessonQuiz(request,env,session?.user,{json,fail,readJSON});

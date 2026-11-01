@@ -1,3 +1,4 @@
+import {createCourseQuizSetup} from './course-resources.js';
 import {createCourseSchedule} from './course-schedule.js';
 import {lessonTiming,billingSchedule,applySchedule} from './schedule-model.mjs';
 import {createLessonFeedback} from './lesson-feedback.js';
@@ -21,11 +22,11 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     <label for="course-description">Course overview</label><textarea id="course-description" name="description" maxlength="4000" rows="3" placeholder="What will students read, practise and achieve?"></textarea>
     <div data-primary-writing hidden><label class="planner-checkbox"><input type="checkbox" name="includeWritingActivity" checked> Include Section 8 writing activity</label><p>The author pre-reading and seven main sections share the lesson allocation. Section labels stay separate from lesson numbers.</p></div>
     <details class="planner-source"><summary>Unit overview &amp; teaching details</summary><label for="course-grade">Grade / age band</label><input id="course-grade" name="gradeBand" maxlength="80">${[['themes','Themes'], ['essentialQuestions','Essential questions'], ['enduringUnderstandings','Enduring understandings'], ['sourceNotes','Source & review notes']].map(([key,label]) => `<label for="course-${key}">${label}</label><textarea id="course-${key}" name="${key}" maxlength="6000" rows="3"></textarea>`).join('')}</details>
-    <details class="planner-source"><summary>Open a prepared course file</summary><label for="course-file">Ink Wire course file</label><input id="course-file" type="file" accept=".json,application/json"><p>Load a converted unit plan or a course file you saved earlier. Review it here before saving to this class. Opening a file does not upload it. PDF conversion is a separate step.</p></details>
+    <details class="planner-source"><summary>Open a prepared course file</summary><label for="course-file">Ink Wire course file</label><input id="course-file" type="file" accept=".json,application/json"><p>Load a converted unit plan or a course file you saved earlier. Review it here before saving to this class. Opening a file does not upload it. For PDF, Word or spreadsheet resources, use Resources & AI quizzes below.</p></details>
     <details class="planner-source"><summary>Paste an existing outline</summary><label for="course-outline" id="outline-label">One line per week</label><textarea id="course-outline" rows="6" maxlength="30000" placeholder="Week 1: Introducing the novel&#10;Week 2: Character and motivation"></textarea><p>Paste from a document or spreadsheet. Spreadsheet columns: topic, goals, reading, homework. Choose “Generate weekly plan” to apply it.</p></details>
     <details class="planner-source"><summary>Copy from another class</summary><label for="copy-course">Source class</label><select id="copy-course"></select><button type="button" class="teacher-button secondary" id="copy-course-button">Use this overview</button><p>This copies the plan into this class. You can change its dates and content before saving.</p></details>
     <div class="teacher-actions"><button type="button" class="teacher-button" id="generate-course">Generate weekly plan</button><button type="button" class="teacher-button secondary" id="reschedule-course">Update lesson dates</button></div></div>
-    <div id="course-ai-planning"></div>
+    <div id="course-ai-planning"></div><div id="course-ai-quizzes"></div>
     <div class="planner-review-heading"><div><h3>Lesson plan</h3><p id="course-summary"></p></div><span class="class-badge">Course outline</span></div>
     <p class="planner-hint">Suggested topics are editable starting points. Add the actual text, chapters and assignments for your students.</p><div id="course-lessons"></div>
     <p class="form-error" role="alert" hidden></p><div class="planner-save"><button type="button" class="teacher-button secondary" id="download-course-file">Save course file</button><button type="button" class="teacher-button secondary" id="download-course">Download outline</button><button type="submit" class="teacher-button">Save course overview</button></div><p class="planner-hint">The saved outline is visible to enrolled students and connected parents. Private source notes and teaching details stay with teachers. Publish each lesson’s Summary &amp; Feedback after class.</p></form>`;
@@ -40,6 +41,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   const setDirty = () => { dirty = true; message('Unsaved changes'); updateFeedbackButtons(); };
   const assistant = createCourseAssistant({ root: $('#course-ai-planning'), form, getClassId: () => currentId,
     getDraft: () => currentDraft(), applyDraft: value => { fill(value); setDirty(); } });
+  const quizSetup=createCourseQuizSetup({root:$('#course-ai-quizzes'),getClassId:()=>currentId,canGenerate:()=>Boolean(savedCourse) && !dirty && !saving && !assistant.isBusy()});
   const scheduler=createCourseSchedule({root:$('#course-scheduling'),getCourse:currentDraft,onChange:()=>{setDirty();if(course)refreshLessonBadges();},onFrequency:n=>{field('lessonsPerWeek').value=n;},apply:value=>{course=value;renderLessons();setDirty();},});
   function settings() {
     const next = { ...course, ...Object.fromEntries(new FormData(form)), ...scheduler.settings(), lessonCount: Number(field('lessonCount').value), lessonsPerWeek: field('pacing').value === 'lessons' ? 1 : Number(field('lessonsPerWeek').value), lessonMinutes: Number(field('lessonMinutes').value), includeWritingActivity: field('includeWritingActivity').checked };
@@ -110,7 +112,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
   dialog.addEventListener('close', () => { generation++; clearTimeout(unlockTimer); assistant.reset(); if (trigger?.isConnected) trigger.focus(); });
   form.addEventListener('input', event => {
-    if (event.target.closest('.course-assistant')) return;
+    if (event.target.closest('.course-assistant, .course-quiz-setup')) return;
     if (event.target.id === 'copy-course' || event.target.id === 'course-file') return;
     setDirty();
     const row = event.target.closest('[data-plan-lesson]');
@@ -196,7 +198,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   $('#download-course').onclick = download;
   form.addEventListener('submit', async event => {
-    event.preventDefault(); if (saving || assistant.isBusy()) return;
+    event.preventDefault(); if (saving || (assistant.isBusy() || quizSetup.isBusy())) return;
     try {
       const next = validateCourse(currentDraft());
       saving = true; error(''); message('Saving course overview…');
@@ -224,7 +226,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       if (Number.isInteger(lessonIndex)) { const row = $('#course-lessons').querySelector(`[data-plan-lesson="${lessonIndex}"]`); if (row) { row.open = true; row.querySelector('input').focus(); } }
       return;
     }
-    assistant.reset();
+    assistant.reset(); quizSetup.reset();
     trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation; course = null;
     form.hidden = true; error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
@@ -236,7 +238,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       const initial = result.course || useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full');
       if (!result.course) initial.lessons = generateLessons(initial).map(l=>({...l,id:crypto.randomUUID()}));
       fill(initial); form.hidden = false;
-      assistant.open();
+      assistant.open(); quizSetup.load();
       message(result.course ? 'Saved course outline. Open a completed lesson for Summary & Feedback.' : 'Rivendell starting format · 15 weeks · one 120-minute lesson each week.');
       const summary = list.querySelector(`[data-course-status="${classId}"]`); if (result.course && summary) summary.textContent = courseSummary(result.course);
       if (Number.isInteger(lessonIndex)) {
@@ -247,11 +249,11 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   if (!root) list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
   window.addEventListener('beforeunload', event => { if (dirty && isOpen()) { event.preventDefault(); event.returnValue = ''; } });
-  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy(),
+  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy() || quizSetup.isBusy(),
     canLeave() {
-      if (saving || assistant.isBusy()) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
+      if (saving || (assistant.isBusy() || quizSetup.isBusy())) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
       return !dirty || confirm('Switch classes without saving this course overview? Your unsaved changes will be lost.');
     },
-    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); currentId = ''; course = null; dirty = false; form.hidden = true; }
+    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); quizSetup.reset(); currentId = ''; course = null; dirty = false; form.hidden = true; }
   };
 }
