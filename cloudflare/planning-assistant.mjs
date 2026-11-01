@@ -30,7 +30,7 @@ export function planningInput(course, mode, lessonIndex, brief) {
   const indexes = mode === 'course' ? course.lessons.map((_, i) => i) : [lessonIndex];
   // Deliberately exclude account identifiers, rosters, organisation, dates and private source notes.
   return { mode, brief, course: Object.fromEntries(['title', 'description', 'preset', 'gradeBand', 'themes', 'essentialQuestions', 'enduringUnderstandings', 'lessonMinutes'].map(key => [key, course[key] ?? ''])),
-    lessons: indexes.map(i => ({ number: i + 1, section: course.lessons[i].section || '', ...Object.fromEntries(Object.keys(fields).map(key => [key, course.lessons[i][key] || ''])) })) };
+    lessons: indexes.map(i => ({ number: i + 1, lessonMinutes:course.lessons[i].lessonMinutes ?? course.lessonMinutes, section: course.lessons[i].section || '', ...Object.fromEntries(Object.keys(fields).map(key => [key, course.lessons[i][key] || ''])) })) };
 }
 
 export function applyPlanningResult(base, mode, lessonIndex, value) {

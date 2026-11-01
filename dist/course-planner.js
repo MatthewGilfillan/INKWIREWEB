@@ -1,3 +1,5 @@
+import {createCourseSchedule} from './course-schedule.js';
+import {lessonTiming,billingSchedule,applySchedule} from './schedule-model.mjs';
 import {createLessonFeedback} from './lesson-feedback.js';
 import {lessonKey,lessonEnd} from './lesson-feedback-model.mjs';
 import { formats, useFormat } from './course-formats.mjs';
@@ -5,15 +7,16 @@ import { api, escape } from './workspace-shared.js';
 import { presets, defaults, generateLessons, validateCourse, courseSummary, lessonDate, readCourseFile } from './course-model.mjs';
 import { createCourseAssistant } from './course-assistant.js';
 
-export function createCoursePlanner({ list, getClasses, status, problem, onSaved }) {
-  const dialog = document.createElement('dialog');
+export function createCoursePlanner({ list, getClasses, status, problem, onSaved, root }) {
+  const dialog = document.createElement(root ? 'section' : 'dialog');
+  const isOpen = () => root ? Boolean(currentId) : dialog.open;
   dialog.className = 'course-planner'; dialog.setAttribute('aria-labelledby', 'planner-title');
   dialog.innerHTML = `<button class="teacher-close" type="button" data-planner-close aria-label="Close course overview">×</button>
     <p class="teacher-eyebrow">COURSE PLANNING</p><h2 id="planner-title">Build course overview</h2><p id="planner-class"></p>
     <p id="planner-message" role="status"></p><form id="course-form" hidden>
     <div class="planner-intro"><p>Start with a reusable format, paste your own outline, or copy a previous class. Review the lessons before saving your teacher draft.</p><label for="course-format">Teaching format</label><select id="course-format" name="format">${formats.map(f => `<option value="${f.id}">${escape(f.name)}</option>`).join('')}</select><label for="course-pacing">Lesson frequency</label><select id="course-pacing" name="pacing"><option value="weekly">Recurring weekly timetable</option><option value="lessons">Set individual class dates later</option></select><div class="planner-grid three"><div><label for="course-weeks">Total lessons</label><input id="course-weeks" name="lessonCount" type="number" min="1" max="156" required></div><div data-weekly-frequency><label for="course-frequency">Lessons per week</label><input id="course-frequency" name="lessonsPerWeek" type="number" min="1" max="7" required></div><div><label for="course-minutes">Minutes per lesson</label><input id="course-minutes" name="lessonMinutes" type="number" min="15" max="240" required></div></div>
-    <div class="planner-grid three"><div data-weekly-start><label for="course-start">First lesson <span>(optional)</span></label><input id="course-start" name="startDate" type="date" min="2000-01-01" max="2100-01-01"></div><div><label for="course-time">Lesson time</label><input id="course-time" name="startTime" type="time" required></div><div><label for="course-zone">Time zone</label><select id="course-zone" name="timeZone"><option value="Asia/Shanghai">Beijing / Shanghai (UTC+8)</option><option value="Asia/Bangkok">Bangkok (UTC+7)</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></div></div>
-    <p class="planner-hint">For a weekly timetable, choose 1–7 lessons per week. Suggested lesson dates are spaced across the week and remain editable. Individual-date courses keep the lesson sequence without assuming how many weeks it takes.</p><label for="course-preset">Content starting point</label><select id="course-preset" name="preset">${presets.map(p => `<option value="${p.id}">${escape(p.name)}</option>`).join('')}</select><p id="preset-description"></p>
+    <div class="planner-grid three"><div data-weekly-start><label for="course-start">Start date <span>(optional)</span></label><input id="course-start" name="startDate" type="date" min="2000-01-01" max="2100-01-01"></div><div data-course-end><label for="course-end">End date <span>(optional)</span></label><input id="course-end" name="endDate" type="date" min="2000-01-01" max="2100-12-31"></div><div><label for="course-time">Default lesson time</label><input id="course-time" name="startTime" type="time" required></div><div><label for="course-zone">Time zone</label><select id="course-zone" name="timeZone"><option value="Asia/Shanghai">Beijing / Shanghai (UTC+8)</option><option value="Asia/Bangkok">Bangkok (UTC+7)</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></div></div>
+    <div id="course-scheduling"></div><p class="planner-hint">For a weekly timetable, choose 1–7 lessons per week. Add specific weekly days and times below, or use evenly spaced suggested dates. Each lesson can be cancelled or rescheduled. Individual-date courses keep the lesson sequence without assuming how many weeks it takes.</p><label for="course-preset">Content starting point</label><select id="course-preset" name="preset">${presets.map(p => `<option value="${p.id}">${escape(p.name)}</option>`).join('')}</select><p id="preset-description"></p>
     <div class="planner-grid"><div><label for="course-organization">School / organisation</label><input id="course-organization" name="organization" maxlength="120"></div><div><label for="course-title">Course title</label><input id="course-title" name="title" maxlength="160" required></div></div>
     <label for="course-description">Course overview</label><textarea id="course-description" name="description" maxlength="4000" rows="3" placeholder="What will students read, practise and achieve?"></textarea>
     <div data-primary-writing hidden><label class="planner-checkbox"><input type="checkbox" name="includeWritingActivity" checked> Include Section 8 writing activity</label><p>The author pre-reading and seven main sections share the lesson allocation. Section labels stay separate from lesson numbers.</p></div>
@@ -26,7 +29,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     <div class="planner-review-heading"><div><h3>Lesson plan</h3><p id="course-summary"></p></div><span class="class-badge">Course outline</span></div>
     <p class="planner-hint">Suggested topics are editable starting points. Add the actual text, chapters and assignments for your students.</p><div id="course-lessons"></div>
     <p class="form-error" role="alert" hidden></p><div class="planner-save"><button type="button" class="teacher-button secondary" id="download-course-file">Save course file</button><button type="button" class="teacher-button secondary" id="download-course">Download outline</button><button type="submit" class="teacher-button">Save course overview</button></div><p class="planner-hint">The saved outline is visible to enrolled students and connected parents. Private source notes and teaching details stay with teachers. Publish each lesson’s Summary &amp; Feedback after class.</p></form>`;
-  document.body.append(dialog);
+  (root || document.body).append(dialog);
+  if (root) dialog.querySelector('[data-planner-close]').hidden = true;
   const $ = selector => dialog.querySelector(selector), form = $('#course-form');
   let currentId = '', revision = 0, course, dirty = false, saving = false, trigger, generation = 0;
   const feedback=createLessonFeedback(); let savedCourse=null, serverTime=Date.now(), localTime=performance.now(), unlockTimer;
@@ -36,19 +40,31 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   const setDirty = () => { dirty = true; message('Unsaved changes'); updateFeedbackButtons(); };
   const assistant = createCourseAssistant({ root: $('#course-ai-planning'), form, getClassId: () => currentId,
     getDraft: () => currentDraft(), applyDraft: value => { fill(value); setDirty(); } });
+  const scheduler=createCourseSchedule({root:$('#course-scheduling'),getCourse:currentDraft,onChange:()=>{setDirty();if(course)refreshLessonBadges();},onFrequency:n=>{field('lessonsPerWeek').value=n;},apply:value=>{course=value;renderLessons();setDirty();},});
   function settings() {
-    const next = { ...course, ...Object.fromEntries(new FormData(form)), lessonCount: Number(field('lessonCount').value), lessonsPerWeek: field('pacing').value === 'lessons' ? 1 : Number(field('lessonsPerWeek').value), lessonMinutes: Number(field('lessonMinutes').value), includeWritingActivity: field('includeWritingActivity').checked };
+    const next = { ...course, ...Object.fromEntries(new FormData(form)), ...scheduler.settings(), lessonCount: Number(field('lessonCount').value), lessonsPerWeek: field('pacing').value === 'lessons' ? 1 : Number(field('lessonsPerWeek').value), lessonMinutes: Number(field('lessonMinutes').value), includeWritingActivity: field('includeWritingActivity').checked };
     next.weeks = Math.ceil(next.lessonCount / next.lessonsPerWeek);
-    if (next.pacing === 'lessons') next.startDate = '';
+    if (next.pacing === 'lessons') { next.startDate = ''; next.endDate = ''; next.weeklySlots=[]; }
     return next;
   }
   function readLessons() {
-    return [...dialog.querySelectorAll('[data-plan-lesson]')].map((row, i) => ({ id:lessonKey(course.lessons[i],i), week: course.lessons[i].week, slot: course.lessons[i].slot,
-      ...Object.fromEntries([...row.querySelectorAll('[data-lesson-field]')].map(input => [input.dataset.lessonField, input.value])) }));
+    return [...dialog.querySelectorAll('[data-plan-lesson]')].map((row, i) => ({...course.lessons[i],id:lessonKey(course.lessons[i],i),
+      ...Object.fromEntries([...row.querySelectorAll('[data-lesson-field]')].map(input=>[input.dataset.lessonField,input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value]))}));
+  }
+  function refreshLessonBadges(){
+    if(!course)return;const current=currentDraft(),billing=billingSchedule(current);scheduler.refresh(current);
+    for(const [i,lesson]of current.lessons.entries()){
+      const row=$(`[data-plan-lesson="${i}"]`);row.classList.toggle('is-cancelled',lesson.status==='cancelled');
+      row.querySelector('[data-lesson-billing]').textContent=billing.get(lessonKey(lesson,i))?.label || '';
+      row.querySelector('[data-lesson-state]').textContent=lesson.status==='cancelled'?'Cancelled':lesson.rescheduledFrom?`Rescheduled from ${lesson.rescheduledFrom.date} at ${lesson.rescheduledFrom.startTime}`:'Scheduled';
+      row.querySelector('[data-cancel-lesson]').textContent=lesson.status==='cancelled'?'Restore lesson':'Cancel lesson';
+      row.querySelector('[data-charge-cancellation]').hidden=lesson.status!=='cancelled';
+    }
   }
   function renderLessons() {
     $('#course-summary').textContent = courseSummary(course);
-    $('#course-lessons').innerHTML = course.lessons.map((lesson, i) => `<details class="plan-lesson" data-plan-lesson="${i}" ${i === 0 ? 'open' : ''}><summary><span><b>${course.pacing === 'lessons' ? `Lesson ${i + 1}` : `Week ${lesson.week}${course.lessonsPerWeek > 1 ? ` · lesson ${lesson.slot}` : ''}`}</b><span data-topic-label>${escape(lesson.title)}</span></span><span data-date-label>${escape(lesson.date || 'Date to be set')}</span></summary><div class="plan-lesson-body"><div class="feedback-lesson-actions"><button type="button" class="teacher-button secondary" data-feedback-open="${escape(lessonKey(lesson,i))}" disabled>Summary &amp; Feedback</button><span data-feedback-unlock></span></div><div class="planner-grid"><div><label for="lesson-${i}-title">Topic</label><input id="lesson-${i}-title" data-lesson-field="title" maxlength="160" required value="${escape(lesson.title)}"></div><div><label for="lesson-${i}-date">Lesson date</label><input id="lesson-${i}-date" data-lesson-field="date" type="date" min="2000-01-01" max="2100-12-31" value="${escape(lesson.date)}"></div></div>${[['section','Book section / unit'], ['goal', 'Learning goals / outcomes'], ['reading', 'Reading before class'], ['homework', 'Assignments / homework'], ['skills','Skills'], ['activities','Lesson activities'], ['evidence','Evidence of learning'], ['sourcePages','Source pages']].map(([key, label]) => `<label for="lesson-${i}-${key}">${label}</label><textarea id="lesson-${i}-${key}" data-lesson-field="${key}" maxlength="${key === 'activities' ? 4000 : ['skills','evidence'].includes(key) ? 2000 : key === 'section' ? 160 : key === 'sourcePages' ? 80 : 1200}" rows="2">${escape(lesson[key])}</textarea>`).join('')}</div></details>`).join('');
+    $('#course-lessons').innerHTML = course.lessons.map((lesson, i) => `<details class="plan-lesson" data-plan-lesson="${i}" ${i === 0 ? 'open' : ''}><summary><span><b>${course.pacing === 'lessons' ? `Lesson ${i + 1}` : `Week ${lesson.week}${course.lessonsPerWeek > 1 ? ` · lesson ${lesson.slot}` : ''}`}</b><span data-topic-label>${escape(lesson.title)}</span></span><span data-date-label>${escape(lesson.date || 'Date to be set')}</span></summary><div class="plan-lesson-body"><div class="lesson-schedule-actions"><span data-lesson-state></span><button type="button" class="text-button" data-reschedule-lesson="${i}">Reschedule</button><button type="button" class="text-button danger-text" data-cancel-lesson="${i}">Cancel lesson</button></div><p class="lesson-billing" data-lesson-billing></p><label class="planner-checkbox" data-charge-cancellation hidden><input type="checkbox" data-lesson-field="chargeCancelled" ${lesson.chargeCancelled?'checked':''}>Count this cancellation for billing / the lesson pack</label><div class="feedback-lesson-actions"><button type="button" class="teacher-button secondary" data-feedback-open="${escape(lessonKey(lesson,i))}" disabled>Summary &amp; Feedback</button><span data-feedback-unlock></span></div><div class="planner-grid"><div><label for="lesson-${i}-title">Topic</label><input id="lesson-${i}-title" data-lesson-field="title" maxlength="160" required value="${escape(lesson.title)}"></div><div><label for="lesson-${i}-date">Lesson date</label><input id="lesson-${i}-date" data-lesson-field="date" type="date" min="2000-01-01" max="2100-12-31" value="${escape(lesson.date)}"></div><div><label for="lesson-${i}-time">Lesson time</label><input id="lesson-${i}-time" data-lesson-field="startTime" type="time" required value="${escape(lesson.startTime || course.startTime)}"></div><div><label for="lesson-${i}-minutes">Minutes</label><input id="lesson-${i}-minutes" data-lesson-field="lessonMinutes" type="number" min="15" max="240" required value="${lesson.lessonMinutes ?? course.lessonMinutes}"></div></div>${[['section','Book section / unit'], ['goal', 'Learning goals / outcomes'], ['reading', 'Reading before class'], ['homework', 'Assignments / homework'], ['skills','Skills'], ['activities','Lesson activities'], ['evidence','Evidence of learning'], ['sourcePages','Source pages']].map(([key, label]) => `<label for="lesson-${i}-${key}">${label}</label><textarea id="lesson-${i}-${key}" data-lesson-field="${key}" maxlength="${key === 'activities' ? 4000 : ['skills','evidence'].includes(key) ? 2000 : key === 'section' ? 160 : key === 'sourcePages' ? 80 : 1200}" rows="2">${escape(lesson[key])}</textarea>`).join('')}</div></details>`).join('');
+    refreshLessonBadges();
   }
   function updateFeedbackButtons() {
     clearTimeout(unlockTimer); let next=Infinity;
@@ -57,16 +73,22 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       let end=null;try{if(lesson)end=lessonEnd(savedCourse,lesson);}catch{}
       const remaining=end===null?Infinity:end-(serverTime+performance.now()-localTime);
       button.disabled=dirty || saving || !lesson || end===null || remaining>0;
-      label.textContent=dirty || !lesson?'Save the course overview first.':end===null?'Set and save this lesson’s date and time.':remaining>0?'Opens '+new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:savedCourse.timeZone}).format(end)+' · '+savedCourse.timeZone:'Ready for your lesson recap and student assessments';
+      label.textContent=lesson?.status==='cancelled'?'Cancelled lessons do not accept feedback.':dirty || !lesson?'Save the course overview first.':end===null?'Set and save this lesson’s date and time.':remaining>0?'Opens '+new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:savedCourse.timeZone}).format(end)+' · '+savedCourse.timeZone:'Ready for your lesson recap and student assessments';
       if(remaining>0)next=Math.min(next,remaining);
     }
-    if(dialog.open && Number.isFinite(next))unlockTimer=setTimeout(updateFeedbackButtons,Math.min(next+10,2147483647));
+    if(isOpen() && Number.isFinite(next))unlockTimer=setTimeout(updateFeedbackButtons,Math.min(next+10,2147483647));
   }
+  $('#course-lessons').addEventListener('click',event=>{
+    const button=event.target.closest('[data-cancel-lesson],[data-reschedule-lesson]');if(!button)return;
+    if(button.dataset.rescheduleLesson!==undefined){const row=$(`[data-plan-lesson="${button.dataset.rescheduleLesson}"]`);row.querySelector('[data-lesson-field="date"]').focus();message('Change the lesson date, time or duration, then save course overview. The same lesson keeps its content and pack credit.');return;}
+    const i=Number(button.dataset.cancelLesson);course=currentDraft();course.lessons[i].status=course.lessons[i].status==='cancelled'?'scheduled':'cancelled';course.lessons[i].chargeCancelled=false;
+    renderLessons();$(`[data-plan-lesson="${i}"]`).open=true;setDirty();
+  });
   $('#course-lessons').addEventListener('click',event=>{const button=event.target.closest('[data-feedback-open]');if(button && !button.disabled){event.preventDefault();feedback.open(currentId,button.dataset.feedbackOpen,button);}});
-  document.addEventListener('visibilitychange',()=>{if(dialog.open)updateFeedbackButtons();});
+  document.addEventListener('visibilitychange',()=>{if(isOpen())updateFeedbackButtons();});
   function fill(value) {
     course = structuredClone(value);
-    for (const key of ['preset', 'organization', 'title', 'description', 'lessonsPerWeek', 'lessonMinutes', 'startDate', 'startTime', 'timeZone', 'gradeBand', 'themes', 'essentialQuestions', 'enduringUnderstandings', 'sourceNotes']) {
+    for (const key of ['preset', 'organization', 'title', 'description', 'lessonsPerWeek', 'lessonMinutes', 'startDate', 'endDate', 'startTime', 'timeZone', 'gradeBand', 'themes', 'essentialQuestions', 'enduringUnderstandings', 'sourceNotes']) {
       if (key === 'timeZone' && ![...field(key).options].some(o => o.value === value[key])) field(key).add(new Option(value[key], value[key]));
       field(key).value = value[key] ?? '';
     }
@@ -77,7 +99,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     refreshScheduleControls();
     $('#course-outline').value = '';
     $('#preset-description').textContent = presets.find(p => p.id === course.preset)?.description || '';
-    renderLessons(); updateFeedbackButtons();
+    scheduler.fill(value); renderLessons(); updateFeedbackButtons();
   }
   function close() {
     if (saving) return;
@@ -94,9 +116,13 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     const row = event.target.closest('[data-plan-lesson]');
     if (row && event.target.dataset.lessonField === 'title') row.querySelector('[data-topic-label]').textContent = event.target.value;
     if (row && event.target.dataset.lessonField === 'date') row.querySelector('[data-date-label]').textContent = event.target.value || 'Date to be set';
+    if(row && ['date','startTime','lessonMinutes'].includes(event.target.dataset.lessonField)){const lesson=course.lessons[Number(row.dataset.planLesson)];if(lesson.date && !lesson.rescheduledFrom)lesson.rescheduledFrom=lessonTiming(course,lesson);}
+    if(row)refreshLessonBadges();
+    if(['course-start','course-end','course-time','course-minutes'].includes(event.target.id))scheduler.invalidate();
   });
   function refreshScheduleControls() {
     const manual = field('pacing').value === 'lessons';
+    scheduler.setWeekly(!manual);$('[data-course-end]').hidden=manual;
     $('[data-weekly-frequency]').hidden = manual; $('[data-weekly-start]').hidden = manual;
     field('lessonsPerWeek').disabled = manual;
     $('#reschedule-course').disabled = manual;
@@ -117,6 +143,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       const next = settings(); next.lessons = generateLessons(next, $('#course-outline').value).map(l=>({...l,id:crypto.randomUUID()})); validateCourse(next);
       if (!next.description || presets.some(p => p.overview === next.description)) next.description = presets.find(p => p.id === next.preset).overview;
       if (course.lessons.length && !confirm('Replace the weekly plan below with a new plan? This replaces its topics, dates and assignments in this draft.')) return;
+      if(next.weeklySlots?.length && next.pacing!=='lessons'){next.lessons=next.lessons.map(l=>({...l,date:''}));try{Object.assign(next,applySchedule(next));}catch{}}
       course = next; field('description').value = course.description; renderLessons(); error(''); setDirty(); $('#course-lessons').scrollIntoView({ block: 'start' });
     } catch (e) { error(e.message); }
   };
@@ -124,7 +151,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     if (!form.reportValidity()) return;
     try {
       const next = settings();
-      next.lessons = readLessons().map((lesson, i) => ({ ...lesson, week: Math.floor(i / next.lessonsPerWeek) + 1, slot: i % next.lessonsPerWeek + 1, date: lessonDate(next, i) }));
+      if(next.weeklySlots?.length){scheduler.preview();return;}
+      next.lessons = readLessons().map((lesson, i) => ({ ...lesson, week: Math.floor(i / next.lessonsPerWeek) + 1, slot: i % next.lessonsPerWeek + 1, date: lessonDate(next, i),startTime:next.startTime,lessonMinutes:next.lessonMinutes }));
       course = validateCourse(next); renderLessons(); error(''); setDirty();
     } catch (e) { error(e.message); }
   };
@@ -133,7 +161,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     const button = event.currentTarget; button.disabled = true;
     try {
       const result = await api(`/api/classes/${source}/overview`);
-      if (token !== generation || !dialog.open) return;
+      if (token !== generation || !isOpen()) return;
       if (!result.course) throw Error('That class has no saved course overview yet.');
       if (dirty && !confirm('Replace this draft with the selected class’s overview?')) return;
       fill({...result.course,lessons:result.course.lessons.map(l=>({...l,id:crypto.randomUUID()}))}); setDirty(); error('');
@@ -144,7 +172,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     try {
       if (file.size > 131072) throw Error('Choose a course file smaller than 128 KiB.');
       const imported = readCourseFile(JSON.parse(await file.text()));
-      if (token !== generation || !dialog.open) return;
+      if (token !== generation || !isOpen()) return;
       if (dirty && !confirm('Replace this draft with the course file? Save or download the current draft first if you want to keep it.')) return;
       fill({...imported,lessons:imported.lessons.map(l=>({...l,id:crypto.randomUUID()}))}); setDirty(); error(''); message('Course file opened locally. Review its source notes and lessons, then save it to this class.');
     } catch (e) { error(e.message); } finally { event.target.value = ''; }
@@ -182,36 +210,48 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
         const classroom = getClasses().find(c => c.id === currentId);
         if (classroom) Object.assign(classroom, { overviewRevision: revision, courseWeeks: course.weeks, courseFrequency: course.lessonsPerWeek, courseMinutes: course.lessonMinutes, coursePacing: course.pacing, courseLessonCount: course.lessonCount });
         message('Course overview saved.'); status.textContent = 'Course overview saved for ' + getClasses().find(c => c.id === currentId)?.name + '.';
-        list.querySelector(`[data-course-status="${currentId}"]`).textContent = courseSummary(course);
-        list.querySelector(`[data-plan-course="${currentId}"]`).textContent = 'Edit course overview';
+        const summary = list.querySelector(`[data-course-status="${currentId}"]`);
+        if (summary) summary.textContent = courseSummary(course);
+        const button = list.querySelector(`[data-plan-course="${currentId}"]`);
+        if (button) button.textContent = 'Edit course overview';
         onSaved?.();
       } finally { controls.forEach((el, i) => { el.disabled = disabled[i]; }); refreshScheduleControls(); }
     } catch (e) { error(e.message); message('Your draft has not been saved.'); }
     finally { saving = false; form.querySelector('button[type=submit]').disabled = false; updateFeedbackButtons(); }
   });
   async function open(classId, button, lessonIndex) {
+    if (root && currentId === classId && course && !form.hidden) {
+      if (Number.isInteger(lessonIndex)) { const row = $('#course-lessons').querySelector(`[data-plan-lesson="${lessonIndex}"]`); if (row) { row.open = true; row.querySelector('input').focus(); } }
+      return;
+    }
     assistant.reset();
-    trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation;
+    trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation; course = null;
     form.hidden = true; error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
     $('#copy-course').innerHTML = '<option value="">Choose another class</option>' + getClasses().filter(c => c.id !== classId && c.overviewRevision).map(c => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
-    dialog.showModal();
+    if (!root) dialog.showModal();
     try {
-      const result = await api(`/api/classes/${classId}/overview`); if (generation !== token || !dialog.open) return;
+      const result = await api(`/api/classes/${classId}/overview`); if (generation !== token || !isOpen()) return;
       revision = result.revision; savedCourse=result.course?structuredClone(result.course):null; serverTime=result.serverNow || Date.now();localTime=performance.now();
       const initial = result.course || useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full');
       if (!result.course) initial.lessons = generateLessons(initial).map(l=>({...l,id:crypto.randomUUID()}));
       fill(initial); form.hidden = false;
       assistant.open();
       message(result.course ? 'Saved course outline. Open a completed lesson for Summary & Feedback.' : 'Rivendell starting format · 15 weeks · one 120-minute lesson each week.');
-      if (result.course) list.querySelector(`[data-course-status="${classId}"]`).textContent = courseSummary(result.course);
+      const summary = list.querySelector(`[data-course-status="${classId}"]`); if (result.course && summary) summary.textContent = courseSummary(result.course);
       if (Number.isInteger(lessonIndex)) {
         const row = $('#course-lessons').querySelector(`[data-plan-lesson="${lessonIndex}"]`);
         if (row) { row.open = true; row.querySelector('input').focus(); row.scrollIntoView({ block: 'start' }); }
       }
-    } catch (e) { message(e.message + ' Close and reopen to try again.'); if (e.status === 401) problem(e); }
+    } catch (e) { if (generation !== token) return; message(e.message + (root ? ' Select Course overview again to retry.' : ' Close and reopen to try again.')); if (e.status === 401) problem(e); }
   }
-  list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
-  window.addEventListener('beforeunload', event => { if (dirty && dialog.open) { event.preventDefault(); event.returnValue = ''; } });
-  return { isOpen: () => dialog.open, open };
+  if (!root) list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
+  window.addEventListener('beforeunload', event => { if (dirty && isOpen()) { event.preventDefault(); event.returnValue = ''; } });
+  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy(),
+    canLeave() {
+      if (saving || assistant.isBusy()) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
+      return !dirty || confirm('Switch classes without saving this course overview? Your unsaved changes will be lost.');
+    },
+    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); currentId = ''; course = null; dirty = false; form.hidden = true; }
+  };
 }

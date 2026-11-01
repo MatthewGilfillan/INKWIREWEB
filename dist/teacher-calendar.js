@@ -1,11 +1,12 @@
 import { api, escape } from './workspace-shared.js';
 import { calendarGrid, shiftMonth, zonedClock } from './calendar-model.mjs';
 
-export function createTeacherCalendar({ root, getClasses, openCourse, problem }) {
+export function createTeacherCalendar({ root, getClasses, openCourse, problem, getClassId }) {
   let zone = 'Asia/Bangkok', month = zonedClock(Date.now(), zone).date.slice(0, 7), mode = matchMedia('(max-width:600px)').matches ? 'agenda' : 'month', generation = 0, data = null;
   root.innerHTML = `<div class="calendar-toolbar"><div class="teacher-actions"><button type="button" class="teacher-button secondary" data-cal="previous" aria-label="Previous month">←</button><button type="button" class="teacher-button secondary" data-cal="today">Today</button><button type="button" class="teacher-button secondary" data-cal="next" aria-label="Next month">→</button></div><label>Month<input type="month" data-cal="month" min="2000-01" max="2100-12" required></label><label>Show<select data-cal="mode"><option value="month">Month</option><option value="agenda">Agenda</option></select></label></div>
     <div class="calendar-filters"><label>Class<select data-cal="class"><option value="">All classes</option></select></label><label>Calendar time zone<select data-cal="zone"><option value="Asia/Bangkok">Bangkok (UTC+7)</option><option value="Asia/Shanghai">Beijing / Shanghai (UTC+8)</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></label></div><h2 data-cal="title"></h2><p data-cal="status" role="status"></p><button type="button" class="text-button" data-cal="retry" hidden>Try loading calendar again</button><div data-cal="events"></div><div data-cal="issues"></div><div data-cal="unscheduled"></div>`;
   const $ = name => root.querySelector(`[data-cal="${name}"]`);
+  if (getClassId) $('class').closest('label').hidden = true;
   $('mode').value = mode; $('month').value = month;
   function eventLabel(event, day = event.date) {
     const start = zonedClock(event.startsAt, zone), end = zonedClock(event.endsAt, zone);
@@ -13,16 +14,16 @@ export function createTeacherCalendar({ root, getClasses, openCourse, problem })
     return `${start.time}–${end.time}${end.date !== start.date ? ' (ends ' + end.date + ')' : ''}`;
   }
   function eventButton(event, day) {
-    return `<button type="button" class="calendar-event" data-event="${escape(event.id)}" aria-label="${escape(eventLabel(event, day) + ' · ' + event.className + ' · ' + event.title)}"><time datetime="${escape(event.startsAt)}">${escape(eventLabel(event, day))}</time><strong>${escape(event.className)}</strong><span>${escape(event.title)}</span></button>`;
+    return `<button type="button" class="calendar-event ${event.status==='cancelled'?'is-cancelled':''}" data-event="${escape(event.id)}" aria-label="${escape(eventLabel(event, day) + ' · ' + event.className + ' · ' + event.title + (event.status==='cancelled'?' · Cancelled':''))}"><time datetime="${escape(event.startsAt)}">${escape(eventLabel(event, day))}</time><strong>${escape(event.className)}</strong><span>${escape(event.title)}</span>${event.status==='cancelled'?'<span>Cancelled</span>':''}${event.billing?`<small>${escape(event.billing)}</small>`:''}</button>`;
   }
   function dayLabel(day) { return new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day + 'T12:00:00Z')); }
   function render() {
     $('title').textContent = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-01T12:00:00Z'));
     $('month').value = month; $('previous').disabled = month <= '2000-01'; $('next').disabled = month >= '2100-12';
     if (!data) return;
-    const filter = $('class').value, events = data.events.filter(e => !filter || e.classId === filter), monthEvents = events.filter(e => (e.dates || [e.date]).some(d => d.startsWith(month)));
+    const filter = getClassId?.() || $('class').value, events = data.events.filter(e => !filter || e.classId === filter), monthEvents = events.filter(e => (e.dates || [e.date]).some(d => d.startsWith(month)));
     const days = calendarGrid(month), today = zonedClock(Date.now(), zone).date;
-    $('status').textContent = `${monthEvents.length} scheduled lesson${monthEvents.length === 1 ? '' : 's'} this month. Times shown in ${zone}. Open a lesson to review or change its schedule.`;
+    $('status').textContent = `${monthEvents.filter(e=>e.status!=='cancelled').length} scheduled lesson${monthEvents.filter(e=>e.status!=='cancelled').length === 1 ? '' : 's'} this month.${monthEvents.some(e=>e.status==='cancelled')?' '+monthEvents.filter(e=>e.status==='cancelled').length+' cancelled.':''} Times shown in ${zone}. Open a lesson to review or change its schedule.`;
     if (mode === 'month') $('events').innerHTML = `<div class="calendar-weekdays" aria-hidden="true">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<span>${d}</span>`).join('')}</div><div class="calendar-month">${days.map(day => `<section class="calendar-day ${day.startsWith(month) ? '' : 'outside-month'} ${day === today ? 'is-today' : ''}" aria-label="${dayLabel(day)}"><h3><time datetime="${day}" ${day === today ? 'aria-current="date"' : ''}>${Number(day.slice(-2))}</time></h3>${events.filter(e => (e.dates || [e.date]).includes(day)).map(event => eventButton(event, day)).join('')}</section>`).join('')}</div>`;
     else $('events').innerHTML = monthEvents.length ? `<div class="calendar-agenda">${[...new Set(monthEvents.flatMap(e => e.dates || [e.date]).filter(d => d.startsWith(month)))].sort().map(day => `<section><h3>${dayLabel(day)}</h3>${monthEvents.filter(e => (e.dates || [e.date]).includes(day)).map(event => eventButton(event, day)).join('')}</section>`).join('')}</div>` : '<div class="calendar-empty">No lessons are scheduled this month. Choose another month or schedule a class below.</div>';
     const missing = data.unscheduled.filter(c => !filter || c.classId === filter), issues = data.issues.filter(c => !filter || c.classId === filter);

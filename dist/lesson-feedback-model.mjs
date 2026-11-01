@@ -1,9 +1,11 @@
+import {lessonTiming} from './schedule-model.mjs';
 import { lessonInstant } from './calendar-model.mjs';
 export const ratingFields = { attitude: 'Attitude', prepared: 'Prepared for class', effort: 'Effort / focus', learning: 'Learning outcomes' };
 export const lessonKey = (lesson, index) => lesson.id || `legacy-${index + 1}`;
 export function lessonEnd(course, lesson) {
-  if (!lesson.date) return null;
-  return lessonInstant(lesson.date, course.startTime, course.timeZone) + course.lessonMinutes * 60000;
+  if (!lesson.date || lesson.status==='cancelled') return null;
+  const timing=lessonTiming(course,lesson);
+  return lessonInstant(lesson.date, timing.startTime, course.timeZone) + timing.lessonMinutes * 60000;
 }
 export function validateAssessment(input, roster, complete = false) {
   if (!input || typeof input.teacherSpeaker !== 'string' || input.teacherSpeaker.length > 80 || !Array.isArray(input.assessments) || input.assessments.length !== roster.length || roster.length > 60) throw Error('Assess every student on the current class roster (up to 60 students).');

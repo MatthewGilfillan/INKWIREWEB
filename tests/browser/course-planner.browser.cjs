@@ -24,8 +24,8 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
   });
   try {
     await page.goto('http://127.0.0.1:8788/teacher.html');
-    await page.locator(`[data-class-id="${first}"]>summary`).click();
-    await page.getByRole('button', { name: 'Build course overview' }).first().click();
+    await page.locator('#selected-class').selectOption(first);
+    await page.getByRole('tab', {name:'Course overview',exact:true}).click();
     await page.locator('#course-form').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-plan-lesson]').count(), 15);
     assert.match(await page.locator('#course-summary').innerText(), /30 teaching hours/);
@@ -39,18 +39,18 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     assert.equal(await page.locator('#lesson-0-reading').inputValue(), 'The Hobbit, chapter 1');
     await page.getByRole('button', { name: 'Save course overview', exact: true }).click();
     await page.getByText('Course overview saved.', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Close course overview' }).click();
+    await page.getByRole('tab',{name:'Students',exact:true}).click();
     await page.reload();
-    await page.locator(`[data-class-id="${first}"]>summary`).click();
-    await page.getByRole('button', { name: 'Edit course overview' }).click();
+    await page.locator('#selected-class').selectOption(first);
+    await page.getByRole('tab', {name:'Course overview',exact:true}).click();
     await page.locator('#course-form').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#lesson-0-reading').inputValue(), 'The Hobbit, chapter 1');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('#course-lessons').scrollIntoViewIfNeeded();
     await page.locator('.course-planner').screenshot({ path: '/tmp/inkwire-course-weeks.png' });
-    await page.getByRole('button', { name: 'Close course overview' }).click();
-    await page.locator(`[data-class-id="${second}"]>summary`).click();
-    await page.getByRole('button', { name: 'Build course overview' }).click();
+    await page.getByRole('tab',{name:'Students',exact:true}).click();
+    await page.locator('#selected-class').selectOption(second);
+    await page.getByRole('tab', {name:'Course overview',exact:true}).click();
     await page.locator('#course-form').waitFor({ state: 'visible' });
     await page.getByText('Copy from another class', { exact: true }).click();
     await page.locator('#copy-course').selectOption(first);
@@ -99,8 +99,8 @@ test('custom timetable, primary sections and prepared course files retain their 
   });
   try {
     await page.goto('http://127.0.0.1:8788/teacher.html');
-    await page.locator(`[data-class-id="${first}"]>summary`).click();
-    await page.getByRole('button',{name:'Build course overview'}).click();
+    await page.locator('#selected-class').selectOption(first);
+    await page.getByRole('tab', {name:'Course overview',exact:true}).click();
     await page.locator('#course-form').waitFor({state:'visible'});
     await page.locator('#course-format').selectOption('custom');
     await page.locator('#course-weeks').fill('13'); await page.locator('#course-frequency').fill('3');
