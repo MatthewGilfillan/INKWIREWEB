@@ -2,7 +2,7 @@
 
 The teacher master view, class Notebooks tab, student dashboard and linked parent dashboard open one notebook per `(class_id, learner_id)`. Sections and pages have stable IDs. Changing views changes access, never creates another notebook copy.
 
-The hub has four columns: Notebooks → Sections → Pages → Contents. Teachers can search/filter students, add sections and pages, and move pages. PDF entries reference existing worksheet IDs, original files and learner annotation layers. Text pages support rich text and pasted headings/lists. Ink and positioned text are available over locked PDF printouts; free-positioned ink over ordinary rich-text pages is not implemented.
+The hub has four columns: Notebooks → Sections → Pages → Contents. Teachers can search/filter students, add sections and pages, and move pages. Drop one PDF anywhere in the notebook, including over an existing printout, or select “Add a PDF printout”. Review the title and select “Insert printout”; the PDF uploads into the current section and opens immediately without leaving the notebook. PDF entries reference existing worksheet IDs, original files and learner annotation layers. Text pages support rich text and pasted headings/lists. Ink and positioned text are available over locked PDF printouts; free-positioned ink over ordinary rich-text pages is not implemented.
 
 ## Shared content and access
 

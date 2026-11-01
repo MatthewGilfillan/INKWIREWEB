@@ -2,10 +2,11 @@ import './notebook-editor.js';
 import * as Y from 'yjs';
 import {escape,requestId} from '../dist/workspace-shared.js';
 import {encodeState,decodeState} from './notebook-sync.mjs';
+import {inspectPrintout,validatePrintout,uploadPrintout} from './pdf-printout.mjs';
 import {recoverDraft} from './notebook-recovery.mjs';
 const $=s=>document.querySelector(s),query=new URLSearchParams(location.search);
 const practice=query.get('preview')==='1'&&!['inkwire-education.com','www.inkwire-education.com'].includes(location.hostname);
-let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false;
+let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null;
 const colors=['#9d89be','#67a7a3','#ccaa70','#7c9fc1','#b38ba4'];
 async function request(path,body) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(20000)});
@@ -19,7 +20,7 @@ let adapter={
 };
 function problem(error){$('#hub-error').textContent=error?.message||String(error);$('#hub-error').hidden=false;}
 function clearProblem(){$('#hub-error').hidden=true;}
-function pending(){return embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
+function pending(){return !!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
 function mayNavigate(){if(!pending())return true;problem(Error('Your changes are still saving. Keep this page open, or download your draft before leaving.'));return false;}
 function row(value,current,icon,subtitle='',extra='') {return `<button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>`;}
 function updateLinks(){
@@ -47,7 +48,7 @@ function renderLists(){
   $('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':'☷'}</span>`,p.kind==='worksheet'?'PDF printout':'Notebook page')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
   for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';
   $('#add-printout').hidden=!book||library.role!=='teacher';
-  if(book){const url=new URL('worksheets.html',location.href);url.searchParams.set('class',book.classId);url.searchParams.set('learner',book.learnerId);url.searchParams.set('notebook','1');if(practice){url.searchParams.set('preview','1');url.searchParams.set('role',library.role);}$('#add-printout').href=url;$('#add-printout').target='_blank';$('#add-printout').rel='noopener';}
+  $('#printout-hint').hidden=!book||library.role!=='teacher';
   $('#move-page').innerHTML=(selection?.sections||[]).map(s=>`<option value="${escape(s.id)}">${escape(s.title)}</option>`).join('');$('#move-page').value=selection?.sectionId||'';updateLinks();
 }
 function closePage(){
@@ -101,7 +102,7 @@ $('#name-form').onsubmit=async e=>{e.preventDefault();const title=$('#new-name')
   catch(e){$('#name-error').textContent=e.message;}finally{submit.disabled=false;}};
 $('#move-page').onchange=async e=>{const previous=selection.sectionId;if(!mayNavigate()){e.target.value=previous;return;}try{await adapter.move(book.id,selection.pageId,e.target.value);const id=selection.pageId,data=await adapter.book(book.id);selection={...data,sectionId:e.target.value,pageId:id};renderLists();clearProblem();}catch(error){e.target.value=previous;problem(error);}};
 $('#download-page').onclick=()=>{if(!active)return;const bytes=JSON.stringify({notebook:book.learnerName,page:$('#page-title').textContent,savedAt:new Date().toISOString(),syncState:encodeState(Y.encodeStateAsUpdate(active.doc)),text:window.InkWireEditor.getText()},null,2);const u=URL.createObjectURL(new Blob([bytes],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='folio-page-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
-window.addEventListener('message',e=>{if(e.origin===location.origin&&e.source===$('#worksheet-frame').contentWindow&&e.data?.type==='inkwire:worksheet-status')embeddedDirty=!!e.data.dirty;});
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==$('#worksheet-frame').contentWindow)return;if(e.data?.type==='inkwire:worksheet-status')embeddedDirty=!!e.data.dirty;if(e.data?.type==='inkwire:pdf-drop'&&e.data.file instanceof File)offerPrintout(e.data.file);});
 window.addEventListener('beforeunload',e=>{if(pending()){e.preventDefault();e.returnValue='';}});
 window.addEventListener('online',()=>{if(active)flush(active);poll();});
 async function poll(){if(refreshing||!book||!selection||document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;
@@ -115,4 +116,34 @@ async function initialize(){
     $('#class-filter').innerHTML='<option value="">All classes</option>'+library.classes.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');$('#class-filter').value=library.classes.some(c=>c.id===query.get('classId'))?query.get('classId'):'';
     renderLists();const visible=library.notebooks.filter(b=>!$('#class-filter').value||b.classId===$('#class-filter').value),first=visible.find(b=>b.id===query.get('notebookId'))||visible[0];if(first)await openBook(first.id,{initial:true});else{$('#connection').textContent='No notebooks yet';$('#page-meta').textContent='Add students to a class to see their notebooks here.';}
   }catch(e){problem(e);$('#connection').textContent='Could not load notebooks';if(e.status===401){const a=document.createElement('a');a.href='/account';a.textContent='Sign in to your website account →';$('#page-empty').append(a);}}}
+function offerPrintout(file){
+  if(printoutImport?.busy)return;
+  if(!book||!selection||library.role!=='teacher'){problem(Error('Choose a student notebook in your teacher view before inserting a PDF.'));return;}
+  if(!mayNavigate())return;
+  if(!$('#printout-dialog').open){printoutImport={bookId:book.id,classId:book.classId,learnerId:book.learnerId,sectionId:selection.sectionId,id:requestId(),file:null};$('#printout-name').value='';$('#printout-file').value='';$('#printout-file-name').textContent='Up to 10 MB · 60 pages';$('#printout-target').textContent=book.learnerName+' · '+book.className+' / '+selection.sections.find(s=>s.id===selection.sectionId)?.title;$('#printout-error').hidden=true;$('#printout-dialog').showModal();}
+  if(file){try{validatePrintout(file);printoutImport.file=file;printoutImport.id=requestId();$('#printout-file-name').textContent=file.name;if(!$('#printout-name').value)$('#printout-name').value=file.name.replace(/\.pdf$/i,'').slice(0,120);$('#printout-error').hidden=true;}catch(e){$('#printout-error').textContent=e.message;$('#printout-error').hidden=false;}}
+}
+$('#add-printout').onclick=()=>offerPrintout();
+$('#printout-file').onchange=e=>offerPrintout(e.target.files[0]);
+$('#printout-cancel').onclick=()=>{if(!printoutImport?.busy){$('#printout-dialog').close();printoutImport=null;}};
+$('#printout-dialog').addEventListener('cancel',e=>{if(printoutImport?.busy)e.preventDefault();else printoutImport=null;});
+let fileDragDepth=0;
+const fileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
+document.addEventListener('dragenter',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth++;if(library?.role==='teacher'&&book&&!$('#printout-dialog').open)$('#pdf-drop-overlay').hidden=false;});
+document.addEventListener('dragover',e=>{if(fileDrag(e)){e.preventDefault();e.dataTransfer.dropEffect=library?.role==='teacher'?'copy':'none';}});
+document.addEventListener('dragleave',e=>{if(!fileDrag(e))return;if(--fileDragDepth<=0){fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;}});
+document.addEventListener('drop',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;if(e.dataTransfer.files.length!==1){problem(Error('Drop one PDF at a time.'));return;}offerPrintout(e.dataTransfer.files[0]);});
+$('#printout-form').onsubmit=async e=>{
+  e.preventDefault();const upload=printoutImport;if(!upload||upload.busy)return;const title=$('#printout-name').value.trim();
+  try{validatePrintout(upload.file);if(!title)throw Error('Enter a page title.');}catch(error){$('#printout-error').textContent=error.message;$('#printout-error').hidden=false;return;}
+  upload.busy=true;$('#printout-submit').disabled=true;$('#printout-cancel').disabled=true;$('#printout-file').disabled=true;$('#printout-name').disabled=true;$('#printout-error').hidden=true;$('#printout-submit').textContent='Checking PDF…';
+  try{
+    const pages=await inspectPrintout(upload.file);$('#printout-submit').textContent='Uploading…';
+    if(practice){const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter('teacher',{classId:upload.classId,learnerId:upload.learnerId,liveParent:true});await ws.upload(upload.file,pages,title,upload.id);}
+    else await uploadPrintout({file:upload.file,pages,title,id:upload.id,classId:upload.classId});
+    if(upload.sectionId!=='printouts')await adapter.move(upload.bookId,upload.id,upload.sectionId);
+    const data=await adapter.book(upload.bookId);selection={...data,sectionId:upload.sectionId};upload.busy=false;$('#printout-dialog').close();printoutImport=null;clearProblem();renderLists();await openPage(upload.id);
+  }catch(error){$('#printout-error').textContent=error.message;$('#printout-error').hidden=false;}
+  finally{upload.busy=false;$('#printout-submit').disabled=false;$('#printout-cancel').disabled=false;$('#printout-file').disabled=false;$('#printout-name').disabled=false;$('#printout-submit').textContent='Insert printout';}
+};
 await initialize();setInterval(poll,2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
