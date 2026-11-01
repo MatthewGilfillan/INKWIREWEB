@@ -1,3 +1,5 @@
+import {createClassSetup} from './class-setup.js';
+import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
@@ -18,7 +20,7 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
 });
-const tabs=[['students','Students'],['overview','Course overview'],['calendar','Calendar'],['timeline','Timeline'],['notebooks','Notebooks']];
+const tabs=[['students','Students'],['overview','Course overview'],['calendar','Calendar'],['timeline','Timeline'],['files','Class files'],['notebooks','Notebooks']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
   <div class="class-workspace-heading"><div><label for="selected-class">Class</label><select id="selected-class"></select><p id="selected-class-detail"></p></div><span class="class-badge" id="class-membership"></span></div>
   <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='students'}" tabindex="${id==='students'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
@@ -26,6 +28,8 @@ list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classe
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
 const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onSaved:()=>{calendar.refresh();classCalendar.refresh();today.refresh();}});
+const classFiles=createClassFiles({root:$('#class-panel-files'),teacher:true,onPlan:async id=>{await openCourseTab(id);coursePlanner.prepare();}});
+const newClassSetup=createClassSetup({root:$('#create-class-schedule'),onReady:ready=>{$('#create-form [type=submit]').disabled=!ready;}});
 const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-timeline'),onEditLesson:openCourseTab});
 const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
@@ -49,17 +53,19 @@ function renderClassHeading(){
 }
 async function selectClass(id){
   if(id===activeClassId)return true;
+  if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return false;}
   if(!coursePlanner.canLeave()){$('#selected-class').value=activeClassId;return false;}
-  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();
+  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();
   activeClassId=id;$('#student-search').value='';$('#selected-roster').textContent='Loading students…';$('#roster-count').textContent='';renderClassHeading();
   await showClassTab(classTabs.get(id)||'students');if(activeClassId!==id)return false;if(activeTab!=='students')loadRoster(id);return true;
 }
 async function showClassTab(tab,button,lessonIndex){
-  if(!activeClassId)return;activeTab=tab;classTabs.set(activeClassId,tab);
+  if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}activeTab=tab;classTabs.set(activeClassId,tab);
   for(const [id]of tabs){const selected=id===tab;$('#class-tab-'+id).setAttribute('aria-selected',String(selected));$('#class-tab-'+id).tabIndex=selected?0:-1;$('#class-panel-'+id).hidden=!selected;}
   if(tab==='students')await loadRoster(activeClassId);
   if(tab==='overview')await coursePlanner.open(activeClassId,button,lessonIndex);
   if(tab==='notebooks')$('#class-panel-notebooks').innerHTML=`<h2>Class notebooks</h2><p>Open student notebooks for this class. Edits appear in the student and linked parent views.</p><a class="teacher-button" href="/notebooks?classId=${escape(activeClassId)}">Open class notebooks →</a><p><a class="text-button" href="/worksheets?class=${escape(activeClassId)}">PDF worksheet library →</a></p>`;
+  if(tab==='files')await classFiles.open(activeClassId);
   if(tab==='calendar')await classCalendar.refresh();
   if(tab==='timeline')await teacherTimeline.open(activeClassId,null,button);
 }
@@ -131,8 +137,8 @@ for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes
   form.addEventListener('submit',async event=>{
     event.preventDefault();const submit=form.querySelector('[type="submit"]'),error=form.querySelector('.form-error');if(submit.disabled)return;submit.disabled=true;error.hidden=true;
     const body=Object.fromEntries(new FormData(form));if(id==='create-form'){createRequestId ||= requestId();body.requestId=createRequestId;}
-    try{const result=await api(route,body);form.closest('dialog').close();form.reset();if(id==='create-form')createRequestId='';await loadClasses(true);await selectClass(result.classroom.id);showView('classes');$('#selected-class').focus();status.textContent=id==='create-form'?'Class created. Add students or share its invitation.':'You have joined the class.';}
-    catch(problem){error.textContent=problem.message;error.hidden=false;}finally{submit.disabled=false;}
+    try{if(id==='create-form')body.course=newClassSetup.build(body.name);const result=await api(route,body);form.closest('dialog').close();form.reset();if(id==='create-form'){createRequestId='';newClassSetup.fill();}await loadClasses(true);await selectClass(result.classroom.id);showView('classes');if(id==='create-form')await showClassTab('overview');$('#selected-class').focus();status.textContent=id==='create-form'?'Class and timetable created. Add students, upload a unit plan, or add learning goals to each session.':'You have joined the class.';}
+    catch(problem){error.textContent=problem.message;error.hidden=false;}finally{submit.disabled=id==='create-form'&&!newClassSetup.isReady();}
   });
 }
 function showInvitation(invitation){
@@ -189,6 +195,6 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();

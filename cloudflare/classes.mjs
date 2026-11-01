@@ -1,3 +1,4 @@
+import {validateCourse} from '../dist/course-model.mjs';
 import { digest } from './auth.mjs';
 import { createLearningInvite } from './enrollment.mjs';
 import { handleCourseOverview } from './course-overviews.mjs';
@@ -44,7 +45,7 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (request.method !== 'POST') return fail('Use POST.', 405);
   if (request.headers.get('Origin') !== env.APP_ORIGIN || request.headers.get('Sec-Fetch-Site') === 'cross-site') return fail('Invalid origin.', 403, 'INVALID_ORIGIN');
   let input;
-  try { input = await readJSON(request); } catch { return fail('Invalid request.', 400, 'INVALID_INPUT'); }
+  try { input = await readJSON(request, path === '/api/classes' ? 131072 : 8192); } catch { return fail('Invalid request.', 400, 'INVALID_INPUT'); }
   if (!await limitClassAction(env, user.id, inviteMatch ? 'invite' : path)) return fail('Too many attempts. Please try again in 15 minutes.', 429, 'RATE_LIMITED');
   if (lifecycleMatch) {
     const row = await env.DB.prepare(`UPDATE classes SET deleted_at = ${lifecycleMatch[2] === 'delete' ? 'COALESCE(deleted_at, ?)' : '?'} WHERE id = ? AND owner_id = ? RETURNING id, deleted_at AS deletedAt`)
@@ -55,8 +56,14 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const subject = typeof input.subject === 'string' ? input.subject.trim() : '';
     if (!name || name.length > 80 || subject.length > 120 || !/^[a-f0-9-]{36}$/.test(input.requestId || '')) return fail('Enter a class name of up to 80 characters.', 400, 'INVALID_INPUT');
-    await env.DB.prepare(`INSERT INTO classes (id, owner_id, name, subject, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(owner_id, request_id) DO NOTHING`).bind(crypto.randomUUID(), user.id, name, subject, input.requestId, Date.now()).run();
+    let course=null;
+    if(input.course){try{course=validateCourse(input.course);if(!course.lessons.every(l=>l.date) || !course.endDate || !course.weeklySlots?.length)throw Error('Review and complete the class timetable.');}catch(e){return fail(e.message,400,'INVALID_INPUT');}}
+    const now=Date.now(),insert=env.DB.prepare(`INSERT INTO classes (id, owner_id, name, subject, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(owner_id, request_id) DO NOTHING`).bind(crypto.randomUUID(), user.id, name, subject, input.requestId, now);
+    if(course)await env.DB.batch([insert,env.DB.prepare(`INSERT INTO course_overviews(class_id,revision,content,updated_by,updated_at)
+      SELECT id,1,?,?,? FROM classes WHERE owner_id=? AND request_id=? AND deleted_at IS NULL
+      ON CONFLICT(class_id) DO NOTHING`).bind(JSON.stringify(course),user.id,now,user.id,input.requestId)]);
+    else await insert.run();
     const classroom = await env.DB.prepare(`SELECT ${classFields} FROM classes c WHERE c.owner_id = ? AND c.request_id = ?`).bind(user.id, user.id, input.requestId).first();
     if (!await env.DB.prepare('SELECT id FROM classes WHERE id = ? AND deleted_at IS NULL').bind(classroom.id).first()) return fail('This class is in Trash. Restore it or create a new class.', 409, 'CLASS_DELETED');
     await createLearningInvite(env, classroom.id);
