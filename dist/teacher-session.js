@@ -2,6 +2,7 @@ import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
 import {createTeacherCalendar} from './teacher-calendar.js';
 import {courseSummary} from './course-model.mjs';
+import {createTranscriptSummary} from './transcript-summary.js';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
@@ -19,6 +20,7 @@ function renderClasses(){
   list.innerHTML=classrooms.length ? classrooms.map(c=>`<details class="class-card" data-class-id="${escape(c.id)}" ${opened.has(c.id)?'open':''}><summary><span><h2>${escape(c.name)}</h2><small>${escape(c.subject || 'Class details')}</small></span></summary><div class="class-details"><section class="class-course"><div><p class="teacher-eyebrow">COURSE OVERVIEW</p><h3>Plan the term</h3><p data-course-status="${escape(c.id)}">${c.overviewRevision?escape(courseSummary({weeks:c.courseWeeks,lessonsPerWeek:c.courseFrequency,lessonMinutes:c.courseMinutes,pacing:c.coursePacing,lessonCount:c.courseLessonCount ?? undefined})):'Start with a 15-week Rivendell format, paste an outline, or reuse another class.'}</p></div><button type="button" class="teacher-button" data-plan-course="${escape(c.id)}">${c.overviewRevision?'Edit course overview':'Build course overview'}</button></section><div class="roster-heading"><h3>Students &amp; families</h3><span class="class-badge">${c.membership==='owner'?'Class owner':'Teacher'}</span></div><div class="teacher-actions"><button type="button" class="teacher-button" data-add-student="${escape(c.id)}">+ Add student</button><button type="button" class="teacher-button secondary" data-share-kind="class" data-class="${escape(c.id)}">Invite students</button></div><div data-roster="${escape(c.id)}" class="roster"><p>Loading students…</p></div>${c.membership==='owner'?`<details class="invite-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" data-invite="${escape(c.id)}">Create teacher invite</button><button type="button" class="text-button danger-text" data-delete-class="${escape(c.id)}">Delete class</button></details>`:''}</div></details>`).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div>';
 }
 const coursePlanner=createCoursePlanner({list,getClasses:()=>classrooms,status,problem,onSaved:()=>calendar.refresh()});
+createTranscriptSummary();
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:(...args)=>coursePlanner.open(...args),problem});
 async function loadTrash(){
   $('#retry-trash').hidden=true;$('#trash-list').textContent='Loading deleted classes…';

@@ -13,7 +13,7 @@ export function planningAvailable(env) {
   return env.OPENAI_PLANNING_ENABLED === 'true' && Boolean(env.OPENAI_API_KEY?.trim());
 }
 
-async function reserveRequest(env, userId) {
+export async function reserveRequest(env, userId) {
   const now = Date.now(), day = Math.floor(now / 86400000), expires = (day + 2) * 86400000;
   await env.DB.prepare('DELETE FROM ai_planning_limits WHERE expires_at < ?').bind(now).run();
   // Atomic counters bound spend even when several workers receive requests at once.
