@@ -1,19 +1,21 @@
+import {cleanFrame} from './text-frame.mjs';
 import {cleanTextStyle} from './text-format.mjs';
 export const PRINT_SECTION = 'printouts';
 export const emptyDocument = () => ({type:'doc',content:[{type:'paragraph'}]});
 export function cleanDocument(value) {
   let count=0,chars=0;
-  const types=new Set(['doc','paragraph','heading','text','bulletList','orderedList','listItem','blockquote','horizontalRule','hardBreak','codeBlock']);
+  const types=new Set(['doc','paragraph','heading','text','bulletList','orderedList','listItem','blockquote','horizontalRule','hardBreak','codeBlock','textFrame']);
   function node(n,depth=0) {
     if(!n||typeof n!=='object'||!types.has(n.type)||depth>20||++count>5000)throw Error('This page is too large or contains unsupported formatting.');
     const out={type:n.type};
-    const allowedAttrs=n.type==='heading'?['level']:n.type==='orderedList'?['start','type']:n.type==='codeBlock'?['language']:[];
+    const allowedAttrs=n.type==='heading'?['level']:n.type==='orderedList'?['start','type']:n.type==='codeBlock'?['language']:n.type==='textFrame'?['x','y','width','height']:[];
     if(n.attrs&&(typeof n.attrs!=='object'||Array.isArray(n.attrs)||Object.keys(n.attrs).some(k=>!allowedAttrs.includes(k))))throw Error('Unsupported page attributes.');
     if(n.type==='text') {
       if(typeof n.text!=='string'||!n.text)throw Error('Invalid text.');
       chars+=n.text.length;if(chars>100000)throw Error('This page is too large.');out.text=n.text;
       if(n.marks){if(!Array.isArray(n.marks))throw Error('Invalid formatting.');out.marks=n.marks.map(m=>{if(m?.type==='textStyle')return {type:'textStyle',attrs:cleanTextStyle(m.attrs||{})};if(!['bold','italic','underline','strike','code'].includes(m?.type)||m.attrs&&Object.keys(m.attrs).length)throw Error('Invalid formatting.');return {type:m.type};});}
     } else if(n.content!==undefined) {if(!Array.isArray(n.content))throw Error('Invalid page.');out.content=n.content.map(c=>node(c,depth+1));}
+    if(n.type==='textFrame')out.attrs=cleanFrame(n.attrs||{});
     if(n.type==='heading'){if(n.attrs?.level!==undefined&&![2,3].includes(n.attrs.level))throw Error('Invalid heading level.');out.attrs={level:n.attrs?.level??2};}
     if(n.type==='orderedList'){const start=n.attrs?.start??1,type=n.attrs?.type??null;if(!Number.isInteger(start)||start<1||start>=10000||type!==null&&!['1','a','A','i','I'].includes(type))throw Error('Invalid list formatting.');out.attrs={start,type};}
     if(n.type==='codeBlock'&&n.attrs?.language){if(typeof n.attrs.language!=='string'||n.attrs.language.length>40)throw Error('Invalid code language.');out.attrs={language:n.attrs.language};}

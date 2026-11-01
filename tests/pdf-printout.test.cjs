@@ -21,3 +21,9 @@ test('rich text fonts, size, colors and highlight survive the shared document me
  const {cleanTextStyle}=await import('../src/text-format.mjs');assert.deepEqual(cleanTextStyle({fontSize:'24px',color:'rgb(255, 0, 0)'}),{fontSize:'18pt',color:'#ff0000'});
  for(const attr of [{fontFamily:'url(https://evil.invalid)'},{fontSize:'200pt'},{backgroundColor:'url(javascript:bad)'},{onclick:'bad'}])assert.throws(()=>cleanTextStyle(attr));
 });
+test('free-positioned text containers retain geometry, rich text and concurrent contents in shared storage',async()=>{
+ const {seedState,mergeState,encodeState}=await import('../src/notebook-sync.mjs');const {cleanFrame}=await import('../src/text-frame.mjs');
+ const attrs={x:80,y:160,width:420,height:240};const doc={type:'doc',content:[{type:'textFrame',attrs,content:[{type:'paragraph',content:[{type:'text',text:'Movable feedback',marks:[{type:'textStyle',attrs:{fontFamily:'Calibri',fontSize:'20pt'}}]}]}]}]};
+ const bytes=seedState(doc),result=mergeState(bytes,encodeState(bytes));assert.deepEqual(result.document.content[0].attrs,attrs);assert.equal(result.document.content[0].content[0].content[0].text,'Movable feedback');
+ for(const bad of [{x:-1},{width:20},{height:Infinity},{onload:'bad'}])assert.throws(()=>cleanFrame(bad));
+});

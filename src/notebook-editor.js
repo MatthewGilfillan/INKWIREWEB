@@ -1,3 +1,4 @@
+import {TextFrame,placeTextFrame} from './text-frame.mjs';
 import {TextFormat,fontChoices,fontName,textSize,textColor} from './text-format.mjs';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -46,7 +47,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [TextFrame,TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -58,7 +59,8 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     ...(shared ? { editable: false } : ydoc ? { editable: !readOnly } : { editable: !readOnly, content: notebookContent(document, text) }),
     enableContentCheck: true,
     editorProps: {
-      attributes: { class: 'inkwire-editor', role: 'textbox', 'aria-label': label,
+      handleDOMEvents:ydoc?{pointerdown:placeTextFrame}:{},
+      attributes: { class: 'inkwire-editor'+(ydoc?' folio-canvas':''), role: 'textbox', 'aria-label': label,
         'aria-multiline': 'true', spellcheck: 'true' },
     },
     onContentError: ({ error }) => { throw error; },

@@ -78,7 +78,7 @@ async function openPage(id){
     else{link.onclick=null;link.href='/api/worksheets/'+page.id+'/pdf?'+new URLSearchParams({learnerId:book.learnerId,notebook:'1',download:'1'});}return;
   }
   if(page.kind==='worksheet'){
-    const url=new URL('worksheets.html',location.href);for(const [k,v] of Object.entries({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'}))url.searchParams.set(k,v);if(practice){url.searchParams.set('preview','1');url.searchParams.set('role',library.role);}$('#worksheet-frame').src=url;$('#worksheet-frame').hidden=false;$('#page-status').textContent='PDF background locked · '+(library.role==='parent'?'live read-only view':'type and draw over the page');return;
+    const url=new URL(practice?'worksheets.html':'/worksheets',location.href);for(const [k,v] of Object.entries({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'}))url.searchParams.set(k,v);if(practice){url.searchParams.set('preview','1');url.searchParams.set('role',library.role);}$('#worksheet-frame').src=url;$('#worksheet-frame').hidden=false;$('#page-status').textContent='PDF background locked · '+(library.role==='parent'?'live read-only view':'type and draw over the page');return;
   }
   $('#page-status').textContent='Loading page…';
   try{
