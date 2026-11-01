@@ -1,8 +1,14 @@
 import {escape} from './workspace-shared.js';
 
-// Original, quiet synthesised audio; no third-party tracks or autoplay.
-function createAudio(){
-  let context=null,loop=null,beat=0,music=false,effects=true,closed=false;
+// User-supplied looping soundtrack and separate, quiet synthesised effects.
+// Music starts only after the student enables it.
+function createAudio(onMusicError){
+  let context=null,music=false,effects=true,closed=false,musicRevision=0;
+  const track=new Audio('/assets/quiz-lofi-chill.mp3');track.dataset.quizMusic='';track.hidden=true;track.preload='none';track.loop=true;track.volume=.2;
+  const failed=()=>{if(closed || !music)return;music=false;track.pause();onMusicError();};
+  track.addEventListener('error',failed);
+  const visibility=()=>{if(document.hidden)track.pause();else if(music && !closed)track.play().catch(failed);};
+  document.addEventListener('visibilitychange',visibility);
   function ready(){
     if(closed)return false;
     try{context ||= new (window.AudioContext || window.webkitAudioContext)();context.resume().catch(()=>{});return true;}catch{return false;}
@@ -13,23 +19,29 @@ function createAudio(){
     gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(volume,start+.02);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
     osc.connect(gain);gain.connect(context.destination);osc.start(start);osc.stop(start+duration+.02);osc.onended=()=>{osc.disconnect();gain.disconnect();};
   }
-  const notes=[261.63,329.63,392,329.63,293.66,349.23,440,349.23];
   return {
+    element:track,
     effect(success=false){if(effects && ready()){if(success==='incorrect'){tone(293.66,.2,.035);tone(261.63,.24,.03,.15);}else{tone(success?523.25:392);if(success){tone(659.25,.18,.04,.12);tone(783.99,.25,.04,.24);}}}},
     effects(value){effects=value;if(value)this.effect();},
-    music(value){music=value;if(loop)clearInterval(loop);loop=null;if(value && ready()){tone(notes[beat++%notes.length],.45,.025);loop=setInterval(()=>{if(music)tone(notes[beat++%notes.length],.45,.025);},480);return true;}music=false;return !value;},
-    destroy(){closed=true;if(loop)clearInterval(loop);context?.close().catch(()=>{});context=null;},
+    async music(value){
+      const revision=++musicRevision;music=value;if(!value){track.pause();return true;}
+      try{await track.play();return revision===musicRevision && music && !closed;}
+      catch{if(revision===musicRevision)failed();return false;}
+    },
+    volume(value){track.volume=Math.min(1,Math.max(0,value));},
+    destroy(){closed=true;music=false;musicRevision++;document.removeEventListener('visibilitychange',visibility);track.pause();track.removeAttribute('src');track.load();track.remove();context?.close().catch(()=>{});context=null;},
   };
 }
 
 export function createQuizPlayer({root,quiz,preview=false,progress=[],onAnswer,onFinish,onDirty=()=>{}}){
   const feedbacks=Array(quiz.questions.length).fill(null),answers=Array(quiz.questions.length).fill(null);
   for(const saved of progress){feedbacks[saved.questionIndex]=saved;answers[saved.questionIndex]=saved.answerIndex;}
-  let index=Math.min(progress.length,quiz.questions.length-1),reflection='',pending=false,alive=true,timer=null,pace=0,deadline=0,music=false,effects=true,motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const audio=createAudio(),$=s=>root.querySelector(s),events=new AbortController();
+  let index=Math.min(progress.length,quiz.questions.length-1),reflection='',pending=false,alive=true,timer=null,pace=0,deadline=0,music=false,musicRequest=0,effects=true,motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $=s=>root.querySelector(s),events=new AbortController();
+  const audio=createAudio(()=>{music=false;if(!alive)return;$('[data-music]').textContent='Music off';$('[data-music]').setAttribute('aria-pressed','false');$('[data-music-status]').textContent='Music could not play. Tap Music to try again.';});
   const listen=(type,fn)=>root.addEventListener(type,fn,{signal:events.signal});
-  root.innerHTML=`<section class="quiz-game" data-theme="inkwire"><div class="quiz-game-top"><span class="quiz-game-brand">INK WIRE <small>${preview?'TEACHER PREVIEW':'READ • THINK • DISCOVER'}</small></span><div class="quiz-game-settings"><button type="button" data-music aria-pressed="false">Music off</button><button type="button" data-sounds aria-pressed="true">Sound on</button><button type="button" data-motion aria-pressed="${motion}">Motion ${motion?'on':'off'}</button></div></div><div data-game-stage></div></section>`;
-  const game=$('.quiz-game');game.classList.toggle('reduce-motion',!motion);
+  root.innerHTML=`<section class="quiz-game" data-theme="inkwire"><div class="quiz-game-top"><span class="quiz-game-brand">INK WIRE <small>${preview?'TEACHER PREVIEW':'READ • THINK • DISCOVER'}</small></span><div class="quiz-game-settings"><button type="button" data-music aria-pressed="false">Music off</button><button type="button" data-sounds aria-pressed="true">Sound on</button><button type="button" data-motion aria-pressed="${motion}">Motion ${motion?'on':'off'}</button></div></div><div class="quiz-music-controls"><span>Lofi Chill · looping soundtrack</span><label class="quiz-volume">Volume <input type="range" min="0" max="100" value="20" step="5" data-music-volume aria-label="Music volume"><output data-music-volume-value>20%</output></label></div><p data-music-status role="status"></p><div data-game-stage></div></section>`;
+  const game=$('.quiz-game');game.append(audio.element);game.classList.toggle('reduce-motion',!motion);
   function stopTimer(){clearInterval(timer);timer=null;}
   function startTimer(){stopTimer();deadline=Date.now()+pace*1000;const tick=()=>{if(!$('[data-pace-left]'))return;const remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));$('[data-pace-left]').textContent=pace?(remaining?remaining+'s':'Take your time'):'No time limit';if(!remaining)stopTimer();};tick();if(pace)timer=setInterval(tick,250);}
   function render(){
@@ -44,7 +56,10 @@ export function createQuizPlayer({root,quiz,preview=false,progress=[],onAnswer,o
   }
   listen('click',async event=>{
     const button=event.target.closest('button');if(!button || pending || !alive)return;
-    if(button.hasAttribute('data-music')){music=!music;if(!audio.music(music))music=false;button.textContent='Music '+(music?'on':'off');button.setAttribute('aria-pressed',music);}
+    if(button.hasAttribute('data-music')){
+      music=!music;const request=++musicRequest;$('[data-music-status]').textContent='';button.textContent='Music '+(music?'on':'off');button.setAttribute('aria-pressed',music);
+      const enabled=await audio.music(music);if(alive && request===musicRequest && !enabled){music=false;button.textContent='Music off';button.setAttribute('aria-pressed','false');}
+    }
     if(button.hasAttribute('data-sounds')){effects=!effects;audio.effects(effects);button.textContent='Sound '+(effects?'on':'off');button.setAttribute('aria-pressed',effects);}
     if(button.hasAttribute('data-motion')){motion=!motion;game.classList.toggle('reduce-motion',!motion);button.textContent='Motion '+(motion?'on':'off');button.setAttribute('aria-pressed',motion);}
     if(button.hasAttribute('data-answer') && !feedbacks[index]){answers[index]=Number(button.dataset.answer);audio.effect();onDirty(true);root.querySelectorAll('[data-answer]').forEach(el=>{const selected=Number(el.dataset.answer)===answers[index];el.setAttribute('aria-pressed',selected);el.querySelector('.quiz-answer-check').textContent=selected?'✓':'';});$('[data-submit-answer]').disabled=false;}
@@ -64,7 +79,7 @@ export function createQuizPlayer({root,quiz,preview=false,progress=[],onAnswer,o
     }
     if(button.hasAttribute('data-replay')){answers.fill(null);feedbacks.fill(null);index=0;render();$('.quiz-game-question').focus();}
   });
-  listen('input',event=>{if(event.target.matches('[data-player-reflection]'))onDirty(true);});
+  listen('input',event=>{if(event.target.matches('[data-player-reflection]'))onDirty(true);if(event.target.matches('[data-music-volume]')){audio.volume(Number(event.target.value)/100);$('[data-music-volume-value]').textContent=event.target.value+'%';}});
   listen('change',event=>{if(event.target.matches('[data-pace]')){pace=Number(event.target.value);startTimer();}});
   render();
   return {destroy(){alive=false;events.abort();stopTimer();audio.destroy();}};
