@@ -26,7 +26,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     await page.goto('http://127.0.0.1:8788/teacher.html');
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('#course-form').waitFor({ state: 'visible' });
+    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-plan-lesson]').count(), 15);
     assert.match(await page.locator('#course-summary').innerText(), /30 teaching hours/);
     await page.locator('#course-start').fill('2027-01-06');
@@ -43,7 +43,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     await page.reload();
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('#course-form').waitFor({ state: 'visible' });
+    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#lesson-0-reading').inputValue(), 'The Hobbit, chapter 1');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('#course-lessons').scrollIntoViewIfNeeded();
@@ -51,7 +51,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     await page.getByRole('tab',{name:'Students',exact:true}).click();
     await page.locator('#selected-class').selectOption(second);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('#course-form').waitFor({ state: 'visible' });
+    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
     await page.getByText('Copy from another class', { exact: true }).click();
     await page.locator('#copy-course').selectOption(first);
     await page.getByRole('button', { name: 'Use this overview' }).click();
@@ -101,7 +101,7 @@ test('custom timetable, primary sections and prepared course files retain their 
     await page.goto('http://127.0.0.1:8788/teacher.html');
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('#course-form').waitFor({state:'visible'});
+    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});
     await page.locator('#course-format').selectOption('custom');
     await page.locator('#course-weeks').fill('13'); await page.locator('#course-frequency').fill('3');
     await page.locator('#course-minutes').fill('45'); await page.locator('#course-start').fill('2027-01-04');
@@ -134,6 +134,7 @@ test('custom timetable, primary sections and prepared course files retain their 
     await page.getByRole('button',{name:'Save course overview',exact:true}).click();
     await page.getByText('Course overview saved.',{exact:true}).waitFor();
     assert.equal(saved.lessons[4].evidence,'A revised paragraph'); assert.equal(saved.themes,imported.themes);
+    await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();
     await page.locator('#course-format').selectOption('custom');
     await page.locator('#course-pacing').selectOption('weekly'); await page.locator('#course-frequency').fill('2');
     await page.locator('#course-start').fill('2027-01-04'); await page.getByRole('button',{name:'Update lesson dates'}).click();

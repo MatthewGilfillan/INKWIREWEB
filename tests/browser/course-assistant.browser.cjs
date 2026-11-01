@@ -27,7 +27,7 @@ test('teacher previews, discards and accepts AI content without autosaving; stal
     }
     return route.fulfill({status:404,json:{}});
   });
-  async function open(){await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('#course-form').waitFor({state:'visible'});}
+  async function open(){await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});}
   async function generate(){await page.locator('#ai-planning-brief').fill('Create an age-appropriate literature and essay course.');await page.getByRole('button',{name:'Generate suggestion',exact:true}).click();await page.locator('[data-ai-preview]').waitFor({state:'visible'});}
   try{
     await page.goto('http://127.0.0.1:8788/teacher.html');await open();
@@ -38,6 +38,7 @@ test('teacher previews, discards and accepts AI content without autosaving; stal
     await generate();await page.getByRole('button',{name:'Use suggestion in draft',exact:true}).click();
     assert.equal(await page.locator('#lesson-0-title').inputValue(),'Generated lesson 1');assert.equal(saves,0);
     await page.getByRole('button',{name:'Save course overview',exact:true}).click();await page.getByText('Course overview saved.',{exact:true}).waitFor();assert.equal(saves,1);
+    await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();
     await page.locator('#ai-planning-mode').selectOption('activities');await page.locator('#ai-planning-lesson').selectOption('4');await generate();
     assert.equal(await page.locator('.ai-lesson').count(),1);assert.match(await page.locator('.ai-lesson summary').innerText(),/Lesson 5/);
     await page.locator('#lesson-0-title').fill('Teacher edit after preview');await page.getByRole('button',{name:'Use suggestion in draft',exact:true}).click();

@@ -23,7 +23,7 @@ test('class tabs preserve drafts, isolate students and calendar, and expose hone
   assert.match(await page.locator('[data-student-row="a"]').innerText(),/Not tracked yet/);
   await page.locator('#student-search').fill('ben');assert.equal(await page.locator('tbody tr').count(),1);await page.locator('#student-search').fill('');
   await page.screenshot({path:'/tmp/inkwire-students-tab.png',fullPage:true});
-  await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('#course-form').waitFor({state:'visible'});
+  await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('[data-course-overview]').waitFor({state:'visible'});assert.equal(await page.locator('#course-form').isVisible(),false);assert.equal(await page.locator('[data-overview-lesson]').count(),2);await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});
   await page.locator('#course-title').fill('My unsaved course draft');await page.getByRole('tab',{name:'Timeline',exact:true}).click();await page.locator('.timeline-lesson').first().waitFor();
   assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('#class-panel-timeline').isVisible(),true);
   await page.screenshot({path:'/tmp/inkwire-timeline-tab.png',fullPage:true});
@@ -31,7 +31,7 @@ test('class tabs preserve drafts, isolate students and calendar, and expose hone
   page.once('dialog',d=>d.dismiss());await page.locator('#selected-class').selectOption(second);assert.equal(await page.locator('#selected-class').inputValue(),first);
   page.once('dialog',d=>d.accept());await page.locator('#selected-class').selectOption(second);await page.getByText('No students yet.',{exact:false}).waitFor();
   assert.equal(await page.locator('#selected-class-settings').isVisible(),false);
-  await page.locator('#selected-class').selectOption(first);await page.locator('#course-form').waitFor({state:'visible'});assert.equal(await page.locator('#course-title').inputValue(),'Literature & essays');
+  await page.locator('#selected-class').selectOption(first);await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});assert.equal(await page.locator('#course-title').inputValue(),'Literature & essays');
   await page.getByRole('tab',{name:'Calendar',exact:true}).click();await page.locator('#class-panel-calendar [data-cal=month]').fill('2026-11');
   await page.locator('#class-panel-calendar .calendar-event').first().waitFor();assert.equal(await page.locator('#class-panel-calendar .calendar-event').count(),2);assert.ok(!(await page.locator('#class-panel-calendar').innerText()).includes('Summer literature'));
   await page.locator('#class-panel-calendar .calendar-event').first().click();assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');

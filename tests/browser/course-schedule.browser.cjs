@@ -11,7 +11,7 @@ test('teacher chooses Friday/Saturday times, skips extra dates, cancels and resc
   return route.fulfill({status:404,json:{}});
  });
  try{
-  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('#course-form').waitFor({state:'visible'});
+  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});
   await page.locator('#course-end').fill('2027-01-30');await page.getByText('Weekly lesson days & times',{exact:true}).click();
   await page.getByRole('button',{name:'+ Add weekly lesson time',exact:true}).click();const friday=page.locator('[data-weekly-slot="0"]');await friday.locator('[data-slot-field=day]').selectOption('5');await friday.locator('[data-slot-field=startTime]').fill('18:00');await friday.locator('[data-slot-field=lessonMinutes]').fill('90');
   await page.getByRole('button',{name:'+ Add weekly lesson time',exact:true}).click();const saturday=page.locator('[data-weekly-slot="1"]');await saturday.locator('[data-slot-field=day]').selectOption('6');await saturday.locator('[data-slot-field=startTime]').fill('10:00');await saturday.locator('[data-slot-field=lessonMinutes]').fill('60');
@@ -23,6 +23,7 @@ test('teacher chooses Friday/Saturday times, skips extra dates, cancels and resc
   await page.locator('[data-plan-lesson="0"] [data-lesson-field=chargeCancelled]').check();assert.match(await page.locator('[data-plan-lesson="7"] [data-lesson-billing]').textContent(),/lesson 8 of 8/);
   await page.locator('[data-plan-lesson="1"]>summary').click();await page.locator('[data-reschedule-lesson="1"]').click();await page.locator('#lesson-1-date').fill('2027-02-06');await page.locator('#lesson-1-time').fill('11:30');
   await page.getByRole('button',{name:'Save course overview',exact:true}).click();await page.getByText('Course overview saved.',{exact:true}).waitFor();assert.equal(saves,1);assert.deepEqual(course.lessons.map(l=>l.title),originals);assert.equal(course.lessons[0].status,'cancelled');assert.equal(course.lessons[0].chargeCancelled,true);assert.equal(course.lessons[1].date,'2027-02-06');assert.equal(course.lessons[1].startTime,'11:30');assert.equal(course.endDate,'2027-01-30');assert.equal(course.lessons.length,8);
+  await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();
   await page.locator('#course-billing').selectOption('monthly');await page.locator('#course-bill-to').fill('Rivendell');assert.match(await page.locator('[data-billing-summary]').innerText(),/9 scheduled hours/);assert.match(await page.locator('[data-billing-summary]').innerText(),/1 scheduled hours/);
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download billing schedule (CSV)',exact:true}).click();const file=await download;const csv=readFileSync(await file.path(),'utf8');assert.match(csv,/Rivendell/);assert.match(csv,/2027-02-06/);assert.equal(csv.split('\r\n').length,9);
   await page.locator('.schedule-editor').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/inkwire-flexible-schedule.png'});
