@@ -1,5 +1,5 @@
 import {api,escape} from './workspace-shared.js';
-import {renderLessonReport} from './lesson-feedback-view.js';
+import {renderLessonReport,assessmentHTML} from './lesson-feedback-view.js';
 import {renderSummary} from './summary-format.mjs';
 import {createLessonFeedback} from './lesson-feedback.js';
 
@@ -35,7 +35,7 @@ export function createMemberCourse({teacher=false,parent=false,root=null,onEditL
       $('[data-timeline-body]').innerHTML=`<p>${escape(course.description)}</p><p class="timeline-schedule">Lesson dates and times shown below · ${escape(course.timeZone)}</p><div class="lesson-timeline">${course.lessons.map(lesson=>`<article class="timeline-lesson ${lesson.status==='cancelled'?'is-cancelled':''}"><span class="timeline-number" aria-hidden="true">${lesson.number}</span><div class="timeline-content"><div class="timeline-heading"><span class="teacher-eyebrow">LESSON ${lesson.number}</span><span class="class-badge" data-lesson-status>${lesson.status==='cancelled'?'Cancelled':lesson.report?'Published':lesson.endsAt!==null && lesson.endsAt<=data.serverNow?'Awaiting feedback':lesson.date?'Upcoming':'Date to be set'}</span></div><h3>${escape(lesson.title)}</h3><p class="timeline-date">${escape(lesson.date || 'Date to be set')} · ${escape(lesson.startTime || course.startTime)} · ${lesson.lessonMinutes ?? course.lessonMinutes} min${lesson.section?' · '+escape(lesson.section):''}</p>${lesson.rescheduledFrom?`<p class="planner-hint">Rescheduled from ${escape(lesson.rescheduledFrom.date)} · ${escape(lesson.rescheduledFrom.startTime)}</p>`:''}${lesson.billing?`<p class="lesson-billing">${escape(lesson.billing)}</p>`:''}<p>${escape(lesson.goal)}</p>${data.teacher?`<button type="button" class="teacher-button secondary" data-timeline-feedback="${escape(lesson.id)}" disabled>Summary &amp; Feedback</button>${onEditLesson?`<button type="button" class="text-button timeline-edit" data-timeline-edit="${lesson.number-1}">Reschedule / cancel</button>`:''}`:''}<details class="timeline-details" ${lesson.report?'open':''}><summary>${lesson.report?'Class summary & feedback':'Reading & homework'}</summary><div data-timeline-lesson="${escape(lesson.id)}">${lesson.reading?`<h4>Reading before class</h4><p>${escape(lesson.reading)}</p>`:''}${!lesson.report?`<h4>Homework</h4><p>${escape(lesson.homework || 'No homework assigned.')}</p><p class="planner-hint">The lesson recap will appear here after the teacher publishes it.</p>`:''}</div></details></div></article>`).join('')}</div>`;
       for(const lesson of course.lessons.filter(l=>l.report)){
         const root=$(`[data-timeline-lesson="${lesson.id}"]`);
-        if(data.teacher){root.innerHTML='<div data-teacher-recap></div><h4>Homework</h4><p class="feedback-homework"></p>';renderSummary(root.querySelector('[data-teacher-recap]'),lesson.report.summary);root.querySelector('.feedback-homework').textContent=lesson.homework || 'No homework assigned.';}
+        if(data.teacher){root.innerHTML=`<div data-teacher-recap></div><section class="timeline-assessments"><h4>Student assessments</h4>${lesson.report.assessments?.length?lesson.report.assessments.map(student=>`<section class="timeline-student-assessment" data-assessed-student="${escape(student.learnerId)}"><div class="timeline-heading"><h5>${escape(student.name)}</h5><span class="class-badge">${student.attendance==='absent'?'Absent':'Present'}</span></div>${assessmentHTML(student)}</section>`).join(''):'<p>No individual assessments have been published for this lesson.</p>'}</section><h4>Homework</h4><p class="feedback-homework"></p>`;renderSummary(root.querySelector('[data-teacher-recap]'),lesson.report.summary);root.querySelector('.feedback-homework').textContent=lesson.homework || 'No homework assigned.';}
         else renderLessonReport(root,lesson.report,lesson.homework,lesson.report.assessment,{parent:parent || data.demo});
       }
       status(data.demo?'Demo profile — no email or password. Only teachers of this class can open this preview.':'');updateButtons();
@@ -46,6 +46,12 @@ export function createMemberCourse({teacher=false,parent=false,root=null,onEditL
   dialog.addEventListener('click',event=>{const button=event.target.closest('[data-timeline-feedback]');if(button && !button.disabled)feedback.open(classId,button.dataset.timelineFeedback,button);});
   dialog.addEventListener('click',event=>{const button=event.target.closest('[data-timeline-edit]');if(button)onEditLesson?.(classId,button,Number(button.dataset.timelineEdit));});
   document.addEventListener('visibilitychange',()=>{if(isOpen())updateButtons();});
+  document.addEventListener('inkwire:feedback-published',async event=>{
+    if(!teacher || event.detail.classId!==classId)return;
+    const restoreFocus=isOpen() && dialog.contains(document.activeElement);
+    await load();
+    if(restoreFocus && isOpen())$(`[data-timeline-feedback="${event.detail.lessonId}"]`)?.focus();
+  });
   return {async open(id,learnerId,button,{demo=false}={}){
     trigger=button;classId=id;const query=new URLSearchParams();if(learnerId)query.set('learnerId',learnerId);if(demo)query.set('demo','1');
     route=`/api/lesson-feedback/classes/${id}/${teacher && !demo?'timeline':'overview'}?${query}`;if(!root)dialog.showModal();await load();
