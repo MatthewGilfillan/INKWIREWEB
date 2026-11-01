@@ -16,7 +16,7 @@ export async function inspectPrintout(file,engine) {
   } catch(e) {if(e.name==='PasswordException')throw Error('This PDF is password-protected. Choose an unlocked copy.');throw e;}
   finally {await task?.destroy();}
 }
-export async function uploadPrintout({file,pages,title,id,classId}) {
-  const response=await fetch('/api/worksheets?'+new URLSearchParams({classId,title}),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/pdf','X-PDF-Pages':JSON.stringify(pages),'X-Worksheet-Id':id},body:file,signal:AbortSignal.timeout(90000)});
+export async function uploadPrintout({file,pages,title,id,classId,displayMode='printout'}) {
+  const response=await fetch('/api/worksheets?'+new URLSearchParams({classId,title}),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/pdf','X-PDF-Pages':JSON.stringify(pages),'X-Worksheet-Id':id,'X-PDF-Display':displayMode},body:file,signal:AbortSignal.timeout(90000)});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw Error(result.message||'The PDF could not be uploaded. Keep this dialog open and try again.');return result;
 }

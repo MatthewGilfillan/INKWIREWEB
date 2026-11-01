@@ -98,3 +98,14 @@ test('linked parent notebook view reads live annotations while published workshe
   assert.equal((await f.call('outsider',path+'/state'+suffix)).status,404);
  }finally{f.db.close();}
 });
+test('PDF attachment mode stays downloadable and existing printouts remain the default',async()=>{
+ const f=await fixture();try{
+  const id=randomUUID();assert.equal((await f.upload('teacher',id,{'X-PDF-Display':'attachment'})).status,201);
+  assert.equal(f.db.prepare('SELECT display_mode FROM worksheets WHERE id=?').get(id).display_mode,'attachment');
+  const {handleNotebooks}=await import('../cloudflare/notebooks.mjs');const catalog=await(await handleNotebooks(new Request(ORIGIN+'/api/notebooks/'+f.classId+'/'+f.learner),f.env,f.users.parent)).json();assert.equal(catalog.pages[0].displayMode,'attachment');
+  const download=await f.call('parent','/'+id+'/pdf?learnerId='+f.learner+'&notebook=1&download=1');assert.equal(download.status,200);assert.match(download.headers.get('Content-Disposition'),/^attachment/);
+  const normal=(await(await f.upload()).json()).id;assert.equal(f.db.prepare('SELECT display_mode FROM worksheets WHERE id=?').get(normal).display_mode,'printout');
+  assert.equal((await f.upload('teacher',randomUUID(),{'X-PDF-Display':'unsupported'})).status,400);
+  const styled=f.cleanMark({kind:'text',page:0,x:10,y:10,width:200,height:80,text:'Feedback',fontSize:48,fontFamily:'Calibri',italic:true,underline:true,backgroundColor:'#ffdd00',color:'#225588'},pages);assert.equal(styled.fontFamily,'Calibri');assert.equal(styled.backgroundColor,'#ffdd00');assert.equal(styled.italic,true);
+ }finally{f.db.close();}
+});

@@ -13,3 +13,11 @@ test('PDF inspection reads all page sizes, enforces limits and releases parser r
  await assert.rejects(()=>inspectPrintout(file(),engine(61)),/60 pages/);
  await assert.rejects(()=>inspectPrintout(file(),engine(1,3000)),/paper sizes/);assert.equal(destroyed,3);
 });
+test('rich text fonts, size, colors and highlight survive the shared document merge and unsafe styles are rejected',async()=>{
+ const {seedState,mergeState,encodeState}=await import('../src/notebook-sync.mjs');
+ const attrs={fontFamily:'Calibri',fontSize:'20pt',color:'#2244aa',backgroundColor:'#fff176'};
+ const doc={type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Teacher feedback',marks:[{type:'textStyle',attrs},{type:'bold'},{type:'underline'}]}]}]};
+ const state=seedState(doc);const merged=mergeState(state,encodeState(state));assert.deepEqual(merged.document.content[0].content[0].marks.find(m=>m.type==='textStyle').attrs,attrs);
+ const {cleanTextStyle}=await import('../src/text-format.mjs');assert.deepEqual(cleanTextStyle({fontSize:'24px',color:'rgb(255, 0, 0)'}),{fontSize:'18pt',color:'#ff0000'});
+ for(const attr of [{fontFamily:'url(https://evil.invalid)'},{fontSize:'200pt'},{backgroundColor:'url(javascript:bad)'},{onclick:'bad'}])assert.throws(()=>cleanTextStyle(attr));
+});

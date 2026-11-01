@@ -3,3 +3,7 @@
 
 /* Same-origin Folio notebook reader. */
 .notebook-embed .ws-header,.notebook-embed #back-library,.notebook-embed #learner-picker{display:none!important}.notebook-embed .ws-document-heading{padding:12px 18px}.notebook-embed .ws-document-heading h1{font-size:17px}.notebook-embed .ws-content{height:calc(100dvh - 230px);min-height:350px}.notebook-embed .ws-toolbar{padding-inline:12px}.notebook-embed #preview-label{display:none}
+
+#text-font{width:125px}#text-size{width:58px}.note-box textarea{font-family:inherit;font-style:inherit;text-decoration:inherit}.ws-toolbar input[type=number],.ws-toolbar input[list]{padding:6px;border:1px solid #ccd6e2;border-radius:5px}
+
+.worksheet-page[data-tool=text] .note-box{pointer-events:auto}.worksheet-page[data-tool=text] .note-handle{cursor:move}.worksheet-page[data-tool=text] .note-resize{cursor:nwse-resize}

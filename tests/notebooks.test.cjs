@@ -53,7 +53,7 @@ test('one Yjs page merges simultaneous teacher/student edits and gives parents t
 });
 test('organization moves references to existing PDF copies without duplicating their content',async()=>{
   const f=await fixture();try{
-    const w=randomUUID(),s=randomUUID();f.db.prepare('INSERT INTO worksheets VALUES(?,?,?,?,?,?,0)').run(w,f.classId,'Reading','private.pdf','[{"width":612,"height":792}]','teacher');
+    const w=randomUUID(),s=randomUUID();f.db.prepare('INSERT INTO worksheets(id,class_id,title,pdf_key,pages_json,created_by,created_at) VALUES(?,?,?,?,?,?,0)').run(w,f.classId,'Reading','private.pdf','[{"width":612,"height":792}]','teacher');
     const before=await(await f.call('teacher',f.base)).json();assert.equal(before.pages[0].sectionId,'printouts');
     await f.call('teacher',f.base+'/sections',{id:s,title:'Homework'});assert.equal((await f.call('teacher',f.base+'/pages/'+w,{action:'move',sectionId:s})).status,200);
     const after=await(await f.call('parent',f.base)).json();assert.equal(after.pages.length,1);assert.equal(after.pages[0].id,w);assert.equal(after.pages[0].sectionId,s);

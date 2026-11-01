@@ -12,7 +12,7 @@ parents. Later edits stay in the classroom until the teacher shares again.
 **Print / save PDF** prepares all pages with visible annotations for the browser's
 print dialog. Print export is flattened; editable annotations stay on the site.
 
-Text supports plain-text paste, emojis, size, color and bold. The feedback menu
+The Text tool is selected initially and remains selected after adding text. Text boxes keep move and resize handles in Text mode. Text supports plain-text paste, emojis, editable fonts, 8–96 font sizes, color, background highlight, bold, italic and underline. The feedback menu
 offers editable starter phrases. Handwriting recognition, pressure-sensitive ink,
 image stickers, rich-text paste and a custom saved-feedback bank are not included.
 

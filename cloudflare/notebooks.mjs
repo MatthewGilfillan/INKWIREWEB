@@ -35,7 +35,7 @@ export async function handleNotebooks(request,env,user) {
   const scope=[classId,learnerId];
   const sections=async()=>[{id:PRINT_SECTION,title:'PDF printouts'},...(await env.DB.prepare('SELECT id,title FROM notebook_sections WHERE class_id=? AND learner_id=? ORDER BY created_at,id').bind(...scope).all()).results];
   if(parts.length===2&&request.method==='GET') {
-    const worksheets=(await env.DB.prepare('SELECT id,title,created_at AS createdAt FROM worksheets WHERE class_id=? ORDER BY created_at,id').bind(classId).all()).results;
+    const worksheets=(await env.DB.prepare('SELECT id,title,display_mode AS displayMode,created_at AS createdAt FROM worksheets WHERE class_id=? ORDER BY created_at,id').bind(classId).all()).results;
     const pages=(await env.DB.prepare('SELECT id,section_id AS sectionId,title,kind,version,updated_at AS updatedAt FROM notebook_pages WHERE class_id=? AND learner_id=? ORDER BY updated_at,id').bind(...scope).all()).results;
     return json({userId:user.id,learnerName:learner.name,role:user.requestedRole,sections:await sections(),pages:catalogPages(worksheets,pages)});
   }

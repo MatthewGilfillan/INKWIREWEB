@@ -1,3 +1,4 @@
+import {TextFormat,fontChoices,fontName,textSize,textColor} from './text-format.mjs';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
@@ -35,8 +36,9 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     activeProvider = getYjsProviderForRoom(connection.room);
     cleanup = connection.leave;
   }
-  const buttons = [];
+  const buttons = [],formatControls=[];
   function updateToolbar(editor) {
+    const attrs=editor.getAttributes('textStyle');for(const c of formatControls){c.input.disabled=!editor.isEditable;if(window.document.activeElement!==c.input)c.input.value=c.key==='fontSize'?parseFloat(attrs.fontSize)||16:attrs[c.key]||c.fallback;}
     for (const { button, active, available } of buttons) {
       if (active) button.setAttribute('aria-pressed', String(active(editor)));
       button.disabled = !editor.isEditable || (available ? !available(editor) : false);
@@ -44,7 +46,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -75,6 +77,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     { label: 'Bold', display: 'B', mark: 'bold', run: c => c.toggleBold() },
     { label: 'Italic', display: 'I', mark: 'italic', run: c => c.toggleItalic() },
     { label: 'Underline', display: 'U', mark: 'underline', run: c => c.toggleUnderline() },
+    { label:'Strikethrough',display:'S̶',mark:'strike',run:c=>c.toggleStrike() },
     { label: 'Heading', display: 'H2', active: e => e.isActive('heading', { level: 2 }), run: c => c.toggleHeading({ level: 2 }) },
     { label: 'Bullet list', display: '• List', mark: 'bulletList', run: c => c.toggleBulletList() },
     { label: 'Numbered list', display: '1. List', mark: 'orderedList', run: c => c.toggleOrderedList() },
@@ -83,6 +86,14 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     { label: 'Redo', display: '↷', available: e => e.can().redo(), run: c => c.redo() },
   ];
   toolbar.replaceChildren();
+  const fonts=window.document.createElement('datalist');fonts.id='folio-font-families';for(const name of fontChoices){const option=window.document.createElement('option');option.value=name;fonts.append(option);}toolbar.append(fonts);
+  for(const spec of [{key:'fontFamily',label:'Font family',type:'text',fallback:'Calibri',clean:fontName},{key:'fontSize',label:'Font size',type:'number',fallback:'16',clean:textSize},{key:'color',label:'Text color',type:'color',fallback:'#243556',clean:textColor},{key:'backgroundColor',label:'Text highlight color',type:'color',fallback:'#fff176',clean:textColor}]){
+    const label=window.document.createElement('label');label.className='format-control';label.textContent=spec.label;const input=window.document.createElement('input');input.type=spec.type;input.setAttribute('aria-label',spec.label);input.value=spec.fallback;
+    if(spec.key==='fontFamily'){input.setAttribute('list',fonts.id);input.placeholder='Font name';}if(spec.type==='number'){input.min='8';input.max='96';input.step='1';}
+    input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');activeEditor.chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);toolbar.append(label);formatControls.push({...spec,input});
+  }
+  const clear=window.document.createElement('button');clear.type='button';clear.textContent='Clear highlight';clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>activeEditor.chain().focus().setMark('textStyle',{backgroundColor:null}).run();toolbar.append(clear);buttons.push({button:clear});
+
   for (const item of items) {
     const button = window.document.createElement('button');
     button.type = 'button';

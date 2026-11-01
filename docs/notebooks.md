@@ -2,7 +2,7 @@
 
 The teacher master view, class Notebooks tab, student dashboard and linked parent dashboard open one notebook per `(class_id, learner_id)`. Sections and pages have stable IDs. Changing views changes access, never creates another notebook copy.
 
-The hub has four columns: Notebooks → Sections → Pages → Contents. Teachers can search/filter students, add sections and pages, and move pages. Drop one PDF anywhere in the notebook, including over an existing printout, or select “Add a PDF printout”. Review the title and select “Insert printout”; the PDF uploads into the current section and opens immediately without leaving the notebook. PDF entries reference existing worksheet IDs, original files and learner annotation layers. Text pages support rich text and pasted headings/lists. Ink and positioned text are available over locked PDF printouts; free-positioned ink over ordinary rich-text pages is not implemented.
+The hub has four columns: Notebooks → Sections → Pages → Contents. Teachers can search/filter students, add sections and pages, and move pages. Drop one PDF anywhere in the notebook, including over an existing printout, or select “Add a PDF printout”. Choose a locked-background printout (the default) or a downloadable file attachment, review the title and select “Insert printout”; the PDF uploads into the current section and opens immediately without leaving the notebook. PDF entries reference existing worksheet IDs, original files and learner annotation layers. Text pages support rich text and pasted headings/lists, editable font families (including Calibri where installed), 8–96 point font sizes, text colors and highlight colors. Unavailable fonts use a browser fallback. Ink and positioned text are available over locked PDF printouts; free-positioned ink over ordinary rich-text pages is not implemented.
 
 ## Shared content and access
 
@@ -20,7 +20,7 @@ Current server limits: 50 custom sections, 500 explicitly stored page records, 1
 
 ## Deployment
 
-Run `npm test && npm run build`. Apply `cloudflare/migrations/0014_notebooks.sql` after earlier migrations before deploying the account Worker. R2 is activated and the private PDF bucket exists; see [PDF worksheets](pdf-worksheets.md). The Cloudflare build pipeline applies migrations before deployment. The static Sites deployment does not run this account Worker or apply D1 migrations.
+Run `npm test && npm run build`. Apply `cloudflare/migrations/0014_notebooks.sql` and `0015_pdf_attachment_mode.sql` after earlier migrations before deploying the account Worker. R2 is activated and the private PDF bucket exists; see [PDF worksheets](pdf-worksheets.md). The Cloudflare build pipeline applies migrations before deployment. The static Sites deployment does not run this account Worker or apply D1 migrations.
 
 For the hosted practice workspace, open `/notebooks.html?preview=1`. Teacher, student and parent links share fictional records through this browser's IndexedDB; they do not sync across devices or upload practice data to Cloudflare. Practice mode is disabled on `inkwire-education.com` and its www host. Dashboard links for real accounts use `/notebooks` with class/notebook IDs; the Worker protects that route and its aliases.
 

@@ -45,7 +45,7 @@ function renderLists(){
   $('#section-list').innerHTML=(selection?.sections||[]).map((s,i)=>row(s,s.id===selection.sectionId,`<span class="section-icon" style="--book-color:${colors[i%colors.length]}" aria-hidden="true"></span>`)).join('');
   const section=selection?.sections.find(s=>s.id===selection.sectionId);$('#selected-section').textContent=section?.title||'Choose a section';$('#page-breadcrumb').textContent=book?book.learnerName+' / '+(section?.title||'Sections'):'A LITTLE SPACE FOR BIG IDEAS';
   const pages=(selection?.pages||[]).filter(p=>p.sectionId===selection.sectionId);
-  $('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':'☷'}</span>`,p.kind==='worksheet'?'PDF printout':'Notebook page')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
+  $('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':'☷'}</span>`,p.kind==='worksheet'?(p.displayMode==='attachment'?'PDF file attachment':'PDF printout'):'Notebook page')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
   for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';
   $('#add-printout').hidden=!book||library.role!=='teacher';
   $('#printout-hint').hidden=!book||library.role!=='teacher';
@@ -53,7 +53,7 @@ function renderLists(){
 }
 function closePage(){
   openEpoch++;if(active){clearTimeout(active.timer);active.doc.destroy();active=null;}window.InkWireEditor?.destroy();embeddedDirty=false;
-  const frame=$('#worksheet-frame');frame.hidden=true;frame.removeAttribute('src');$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
+  $('#pdf-attachment').hidden=true;const frame=$('#worksheet-frame');frame.hidden=true;frame.removeAttribute('src');$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
 }
 async function openBook(id,{initial=false}={}) {
   if(!initial&&!mayNavigate())return;const next=library.notebooks.find(b=>b.id===id);if(!next)return;
@@ -72,6 +72,11 @@ async function flush(c){
 async function openPage(id){
   if(!mayNavigate())return;const page=selection?.pages.find(p=>p.id===id);if(!page)return;closePage();const epoch=openEpoch;selection.pageId=id;renderLists();pane('content');
   $('#page-title').textContent=page.title;$('#page-breadcrumb').textContent=book.learnerName+' / '+selection.sections.find(s=>s.id===page.sectionId)?.title;$('#page-meta').textContent=book.className+(library.role==='parent'?' · Parent view · read only':' · Shared student notebook');$('#move-label').hidden=library.role!=='teacher';$('#move-page').value=page.sectionId;$('#page-empty').hidden=true;
+  if(page.kind==='worksheet'&&page.displayMode==='attachment'){
+    $('#pdf-attachment').hidden=false;$('#attachment-title').textContent=page.title;$('#page-status').textContent='Downloadable PDF file';const link=$('#download-pdf');link.download=page.title+'.pdf';
+    if(practice){link.href='#';link.onclick=async e=>{e.preventDefault();const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter(library.role,{classId:book.classId,learnerId:book.learnerId,liveParent:true});await ws.metadata(page.id);const url=URL.createObjectURL(new Blob([await ws.pdf()],{type:'application/pdf'}));const a=document.createElement('a');a.href=url;a.download=page.title+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
+    else{link.onclick=null;link.href='/api/worksheets/'+page.id+'/pdf?'+new URLSearchParams({learnerId:book.learnerId,notebook:'1',download:'1'});}return;
+  }
   if(page.kind==='worksheet'){
     const url=new URL('worksheets.html',location.href);for(const [k,v] of Object.entries({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'}))url.searchParams.set(k,v);if(practice){url.searchParams.set('preview','1');url.searchParams.set('role',library.role);}$('#worksheet-frame').src=url;$('#worksheet-frame').hidden=false;$('#page-status').textContent='PDF background locked · '+(library.role==='parent'?'live read-only view':'type and draw over the page');return;
   }
@@ -107,7 +112,7 @@ window.addEventListener('beforeunload',e=>{if(pending()){e.preventDefault();e.re
 window.addEventListener('online',()=>{if(active)flush(active);poll();});
 async function poll(){if(refreshing||!book||!selection||document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;
   try{if(c){const {page}=await adapter.page(c.bookId,c.pageId);if(c===active&&page?.syncState){Y.applyUpdate(c.doc,decodeState(page.syncState),'remote');c.version=page.version;window.InkWireEditor?.setEditable(!c.readOnly);saveStatus(c);}}
-    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};if(changed)renderLists();}
+    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind,displayMode:p.displayMode}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};if(changed)renderLists();}
   }catch(e){if(epoch===openEpoch){problem(e);$('#connection').textContent=e.status===401?'Sign-in expired':'Reconnecting…';if([401,403,404].includes(e.status))window.InkWireEditor?.setEditable(false);}}
   finally{refreshing=false;}}
 async function initialize(){
@@ -120,10 +125,11 @@ function offerPrintout(file){
   if(printoutImport?.busy)return;
   if(!book||!selection||library.role!=='teacher'){problem(Error('Choose a student notebook in your teacher view before inserting a PDF.'));return;}
   if(!mayNavigate())return;
-  if(!$('#printout-dialog').open){printoutImport={bookId:book.id,classId:book.classId,learnerId:book.learnerId,sectionId:selection.sectionId,id:requestId(),file:null};$('#printout-name').value='';$('#printout-file').value='';$('#printout-file-name').textContent='Up to 10 MB · 60 pages';$('#printout-target').textContent=book.learnerName+' · '+book.className+' / '+selection.sections.find(s=>s.id===selection.sectionId)?.title;$('#printout-error').hidden=true;$('#printout-dialog').showModal();}
+  if(!$('#printout-dialog').open){printoutImport={bookId:book.id,classId:book.classId,learnerId:book.learnerId,sectionId:selection.sectionId,id:requestId(),file:null};$('#printout-name').value='';$('#printout-explanation').textContent='Every PDF page stays locked underneath writing and drawing. Each student in this class has a separate copy.';document.querySelector('[name="pdf-display"][value="printout"]').checked=true;$('#printout-file').value='';$('#printout-file-name').textContent='Up to 10 MB · 60 pages';$('#printout-target').textContent=book.learnerName+' · '+book.className+' / '+selection.sections.find(s=>s.id===selection.sectionId)?.title;$('#printout-error').hidden=true;$('#printout-dialog').showModal();}
   if(file){try{validatePrintout(file);printoutImport.file=file;printoutImport.id=requestId();$('#printout-file-name').textContent=file.name;if(!$('#printout-name').value)$('#printout-name').value=file.name.replace(/\.pdf$/i,'').slice(0,120);$('#printout-error').hidden=true;}catch(e){$('#printout-error').textContent=e.message;$('#printout-error').hidden=false;}}
 }
 $('#add-printout').onclick=()=>offerPrintout();
+for(const input of document.querySelectorAll('[name="pdf-display"]'))input.onchange=()=>{$('#printout-explanation').textContent=input.value==='attachment'?'The original PDF is saved as a downloadable file. It does not cover your notebook page.':'Every PDF page stays locked underneath writing and drawing. Each student in this class has a separate copy.';};
 $('#printout-file').onchange=e=>offerPrintout(e.target.files[0]);
 $('#printout-cancel').onclick=()=>{if(!printoutImport?.busy){$('#printout-dialog').close();printoutImport=null;}};
 $('#printout-dialog').addEventListener('cancel',e=>{if(printoutImport?.busy)e.preventDefault();else printoutImport=null;});
@@ -138,12 +144,12 @@ $('#printout-form').onsubmit=async e=>{
   try{validatePrintout(upload.file);if(!title)throw Error('Enter a page title.');}catch(error){$('#printout-error').textContent=error.message;$('#printout-error').hidden=false;return;}
   upload.busy=true;$('#printout-submit').disabled=true;$('#printout-cancel').disabled=true;$('#printout-file').disabled=true;$('#printout-name').disabled=true;$('#printout-error').hidden=true;$('#printout-submit').textContent='Checking PDF…';
   try{
-    const pages=await inspectPrintout(upload.file);$('#printout-submit').textContent='Uploading…';
-    if(practice){const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter('teacher',{classId:upload.classId,learnerId:upload.learnerId,liveParent:true});await ws.upload(upload.file,pages,title,upload.id);}
-    else await uploadPrintout({file:upload.file,pages,title,id:upload.id,classId:upload.classId});
+    const displayMode=document.querySelector('[name="pdf-display"]:checked').value;const pages=await inspectPrintout(upload.file);$('#printout-submit').textContent='Uploading…';
+    if(practice){const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter('teacher',{classId:upload.classId,learnerId:upload.learnerId,liveParent:true});await ws.upload(upload.file,pages,title,upload.id,displayMode);}
+    else await uploadPrintout({file:upload.file,pages,title,id:upload.id,classId:upload.classId,displayMode});
     if(upload.sectionId!=='printouts')await adapter.move(upload.bookId,upload.id,upload.sectionId);
     const data=await adapter.book(upload.bookId);selection={...data,sectionId:upload.sectionId};upload.busy=false;$('#printout-dialog').close();printoutImport=null;clearProblem();renderLists();await openPage(upload.id);
   }catch(error){$('#printout-error').textContent=error.message;$('#printout-error').hidden=false;}
-  finally{upload.busy=false;$('#printout-submit').disabled=false;$('#printout-cancel').disabled=false;$('#printout-file').disabled=false;$('#printout-name').disabled=false;$('#printout-submit').textContent='Insert printout';}
+  finally{upload.busy=false;$('#printout-submit').disabled=false;$('#printout-cancel').disabled=false;$('#printout-file').disabled=false;$('#printout-name').disabled=false;$('#printout-submit').textContent='Insert PDF';}
 };
 await initialize();setInterval(poll,2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});

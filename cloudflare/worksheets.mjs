@@ -1,3 +1,4 @@
+import {fontName,textColor} from '../src/text-format.mjs';
 import {limitClassAction} from './classes.mjs';
 
 const ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -41,8 +42,8 @@ export function cleanMark(value,pages) {
   if(!value||!Number.isInteger(value.page)||!pages[value.page]||!/^#[a-fA-F0-9]{6}$/.test(value.color||''))throw Error('INVALID_MARK');
   const page=pages[value.page],base={page:value.page,kind:value.kind,color:value.color};
   if(value.kind==='text') {
-    if(typeof value.text!=='string'||value.text.length>4000||!finite(value.x,0,page.width)||!finite(value.y,0,page.height)||!finite(value.width,20,page.width)||!finite(value.height,20,page.height)||value.x+value.width>page.width+1||value.y+value.height>page.height+1||!finite(value.fontSize,8,60))throw Error('INVALID_TEXT');
-    return {...base,text:value.text,x:value.x,y:value.y,width:value.width,height:value.height,fontSize:value.fontSize,bold:value.bold===true};
+    if(typeof value.text!=='string'||value.text.length>4000||!finite(value.x,0,page.width)||!finite(value.y,0,page.height)||!finite(value.width,20,page.width)||!finite(value.height,20,page.height)||value.x+value.width>page.width+1||value.y+value.height>page.height+1||!finite(value.fontSize,8,96))throw Error('INVALID_TEXT');
+    return {...base,text:value.text,x:value.x,y:value.y,width:value.width,height:value.height,fontSize:value.fontSize,bold:value.bold===true,italic:value.italic===true,underline:value.underline===true,fontFamily:fontName(value.fontFamily)||'Calibri',backgroundColor:textColor(value.backgroundColor)};
   }
   if(!['pen','highlight'].includes(value.kind)||!finite(value.size,0.5,30)||!Array.isArray(value.points)||value.points.length<2||value.points.length>1500||!value.points.every(p=>Array.isArray(p)&&p.length===2&&finite(p[0],0,page.width)&&finite(p[1],0,page.height)))throw Error('INVALID_STROKE');
   return {...base,size:value.size,points:value.points.map(p=>[p[0],p[1]])};
@@ -67,12 +68,13 @@ export async function handleWorksheets(request,env,user) {
       const classroom=await env.DB.prepare('SELECT name FROM classes WHERE id=?').bind(classId).first();
       const rows=scope.role==='parent'&&url.searchParams.get('notebook')!=='1'
         ?await env.DB.prepare(`SELECT w.id,w.title,w.pages_json,p.published_at FROM worksheets w JOIN worksheet_publications p ON p.worksheet_id=w.id WHERE w.class_id=? AND p.learner_id=? ORDER BY w.created_at DESC`).bind(classId,scope.learnerId).all()
-        :await env.DB.prepare('SELECT id,title,pages_json,created_at FROM worksheets WHERE class_id=? ORDER BY created_at DESC').bind(classId).all();
+        :await env.DB.prepare('SELECT id,title,pages_json,created_at,display_mode FROM worksheets WHERE class_id=? ORDER BY created_at DESC').bind(classId).all();
       const students=scope.role==='teacher'?(await env.DB.prepare(`SELECT l.id,l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(classId).all()).results:[];
-      return json({userId:user.id,...scope,className:classroom.name,students,worksheets:rows.results.map(r=>({id:r.id,title:r.title,pageCount:JSON.parse(r.pages_json).length,publishedAt:r.published_at||null}))});
+      return json({userId:user.id,...scope,className:classroom.name,students,worksheets:rows.results.map(r=>({id:r.id,title:r.title,pageCount:JSON.parse(r.pages_json).length,displayMode:r.display_mode||'printout',publishedAt:r.published_at||null}))});
     }
     if(request.method!=='POST')return fail('Use GET or POST.',405);
     if(scope.role!=='teacher')return fail('Only a class teacher can upload worksheets.',403,'FORBIDDEN');
+    const displayMode=request.headers.get('X-PDF-Display')||'printout';if(!['printout','attachment'].includes(displayMode))return fail('Choose printout or file attachment.');
     const id=request.headers.get('X-Worksheet-Id'),title=(url.searchParams.get('title')||'').trim();
     if(!ID.test(id||'')||!title||title.length>120||request.headers.get('Content-Type')!=='application/pdf')return fail('Choose a PDF and a title of up to 120 characters.');
     const existing=await env.DB.prepare('SELECT id,class_id,created_by FROM worksheets WHERE id=?').bind(id).first();
@@ -88,7 +90,7 @@ export async function handleWorksheets(request,env,user) {
     }catch{return fail('Use a valid PDF of up to 10 MB and 60 pages.',400,'INVALID_PDF');}
     const key='worksheets/'+id+'/'+crypto.randomUUID()+'.pdf';
     await env.WORKSHEETS.put(key,bytes,{httpMetadata:{contentType:'application/pdf'}});
-    try {await env.DB.prepare('INSERT INTO worksheets (id,class_id,title,pdf_key,pages_json,created_by,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,classId,title,key,JSON.stringify(pages),user.id,Date.now()).run();}
+    try {await env.DB.prepare('INSERT INTO worksheets (id,class_id,title,pdf_key,pages_json,created_by,created_at,display_mode) VALUES (?,?,?,?,?,?,?,?)').bind(id,classId,title,key,JSON.stringify(pages),user.id,Date.now(),displayMode).run();}
     catch(error){await env.WORKSHEETS.delete(key);const winner=await env.DB.prepare('SELECT class_id,created_by FROM worksheets WHERE id=?').bind(id).first();if(winner)return winner.class_id===classId&&winner.created_by===user.id?json({id},200):fail('This upload ID is already used.',409);throw error;}
     return json({id},201);
   }
@@ -104,7 +106,7 @@ export async function handleWorksheets(request,env,user) {
   if(!action&&request.method==='GET')return json({id,title:worksheet.title,classId:worksheet.class_id,pages:JSON.parse(worksheet.pages_json),userId:user.id,...scope,publishedAt:publication?.published_at||null});
   if(action==='pdf'&&request.method==='GET') {
     const pdf=await env.WORKSHEETS.get(worksheet.pdf_key);if(!pdf)return fail('PDF unavailable.',404);
-    return new Response(pdf.body,{headers:{...headers,'Content-Type':'application/pdf','Content-Disposition':`inline; filename="worksheet-${id}.pdf"`,'Content-Security-Policy':"sandbox; default-src 'none'"}});
+    return new Response(pdf.body,{headers:{...headers,'Content-Type':'application/pdf','Content-Disposition':` ${url.searchParams.get('download')==='1'?'attachment':'inline'}; filename="worksheet-${id}.pdf"`.trim(),'Content-Security-Policy':"sandbox; default-src 'none'"}});
   }
   if(!scope.learnerId)return fail('Choose a student to open their copy.',400,'LEARNER_REQUIRED');
   if(action==='state'&&request.method==='GET') {

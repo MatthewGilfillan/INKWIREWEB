@@ -27,6 +27,6 @@ export async function createPreviewAdapter(requestedRole, context={}){
       });}finally{db.close();}
     },
     async publish(){if(role!=='teacher')throw Error('Only teachers can share work.');const data=await this.state(),publishedAt=Date.now();await write('published:'+currentId,{...data,publishedAt});return {publishedAt};},
-    async upload(file,pages,title,id){await write('pdf:'+id,file);await write('doc:'+id,{id,pages,title});const ids=await read('list');if(!ids.includes(id))await write('list',[id,...ids]);return {id};},
+    async upload(file,pages,title,id,displayMode='printout'){await write('pdf:'+id,file);await write('doc:'+id,{id,pages,title,displayMode});const ids=await read('list');if(!ids.includes(id))await write('list',[id,...ids]);return {id};},
   };
 }
