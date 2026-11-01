@@ -19,3 +19,21 @@ Ink Wire can read a teacher-selected private Drive folder, list supported docume
 - Google login domains are permitted by the teacher-page content security policy only when the client ID is configured. Student, parent and account pages retain their existing policy.
 
 References: [Google token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model), [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [downloads and exports](https://developers.google.com/workspace/drive/api/guides/manage-downloads).
+
+## Google Forms quiz import
+
+The same web OAuth client supports **Quiz studio → Google Forms** after these additions:
+
+1. Enable **Google Forms API** in the Google Cloud project.
+2. Add `https://www.googleapis.com/auth/forms.body.readonly` to the consent-screen data access configuration. The importer requests only this read-only scope, with incremental scope inclusion disabled; it never requests `forms.responses.readonly`.
+3. Keep the existing `GOOGLE_DRIVE_CLIENT_ID` and authorized JavaScript origin. The deployed teacher CSP allows `https://forms.googleapis.com` when this client is configured.
+4. In Quiz studio, paste the form's **editor URL** (`https://docs.google.com/forms/d/FORM_ID/edit`), connect the owner/editor account, review the items and select up to 20 questions. Student response URLs and `forms.gle` links do not identify the editor resource and are rejected with guidance.
+5. Choose **Use selected questions**, review the answer key, then **Save draft** or **Save & assign quiz**. Imports do not overwrite the Google Form and do not automatically publish anything.
+
+This first version imports text-based, single-answer multiple choice and dropdown questions with 2–4 choices. It preserves wording, section text, the answer key when present, and text feedback. A missing/ambiguous key stays unset and must be completed before assignment. Checkboxes, grids, short answers, images/video, branching, “Other”, oversized text and unsupported choices are listed for manual adaptation; none are silently turned into different questions. All questions are worth one point in Ink Wire; differences from Google grading are shown during review. Select a subset if the form has more than 20 questions.
+
+Google access is temporary in browser memory and discarded after reading the form. No respondents, responses or response grades are requested, persisted or sent to OpenAI. This import does not use AI. As with other browser OAuth grants, Google retains the consent grant until the account holder revokes it in their Google account. The application does not store a refresh token. A form read is bounded to 30 seconds and 2 MiB of JSON.
+
+Without the Google client setup, the UI explains that it is not connected and offers the existing PDF/source-text AI workflow as an alternative; that workflow needs teacher review of generated questions and answer keys.
+
+References: [forms.get and scopes](https://developers.google.com/workspace/forms/api/reference/rest/v1/forms/get), [Forms question types and grading](https://developers.google.com/workspace/forms/api/reference/rest/v1/forms).

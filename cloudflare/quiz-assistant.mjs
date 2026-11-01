@@ -24,7 +24,14 @@ export const readQuizDraft=async(env,classId,lessonId)=>{
   return row?{revision:row.revision,courseRevision:row.course_revision,quizRevision:row.quiz_revision,...JSON.parse(row.content),source:row.source,createdAt:row.updated_at}:null;
 };
 export async function saveQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,draft,source){
-  const safe=validateAIDraft(draft),now=Date.now();
+  return persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,validateAIDraft(draft),source);
+}
+export async function saveTeacherQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,quiz){
+  const safe=validateQuiz(quiz,{draft:true});
+  return persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,{quiz:safe,reviewNotes:'Check the questions and answer key before assigning.',sources:safe.questions.map(()=> 'Teacher-created or imported question.')},'Teacher draft');
+}
+async function persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,safe,source){
+  const now=Date.now();
   const saved=await env.DB.prepare(`INSERT INTO quiz_drafts(class_id,lesson_id,revision,course_revision,quiz_revision,content,review_notes,source,updated_by,updated_at)
     SELECT ?,?,1,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM course_overviews WHERE class_id=? AND revision=?)
     AND EXISTS(SELECT 1 FROM classes c WHERE c.id=? AND c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)))

@@ -1,4 +1,4 @@
-import {readQuizDraft} from './quiz-assistant.mjs';
+import {readQuizDraft,saveTeacherQuizDraft} from './quiz-assistant.mjs';
 import {planningAvailable} from './planning-assistant.mjs';
 import {lessonKey} from '../dist/lesson-feedback-model.mjs';
 import {validateQuiz} from './quiz-model.mjs';
@@ -54,6 +54,12 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
   let input;try{input=await readJSON(request,90000);}catch{return fail('Check the quiz data.',400,'INVALID_INPUT');}
   const now=Date.now();
   if(teacher){
+    if(input.action==='save-draft'){
+      if(!Number.isSafeInteger(input.draftRevision) || input.draftRevision<0 || input.courseRevision!==classroom.revision || input.revision!==(quiz?.revision || 0))return fail('The course or quiz changed. Reopen it before saving a draft.',409,'CONFLICT');
+      let saved;try{saved=await saveTeacherQuizDraft(env,user,classId,lessonId,classroom.revision,input.revision,input.draftRevision,input.quiz);}catch(e){return fail(e.message,400,'INVALID_INPUT');}
+      if(!saved)return fail('The draft changed, or a student started the quiz. Reopen before editing.',409,'CONFLICT');
+      return json(await output());
+    }
     if(input.draftRevision!==undefined){
       const draft=await readQuizDraft(env,classId,lessonId);
       if(!draft || draft.revision!==input.draftRevision || draft.courseRevision!==classroom.revision || draft.quizRevision!==(quiz?.revision || 0))return fail('The AI draft or course changed. Reopen the quiz and generate a fresh draft before assigning.',409,'CONFLICT');

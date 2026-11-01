@@ -92,7 +92,7 @@ export default {
           if (!response.ok) return unavailable();
           const html = await response.text();
           return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8',
-            'Content-Security-Policy': role==='teacher' && env.GOOGLE_DRIVE_CLIENT_ID ? "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; font-src 'self'; img-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com; frame-src https://accounts.google.com/gsi/; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" : "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
+            'Content-Security-Policy': role==='teacher' && env.GOOGLE_DRIVE_CLIENT_ID ? "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; font-src 'self'; img-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com https://forms.googleapis.com; frame-src https://accounts.google.com/gsi/; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" : "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
         } catch {
           console.error('Ink Wire workspace access check failed.');
           return unavailable();
