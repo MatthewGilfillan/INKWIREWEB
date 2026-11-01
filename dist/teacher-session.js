@@ -16,7 +16,7 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
 });
-const tabs=[['students','Students'],['overview','Course overview'],['calendar','Calendar'],['timeline','Timeline']];
+const tabs=[['students','Students'],['overview','Course overview'],['calendar','Calendar'],['timeline','Timeline'],['notebooks','Notebooks']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
   <div class="class-workspace-heading"><div><label for="selected-class">Class</label><select id="selected-class"></select><p id="selected-class-detail"></p></div><span class="class-badge" id="class-membership"></span></div>
   <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='students'}" tabindex="${id==='students'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
@@ -57,6 +57,7 @@ async function showClassTab(tab,button,lessonIndex){
   for(const [id]of tabs){const selected=id===tab;$('#class-tab-'+id).setAttribute('aria-selected',String(selected));$('#class-tab-'+id).tabIndex=selected?0:-1;$('#class-panel-'+id).hidden=!selected;}
   if(tab==='students')await loadRoster(activeClassId);
   if(tab==='overview')await coursePlanner.open(activeClassId,button,lessonIndex);
+  if(tab==='notebooks')$('#class-panel-notebooks').innerHTML=`<h2>Class notebooks</h2><p>Open student notebooks for this class. Edits appear in the student and linked parent views.</p><a class="teacher-button" href="/notebooks?classId=${escape(activeClassId)}">Open class notebooks →</a><p><a class="text-button" href="/worksheets?class=${escape(activeClassId)}">PDF worksheet library →</a></p>`;
   if(tab==='calendar')await classCalendar.refresh();
   if(tab==='timeline')await teacherTimeline.open(activeClassId,null,button);
 }

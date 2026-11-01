@@ -1,3 +1,5 @@
+import {handleNotebooks} from './notebooks.mjs';
+import {handleWorksheets} from './worksheets.mjs';
 import {handleCourseResources} from './course-resources.mjs';
 import {handleCoursePreparation} from './course-preparation.mjs';
 import {handleQuizAssistant} from './quiz-assistant.mjs';
@@ -77,6 +79,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
+      if (['/notebooks','/notebooks/','/notebooks.html'].includes(url.pathname)) {
+        if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/notebooks${url.search}`);
+        if(!await ready(env))return unavailable();
+        const session=await createAuth(env).api.getSession({headers:request.headers});
+        if(!session?.user?.emailVerified)return privateRedirect('/account');
+        if(!['teacher','student','parent'].includes(session.user.requestedRole))return privateRedirect('/account?manage=1');
+        if(url.pathname!=='/notebooks')return privateRedirect('/notebooks'+url.search);
+        const response=await env.ASSETS.fetch(new Request(new URL('/notebooks',env.APP_ORIGIN)));
+        return new Response(response.body,{headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
+          'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'none'"}});
+      }
+      if (['/worksheets','/worksheets/','/worksheets.html'].includes(url.pathname)) {
+        if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/worksheets${url.search}`);
+        if(!await ready(env))return unavailable();
+        try {
+        const session=await createAuth(env).api.getSession({headers:request.headers});
+        if(!session?.user?.emailVerified)return privateRedirect('/account');
+        if(url.pathname!=='/worksheets')return privateRedirect('/worksheets'+url.search);
+        const response=await env.ASSETS.fetch(new Request(new URL('/worksheets',env.APP_ORIGIN)));
+        return new Response(response.body,{status:response.status,headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
+          'Content-Security-Policy':"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' blob: data:; img-src 'self' blob: data:; connect-src 'self' blob:; form-action 'self'; frame-ancestors 'self'; base-uri 'none'"}});
+        } catch { return unavailable(); }
+      }
       const workspaceMatch = url.pathname.match(/^\/(teacher|student|parent)(?:\.html)?\/?$/);
       if (workspaceMatch) {
         const role = workspaceMatch[1], destination = '/' + role;
@@ -119,6 +144,8 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if(url.pathname==='/api/notebooks'||url.pathname.startsWith('/api/notebooks/')){const session=await auth.api.getSession({headers:request.headers});return await handleNotebooks(request,env,session?.user);}
+      if(url.pathname==='/api/worksheets'||url.pathname.startsWith('/api/worksheets/')){const session=await auth.api.getSession({headers:request.headers});return await handleWorksheets(request,env,session?.user);}
       if (url.pathname==='/api/drive-config' && request.method==='GET') {
         const session=await auth.api.getSession({headers:request.headers});
         if(!session?.user?.emailVerified || session.user.requestedRole!=='teacher')return fail('Teacher access required.',403,'FORBIDDEN');

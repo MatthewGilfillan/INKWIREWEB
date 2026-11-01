@@ -674,3 +674,12 @@ test('transcript summary sends the entire file to OpenAI only for a verified tea
     const failed=await f.request(route,body,teacher);assert.equal(failed.status,502);const error=await failed.json();assert.equal(error.providerCode,'model_not_found');assert.ok(!JSON.stringify(error).includes('Sensitive'));
   }finally{global.fetch=originalFetch;f.db.close();}
 });
+
+test('notebook and PDF routes require the website session, including HTML aliases',async()=>{
+ const f=await fixture();try{
+  for(const path of ['/notebooks','/notebooks/','/notebooks.html','/worksheets','/worksheets/','/worksheets.html'])assert.equal((await f.request(path)).headers.get('Location'),'/account');
+  for(const path of ['/api/notebooks','/api/worksheets'])assert.equal((await f.request(path)).status,401);
+  await f.signup();await f.activate();const cookies=f.cookie(await f.post('signin',{email:EMAIL,password:PASSWORD}));
+  for(const path of ['/notebooks','/worksheets']){const page=await f.request(path,undefined,{Cookie:cookies});assert.equal(page.status,200);assert.equal(page.headers.get('Cache-Control'),'no-store');assert.match(page.headers.get('Content-Security-Policy'),/frame-ancestors 'self'/);}
+ }finally{f.db.close();}
+});

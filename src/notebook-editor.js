@@ -24,7 +24,7 @@ function destroy() {
   activeProvider = undefined;
 }
 
-function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople }) {
+function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople, ydoc, readOnly = false }) {
   destroy();
   let connection;
   const sharedDocument = shared && demoDocument(shared.key);
@@ -44,8 +44,8 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...(shared ? { undoRedo: false } : {}) }),
-      ...(shared ? [
+    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+      ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
           name: shared.role === 'teacher' ? 'Teacher · demo' : 'Alex · student demo',
@@ -53,7 +53,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
         } }),
       ] : [])],
     // Never seed a shared document from existing browser-local work.
-    ...(shared ? { editable: false } : { content: notebookContent(document, text) }),
+    ...(shared ? { editable: false } : ydoc ? { editable: !readOnly } : { editable: !readOnly, content: notebookContent(document, text) }),
     enableContentCheck: true,
     editorProps: {
       attributes: { class: 'inkwire-editor', role: 'textbox', 'aria-label': label,
@@ -115,4 +115,4 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
 }
 
 window.InkWireEditor = { mount, destroy, hasPendingChanges,
-  getText: () => activeEditor?.getText() || '' };
+  getText: () => activeEditor?.getText() || '', setEditable: value => activeEditor?.setEditable(value) };

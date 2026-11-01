@@ -3,7 +3,7 @@ import {api,escape,signOut} from './workspace-shared.js';
 const role=document.body.dataset.memberRole,list=document.querySelector('#class-list'),status=document.querySelector('#dashboard-status'),retry=document.querySelector('#retry-classes');
 let loading=false;
 const timeline=createMemberCourse({parent:role==='parent'});
-const card=(c,learnerId='')=>`<article class="member-class"><span class="class-badge">Enrolled</span><h2>${escape(c.name)}</h2><p>${escape(c.subject || 'Class')}</p><button type="button" class="teacher-button" data-member-course="${escape(c.id)}" data-learner="${escape(learnerId)}">Course timeline &amp; feedback</button></article>`;
+const card=(c,learnerId='')=>`<article class="member-class"><span class="class-badge">Enrolled</span><h2>${escape(c.name)}</h2><p>${escape(c.subject || 'Class')}</p><button type="button" class="teacher-button" data-member-course="${escape(c.id)}" data-learner="${escape(learnerId)}">Course timeline &amp; feedback</button><a class="teacher-button secondary" href="/notebooks?classId=${escape(c.id)}${learnerId?'&amp;notebookId='+escape(c.id)+'.'+escape(learnerId):''}">${role==='parent'?'View live notebook':'Open my notebook'} →</a></article>`;
 async function load(){
   if(loading)return;loading=true;retry.hidden=true;
   try{
