@@ -1,3 +1,4 @@
+import {validateScheduleFields,validateLessonSchedule} from './schedule-model.mjs';
 // Shared by the teacher planner and its authenticated API.
 export const presets = [
   { id: 'combined', name: 'Literature & essay writing', description: 'Read closely, discuss ideas and build a literary essay.', overview: 'Students develop thoughtful interpretations of literature through close reading and discussion, then shape those ideas into clear, well-supported essays. The course moves from short analytical responses to independent drafting, feedback and revision.' },
@@ -56,7 +57,9 @@ export function defaults(title = '') {
 export function courseSummary(course) {
   const count = course.lessonCount ?? course.weeks * course.lessonsPerWeek;
   const schedule = course.pacing === 'lessons' ? `${count} lessons · dates to arrange` : `${course.weeks} weeks · ${course.lessonsPerWeek} lesson${course.lessonsPerWeek === 1 ? '' : 's'}/week`;
-  return `${schedule} · ${course.lessonMinutes} min · ${Number((count * course.lessonMinutes / 60).toFixed(1))} teaching hours`;
+  const cancelled=course.lessons?.filter(l=>l.status==='cancelled').length || 0,minutes=course.lessons?.length?course.lessons.reduce((sum,l)=>sum+(l.status==='cancelled'?0:l.lessonMinutes ?? course.lessonMinutes),0):count*course.lessonMinutes;
+  const varied=course.lessons?.some(l=>l.lessonMinutes && l.lessonMinutes!==course.lessonMinutes);
+  return `${schedule} · ${varied?'varied lesson lengths':course.lessonMinutes+' min'} · ${Number((minutes / 60).toFixed(1))} teaching hours${cancelled?' · '+cancelled+' cancelled':''}`;
 }
 export function lessonDate(course, index) {
   return course.pacing === 'lessons' ? '' : addDays(course.startDate, Math.floor(index / course.lessonsPerWeek) * 7 + Math.floor((index % course.lessonsPerWeek) * 7 / course.lessonsPerWeek));
@@ -115,7 +118,7 @@ export function validateCourse(value) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value.startTime)) throw Error('Choose a valid lesson time.');
   try { if (typeof value.timeZone !== 'string' || value.timeZone.length > 80) throw Error(); new Intl.DateTimeFormat('en', { timeZone: value.timeZone }); }
   catch { throw Error('Choose a valid time zone.'); }
-  Object.assign(course, { startDate: value.startDate, startTime: value.startTime, timeZone: value.timeZone });
+  Object.assign(course, { startDate: value.startDate, startTime: value.startTime, timeZone: value.timeZone }, validateScheduleFields(value));
   if (!Array.isArray(value.lessons) || value.lessons.length !== (course.lessonCount ?? course.weeks * course.lessonsPerWeek) || value.lessons.length > 156) throw Error('Generate the weekly plan after changing the course length.');
   const lessonIds = new Set();
   course.lessons = value.lessons.map((lesson, i) => {
@@ -125,7 +128,7 @@ export function validateCourse(value) {
     lessonIds.add(id);
     const result = { ...(lesson.id ? {id:lesson.id} : {}), week: lesson.week, slot: lesson.slot, date: lesson.date, title: text(lesson.title, 160, 'lesson topic', true), goal: text(lesson.goal, 1200, 'learning goals'), reading: text(lesson.reading, 1200, 'reading'), homework: text(lesson.homework, 1200, 'homework') };
     for (const [key, max] of [['section', 160], ['skills', 2000], ['activities', 4000], ['evidence', 2000], ['sourcePages', 80]]) if (lesson[key] !== undefined) result[key] = text(lesson[key], max, key);
-    return result;
+    return {...result,...validateLessonSchedule(lesson)};
   });
   if (new TextEncoder().encode(JSON.stringify(course)).byteLength > 120000) throw Error('This overview is too long. Shorten the lesson notes before saving.');
   return course;

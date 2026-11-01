@@ -27,7 +27,7 @@ test('teacher previews, discards and accepts AI content without autosaving; stal
     }
     return route.fulfill({status:404,json:{}});
   });
-  async function open(){await page.locator(`[data-class-id="${id}"]>summary`).click();await page.getByRole('button',{name:/Build course overview|Edit course overview/}).click();await page.locator('#course-form').waitFor({state:'visible'});}
+  async function open(){await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('#course-form').waitFor({state:'visible'});}
   async function generate(){await page.locator('#ai-planning-brief').fill('Create an age-appropriate literature and essay course.');await page.getByRole('button',{name:'Generate suggestion',exact:true}).click();await page.locator('[data-ai-preview]').waitFor({state:'visible'});}
   try{
     await page.goto('http://127.0.0.1:8788/teacher.html');await open();
@@ -46,10 +46,10 @@ test('teacher previews, discards and accepts AI content without autosaving; stal
     assert.equal(await page.locator('#lesson-0-title').inputValue(),'Teacher edit after preview');assert.equal(saves,1);
     fail=false;release={};await page.getByRole('button',{name:'Generate suggestion',exact:true}).click();
     await page.getByText(/Drafting your suggestion/).waitFor();assert.equal(await page.locator('#lesson-0-title').isEnabled(),false);
-    page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Close course overview'}).click();
+    await page.getByRole('tab',{name:'Students',exact:true}).click();
     release.resolve();release=null;
-    await page.getByRole('button',{name:'Edit course overview'}).click();await page.locator('#course-form').waitFor({state:'visible'});
-    assert.equal(await page.locator('#lesson-0-title').inputValue(),'Generated lesson 1');assert.equal(await page.locator('[data-ai-preview]').isVisible(),false);
+    await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('[data-ai-preview]').waitFor({state:'visible'});
+    assert.equal(await page.locator('#lesson-0-title').inputValue(),'Teacher edit after preview');
     assert.equal(await page.locator('#lesson-0-title').isEnabled(),true);
     await page.setViewportSize({width:390,height:844});
     if(!await page.locator('.course-assistant>details').evaluate(el=>el.open))await page.getByText('Plan with AI',{exact:false}).click();

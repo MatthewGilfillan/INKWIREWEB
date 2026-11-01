@@ -1,0 +1,46 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {chromium}=require('playwright');
+const first='11111111-1111-4111-8111-111111111111',second='22222222-2222-4222-8222-222222222222';
+test('class tabs preserve drafts, isolate students and calendar, and expose honest quick facts on mobile',async()=>{
+ const {defaults,generateLessons}=await import('../../dist/course-model.mjs');const {projectCalendar}=await import('../../dist/calendar-model.mjs');
+ const course={...defaults('Literature & essays'),weeks:2,startDate:'2026-11-03'};course.lessons=generateLessons(course);
+ const classes=[{id:first,name:'Literature & essays',membership:'owner',course,revision:1},{id:second,name:'Summer literature',membership:'teacher',course:{...course,title:'Summer literature'},revision:1}];
+ const students=[{id:'a',name:'Alice Example',connected:true,parents:[{id:'p',name:'Parent Example'}],courses:[{id:first,name:'Literature & essays'}],attendance:{present:3,absent:1,recorded:4,rate:75}},{id:'b',name:'Ben Example',connected:false,parents:[],demoParent:true,attendance:{recorded:0,rate:null}}];
+ const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROME_CHANNEL?{channel:process.env.PLAYWRIGHT_CHROME_CHANNEL}:{})});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(8000);
+ await page.route('**/api/**',async route=>{const url=new URL(route.request().url()),p=url.pathname;
+  if(p==='/api/classes')return route.fulfill({json:{classes}});
+  if(p.endsWith('/roster'))return route.fulfill({json:{students:p.includes(first)?students:[]}});
+  if(p==='/api/classes/calendar')return route.fulfill({json:projectCalendar(classes,url.searchParams.get('from'),url.searchParams.get('to'),url.searchParams.get('timeZone'))});
+  if(p.endsWith('/timeline'))return route.fulfill({json:{teacher:true,serverNow:Date.now(),className:'Literature & essays',course:{...course,lessons:course.lessons.map((l,i)=>({...l,id:'legacy-'+(i+1),number:i+1,endsAt:Date.now()+86400000,report:null}))}}});
+  if(p.endsWith('/overview'))return route.fulfill({json:{course:classes.find(c=>p.includes(c.id)).course,revision:1,serverNow:Date.now()}});
+  if(p.endsWith('/planning-assistant'))return route.fulfill({json:{available:false}});
+  return route.fulfill({status:404,json:{}});
+ });
+ try{
+  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('rowheader',{name:'Alice Example'}).waitFor();
+  assert.match(await page.locator('.student-table').innerText(),/75%/);assert.match(await page.locator('.student-table').innerText(),/3 \/ 4 recorded lessons/);
+  assert.match(await page.locator('[data-student-row="b"]').innerText(),/Not recorded yet/);assert.match(await page.locator('[data-student-row="b"]').innerText(),/Not linked/);
+  assert.match(await page.locator('[data-student-row="a"]').innerText(),/Not tracked yet/);
+  await page.locator('#student-search').fill('ben');assert.equal(await page.locator('tbody tr').count(),1);await page.locator('#student-search').fill('');
+  await page.screenshot({path:'/tmp/inkwire-students-tab.png',fullPage:true});
+  await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('#course-form').waitFor({state:'visible'});
+  await page.locator('#course-title').fill('My unsaved course draft');await page.getByRole('tab',{name:'Timeline',exact:true}).click();await page.locator('.timeline-lesson').first().waitFor();
+  assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('#class-panel-timeline').isVisible(),true);
+  await page.screenshot({path:'/tmp/inkwire-timeline-tab.png',fullPage:true});
+  await page.getByRole('tab',{name:'Course overview',exact:true}).click();assert.equal(await page.locator('#course-title').inputValue(),'My unsaved course draft');
+  page.once('dialog',d=>d.dismiss());await page.locator('#selected-class').selectOption(second);assert.equal(await page.locator('#selected-class').inputValue(),first);
+  page.once('dialog',d=>d.accept());await page.locator('#selected-class').selectOption(second);await page.getByText('No students yet.',{exact:false}).waitFor();
+  assert.equal(await page.locator('#selected-class-settings').isVisible(),false);
+  await page.locator('#selected-class').selectOption(first);await page.locator('#course-form').waitFor({state:'visible'});assert.equal(await page.locator('#course-title').inputValue(),'Literature & essays');
+  await page.getByRole('tab',{name:'Calendar',exact:true}).click();await page.locator('#class-panel-calendar [data-cal=month]').fill('2026-11');
+  await page.locator('#class-panel-calendar .calendar-event').first().waitFor();assert.equal(await page.locator('#class-panel-calendar .calendar-event').count(),2);assert.ok(!(await page.locator('#class-panel-calendar').innerText()).includes('Summer literature'));
+  await page.locator('#class-panel-calendar .calendar-event').first().click();assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');
+  await page.getByRole('tab',{name:'Students',exact:true}).click();await page.locator('#class-panel-students').waitFor({state:'visible'});await page.locator('.student-table-scroll').waitFor({state:'visible'});await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.locator('#selected-roster[aria-busy=false]').waitFor();
+  await page.waitForFunction(()=>{const el=document.querySelector('.student-table-scroll');return el && el.clientWidth>0 && el.scrollWidth>el.clientWidth;});
+  await page.screenshot({path:'/tmp/inkwire-students-tab-mobile.png',fullPage:true});
+  await page.getByRole('tab',{name:'Students',exact:true}).focus();await page.keyboard.press('ArrowRight');assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('dialog[open]').count(),0);assert.deepEqual(await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(el=>el.id);return ids.filter((id,i)=>ids.indexOf(id)!==i);}),[]);assert.deepEqual(errors,[]);
+ }finally{await browser.close();}
+});

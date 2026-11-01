@@ -82,3 +82,36 @@ test('published lessons retain stable identifiers and teachers can publish manua
  const {handleCourseOverview}=await import('../cloudflare/course-overviews.mjs');const replaced=structuredClone(f.course);replaced.lessons[0].id=crypto.randomUUID();const req=new Request(origin+'/api/classes/'+classId+'/overview',{method:'POST',headers:{Origin:origin},body:JSON.stringify({course:replaced,revision:1})});assert.equal((await handleCourseOverview(req,f.env,teachers.owner,classId,f.helpers)).status,409);
  }finally{Date.now=clock;global.fetch=fetch;f.db.close();}
 });
+
+test('teacher roster counts published attendance only and never exposes other teachers’ classes',async()=>{
+ const f=await fixture();
+ try{
+  const {handleEnrollment}=await import('../cloudflare/enrollment.mjs');
+  const route=(user=teachers.owner)=>handleEnrollment(new Request(origin+'/api/enrollment/classes/'+classId+'/roster'),f.env,user,f.helpers);
+  const insert=f.db.prepare('INSERT INTO lesson_feedback(class_id,lesson_id,draft,published,updated_by,updated_at) VALUES(?,?,?,?,?,0)');
+  insert.run(classId,'legacy-1',JSON.stringify(draft),JSON.stringify({students:{a:{attendance:'present'},b:{attendance:'absent'}}}),'t');
+  insert.run(classId,'orphan-lesson',JSON.stringify(draft),JSON.stringify({students:{a:{attendance:'absent'}}}),'t');
+  f.db.prepare('INSERT INTO classes(id,owner_id,name,subject,request_id,created_at) VALUES(?,?,?,?,?,0)').run('secret','u','Another teacher’s PRIVATE course','','private');
+  f.db.prepare('INSERT INTO class_students VALUES(?,?,0)').run('secret','a');
+  let result=await (await route()).json();
+  assert.deepEqual(result.students[0].attendance,{present:1,absent:0,recorded:1,rate:100});
+  assert.deepEqual(result.students[1].attendance,{present:0,absent:1,recorded:1,rate:0});
+  assert.equal(result.students[0].homework.rate,null);assert.equal(result.students[0].homework.tracked,false);
+  assert.deepEqual(result.students[0].courses,[{id:classId,name:'Fictional Animal Farm'}]);
+  assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+  assert.equal((await route(teachers.other)).status,404);assert.equal((await route(teachers.parent)).status,404);
+  f.db.prepare('UPDATE lesson_feedback SET published=NULL').run();
+  result=await (await route()).json();assert.deepEqual(result.students[0].attendance,{present:0,absent:0,recorded:0,rate:null});
+ }finally{f.db.close();}
+});
+
+test('published lesson dates and attendance cannot be erased through rescheduling or cancellation',async()=>{
+ const f=await fixture(),clock=Date.now,fetch=global.fetch;Date.now=()=>end;global.fetch=async()=>provider();
+ try{
+  await f.request('lessons/legacy-1',f.body());const {handleCourseOverview}=await import('../cloudflare/course-overviews.mjs');
+  const save=course=>handleCourseOverview(new Request(origin+'/api/classes/'+classId+'/overview',{method:'POST',headers:{Origin:origin},body:JSON.stringify({course,revision:1})}),f.env,teachers.owner,classId,f.helpers);
+  const cancelled=structuredClone(f.course);cancelled.lessons[0].status='cancelled';assert.equal((await save(cancelled)).status,409);
+  const rescheduled=structuredClone(f.course);rescheduled.lessons[0].startTime='20:00';assert.equal((await save(rescheduled)).status,409);
+  const unchanged=structuredClone(f.course);unchanged.lessons[0].startTime=unchanged.startTime;unchanged.lessons[0].lessonMinutes=unchanged.lessonMinutes;unchanged.billingMode='packs';assert.equal((await save(unchanged)).status,200);
+ }finally{Date.now=clock;global.fetch=fetch;f.db.close();}
+});

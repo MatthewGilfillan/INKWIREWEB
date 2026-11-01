@@ -1,5 +1,6 @@
 import { digest } from './auth.mjs';
 import { isTeacher, limitClassAction } from './classes.mjs';
+import { addRosterProgress } from './roster-progress.mjs';
 
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const cleanCode = code => typeof code === 'string' ? code.replace(/[\s-]/g, '').toUpperCase() : '';
@@ -63,6 +64,7 @@ export async function handleEnrollment(request, env, user, {json, fail, readJSON
     if (teacher && roster && await classAccess(env,user,roster[1])) {
       const students = (await env.DB.prepare(`SELECT l.id, l.display_name AS name, l.user_id IS NOT NULL AS connected, EXISTS(SELECT 1 FROM demo_parent_profiles d WHERE d.learner_id=l.id AND d.class_id=s.class_id) AS demoParent FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(roster[1]).all()).results;
       for (const student of students) student.parents=(await env.DB.prepare('SELECT parent_id AS id, parent_name AS name FROM learner_parents WHERE learner_id=? ORDER BY connected_at').bind(student.id).all()).results;
+      await addRosterProgress(env,user,roster[1],students);
       return json({students});
     }
     return fail('Not found.',404,'NOT_FOUND');
