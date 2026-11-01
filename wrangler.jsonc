@@ -25,7 +25,10 @@
       "/worksheets.html",
       "/notebooks",
       "/notebooks/",
-      "/notebooks.html"
+      "/notebooks.html",
+      "/profile",
+      "/profile/",
+      "/profile.html"
     ],
     "not_found_handling": "404-page"
   },

@@ -9,7 +9,7 @@ async function load(){
   try{
     const data=await api('/api/enrollment/mine');
     if(role==='student')list.innerHTML=data.classes.length?data.classes.map(c=>card(c,data.learner?.id || '')).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Use your teacher’s invitation link or join code to connect to your class.</p></div>';
-    else list.innerHTML=data.children.length?data.children.map(child=>`<h2 class="child-heading">${escape(child.name)}</h2>${child.classes.length?child.classes.map(c=>card(c,child.id)).join(''):'<p>Your parent connection is active. This student has no classes yet.</p>'}`).join(''):'<div class="empty-classes"><h2>Connect to your child</h2><p>Use the parent invitation your teacher shared. You’ll see your child’s classes here once connected.</p></div>';
+    else list.innerHTML=data.children.length?data.children.map(child=>`<h2 class="child-heading"><img class="profile-face" src="/api/profiles/learners/${encodeURIComponent(child.id)}/image" alt="" loading="lazy">${escape(child.name)}</h2>${child.classes.length?child.classes.map(c=>card(c,child.id)).join(''):'<p>Your parent connection is active. This student has no classes yet.</p>'}`).join(''):'<div class="empty-classes"><h2>Connect to your child</h2><p>Use the parent invitation your teacher shared. You’ll see your child’s classes here once connected.</p></div>';
     status.textContent='';
   }catch(error){list.replaceChildren();if(error.status===401)location.replace('/account');status.textContent=error.message;retry.hidden=false;}finally{loading=false;}
 }
