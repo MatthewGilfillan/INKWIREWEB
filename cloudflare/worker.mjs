@@ -1,3 +1,4 @@
+import {handleProfile} from './profiles.mjs';
 import {handleNotebooks} from './notebooks.mjs';
 import {handleWorksheets} from './worksheets.mjs';
 import {handleCourseResources} from './course-resources.mjs';
@@ -79,6 +80,19 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
+      if (['/profile','/profile/','/profile.html'].includes(url.pathname)) {
+        if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/profile`);
+        if(!await ready(env))return unavailable();
+        try {
+          const session=await createAuth(env).api.getSession({headers:request.headers});
+          if(!session?.user?.emailVerified)return privateRedirect('/account?manage=1');
+          if(url.pathname!=='/profile')return privateRedirect('/profile');
+          const response=await env.ASSETS.fetch(new Request(new URL('/profile',env.APP_ORIGIN)));
+          return new Response(response.body,{status:response.status,headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
+            'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"}});
+        } catch { return unavailable(); }
+      }
+
       if (['/notebooks','/notebooks/','/notebooks.html'].includes(url.pathname)) {
         if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/notebooks${url.search}`);
         if(!await ready(env))return unavailable();
@@ -144,6 +158,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname.startsWith('/api/profiles/')) {
+        const session=await auth.api.getSession({headers:request.headers});
+        return await handleProfile(request,env,session?.user,{json,fail,readJSON});
+      }
       if(url.pathname==='/api/notebooks'||url.pathname.startsWith('/api/notebooks/')){const session=await auth.api.getSession({headers:request.headers});return await handleNotebooks(request,env,session?.user);}
       if(url.pathname==='/api/worksheets'||url.pathname.startsWith('/api/worksheets/')){const session=await auth.api.getSession({headers:request.headers});return await handleWorksheets(request,env,session?.user);}
       if (url.pathname==='/api/drive-config' && request.method==='GET') {

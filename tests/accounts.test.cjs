@@ -683,3 +683,18 @@ test('notebook and PDF routes require the website session, including HTML aliase
   for(const path of ['/notebooks','/worksheets']){const page=await f.request(path,undefined,{Cookie:cookies});assert.equal(page.status,200);assert.equal(page.headers.get('Cache-Control'),'no-store');assert.match(page.headers.get('Content-Security-Policy'),/frame-ancestors 'self'/);}
  }finally{f.db.close();}
 });
+
+test('profile pages and APIs use the authenticated account and reject large or cross-site saves',async()=>{
+ const f=await fixture();try{
+  for(const path of ['/profile','/profile/','/profile.html'])assert.equal((await f.request(path)).headers.get('Location'),'/account?manage=1');
+  for(const path of ['/api/profiles/me','/api/profiles/me/image','/api/profiles/learners/a/image'])assert.equal((await f.request(path)).status,401);
+  const owner=await signInAs(f,'profile-owner@example.invalid','student'),other=await signInAs(f,'profile-other@example.invalid','parent');
+  const page=await f.request('/profile',undefined,owner);assert.equal(page.status,200);assert.equal(page.headers.get('Cache-Control'),'no-store');assert.match(page.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
+  const {avatarPreset}=await import('../dist/avatar-model.mjs');const body={kind:'avatar',avatar:avatarPreset('bear'),revision:0,userId:'other'};
+  assert.equal((await f.request('/api/profiles/me',body,{...owner,Origin:'https://other.invalid'})).status,403);
+  assert.equal((await f.request('/api/profiles/me',{...body,extra:'a'.repeat(280001)},owner)).status,400);
+  assert.equal((await f.request('/api/profiles/me',body,owner)).status,200);
+  assert.equal((await(await f.request('/api/profiles/me',undefined,owner)).json()).avatar.head,'bear');
+  assert.equal((await(await f.request('/api/profiles/me',undefined,other)).json()).kind,'none');
+ }finally{f.db.close();}
+});
