@@ -1,0 +1,70 @@
+import {createDriveCourseImport} from './drive-course-import.js';
+import {api,escape,requestId} from './workspace-shared.js';
+import {formats,useFormat} from './course-formats.mjs';
+import {generateLessons,validateCourse} from './course-model.mjs';
+import {courseIcon} from './course-overview.js';
+export function createCoursePreparation({root,getClassId,getRevision,getDraft,applyDraft,onBusy=()=>{}}){
+  root.classList.add('course-preparation');
+  root.innerHTML=`<div class="preparation-heading"><div><p class="teacher-eyebrow">FROM YOUR TEACHING MATERIALS</p><h3>Prepare Course with AI</h3></div><span class="class-badge">Private draft</span></div><p>Upload a unit plan, or your TpT novel study and supporting resources. One preparation builds the overview, lesson activities, reading, homework and pre-lesson quiz drafts.</p>
+    <div class="planner-grid"><label>Unit plan / overview<input type="file" data-prep-plan accept=".pdf,.doc,.docx,.txt"></label><label>Book and supporting resources<input type="file" data-prep-files multiple accept=".pdf,.doc,.docx,.csv,.xls,.xlsx,.txt,.vtt"></label></div>
+    <details class="planner-source"><summary>Upload a resource folder</summary><p>Choose a folder on this computer, including a folder synced by Google Drive. Supported documents are included; other files are skipped.</p><input type="file" data-prep-folder webkitdirectory multiple aria-label="Choose resource folder"><p data-prep-folder-note></p></details>
+    <div data-prep-drive></div><div data-prep-resources></div><p class="planner-hint">PDF, Word, CSV, Excel, TXT or VTT · up to 8 files / 40 MiB per course, 20 MiB each. Files are sent to OpenAI and kept as private course resources until removed in the editor. For scanned documents or diagrams, use PDF. Spreadsheets use the first 1,000 rows per sheet.</p>
+    <div class="planner-grid"><label>Teaching format<select data-prep-format>${formats.map(f=>`<option value="${f.id}">${escape(f.name)}</option>`).join('')}</select></label><label>Course length<select data-prep-length><option value="source">Read lesson count from the unit plan</option><option value="settings">Use my lesson count</option></select></label><label>Lessons<input type="number" data-prep-count min="1" max="30" value="15"></label><label>Minutes per lesson<input type="number" data-prep-minutes min="15" max="240" value="120"></label><label>Questions per quiz<select data-prep-questions><option>3</option><option selected>5</option><option>8</option><option>10</option></select></label></div>
+    <label>Instructions for this course <span>(optional)</span><textarea data-prep-brief maxlength="3000" rows="3" placeholder="For example: follow this unit plan closely; combine literature study with essay writing. For a TpT study, include author pre-reading and the final writing activity."></textarea></label>
+    <div class="teacher-actions"><button type="button" class="teacher-button" data-prep-start>Prepare whole course</button><button type="button" class="teacher-button secondary" data-prep-resume hidden>Resume preparation</button><button type="button" class="text-button" data-prep-refresh>Refresh draft</button><button type="button" class="text-button" data-prep-stop hidden>Pause after this step</button></div><p data-prep-status role="status" aria-live="polite"></p><progress data-prep-progress value="0" max="1" hidden aria-label="Course preparation progress"></progress><div data-prep-review></div>`;
+  const $=s=>root.querySelector(s);let busy=false,epoch=0,state=null,available=false,stop=false,resources=[],appliedId=null;
+  const uploadedSelections=new Set();
+  const selectionKey=x=>[x.kind,x.file.name,x.file.size,x.file.lastModified].join('|');
+  const drive=createDriveCourseImport({root:$('[data-prep-drive]'),getClassId,getResources:()=>resources,onImported:value=>{resources=value;render();},onBusy:value=>{onBusy(value);$('[data-prep-start]').disabled=value || !available;}});
+  const path=()=>`/api/course-preparation/classes/${getClassId()}`;
+  const remaining=()=>state?.course?.lessons.filter(l=>l.status!=='cancelled' && !Object.hasOwn(state.quizzes,l.id)).length ?? 1;
+  const message=value=>$('[data-prep-status]').textContent=value;
+  const selectedFiles=()=>[
+    ...[...$('[data-prep-plan]').files].map(file=>({file,kind:'unit-plan'})),
+    ...[...$('[data-prep-files]').files,...$('[data-prep-folder]').files].filter(f=>/\.(pdf|docx?|csv|xlsx?|txt|vtt)$/i.test(f.name)).map(file=>({file,kind:/unit[ -]?plan|overview/i.test(file.name)?'unit-plan':'resource'}))];
+  const controls=()=>root.querySelectorAll('input,select,textarea,button:not([data-prep-stop])');
+  function setBusy(value){busy=value;onBusy(value);controls().forEach(el=>el.disabled=value);$('[data-prep-stop]').hidden=!value;$('[data-prep-start]').disabled=value || !available;}
+  function render(){
+    $('[data-prep-resources]').innerHTML=resources.length?`<p><strong>Resources ready:</strong> ${resources.map(r=>escape(r.filename)).join(' · ')}</p>`:'';
+    $('[data-prep-resume]').hidden=!state || !remaining();
+    $('[data-prep-progress]').hidden=!state;
+    const total=(state?.course?.lessons.filter(l=>l.status!=='cancelled').length || 0)+1;
+    $('[data-prep-progress]').max=total;$('[data-prep-progress]').value=state?.course?total-remaining():0;
+    if(!state?.course){$('[data-prep-review]').replaceChildren();return;}
+    const count=Object.values(state.quizzes).filter(q=>q.draft).length,missing=Object.values(state.quizzes).filter(q=>!q.draft).length;
+    $('[data-prep-review]').innerHTML=`<div class="preparation-result"><h3>${escape(state.course.title)}</h3><p>${state.course.lessons.length} lessons · ${state.course.lessonMinutes} minutes · ${count} quiz drafts${missing?' · '+missing+' need more source material':''}</p><p>${escape(state.course.description)}</p><details class="planner-source" open><summary>Teacher review notes</summary><p class="preparation-text">${escape(state.reviewNotes || 'Review lesson content and quiz answer keys before saving.')}</p></details><p>The outline stays private until you use it in the editor and save the course overview. Quiz drafts stay private until you assign them.</p><div class="teacher-actions"><button type="button" class="teacher-button" data-prep-use>Use plan in editor</button><button type="button" class="text-button" data-prep-attach>Save prepared quiz drafts to the saved overview</button></div>${state.course.lessons.map((l,i)=>{
+      const item=state.quizzes[l.id];return `<details class="preparation-lesson"><summary><span class="overview-number">${String(i+1).padStart(2,'0')}</span><span>${escape(l.title)}</span></summary><div>${[['section','Section'],['goal','Learning goals'],['reading','Before class'],['activities','Lesson activities'],['homework','Homework'],['evidence','Evidence of learning']].filter(([k])=>l[k]).map(([k,label])=>`<p class="preparation-text"><strong>${label}</strong><br>${escape(l[k])}</p>`).join('')}<h4>${courseIcon('quiz')} Quiz draft</h4>${item?.draft?`<p>${escape(item.draft.reviewNotes)}</p><ol>${item.draft.quiz.questions.map((q,n)=>`<li><strong>${escape(q.prompt)}</strong><ul>${q.options.map((o,j)=>`<li>${j===q.correctIndex?'<strong>Correct: ':''}${escape(o)}${j===q.correctIndex?'</strong>':''}</li>`).join('')}</ul><p>${escape(q.explanation)}</p><small>Source: ${escape(item.draft.sources[n])}</small></li>`).join('')}</ol>`:`<p>${escape(item?.notes || (l.status==='cancelled'?'Cancelled lesson.':'Not prepared yet.'))}</p>`}</div></details>`;}).join('')}</div>`;
+  }
+  async function refresh(){const version=epoch;const [data,files]=await Promise.all([api(path()),api(`/api/course-resources/classes/${getClassId()}`)]);if(version!==epoch)return;state=data.preparation;available=data.available;resources=files.resources;render();$('[data-prep-start]').disabled=busy || !available;}
+  async function run(work){if(busy || drive.isBusy())return;stop=false;setBusy(true);const version=epoch;try{await work(version);}catch(e){if(version===epoch){message(e.message+' Completed steps remain saved.');try{await refresh();}catch{}}}finally{if(version===epoch){setBusy(false);render();}}}
+  async function prepareSteps(version){
+    while(version===epoch && state && remaining() && !stop){
+      message(state.course?`Preparing quiz drafts… ${Object.keys(state.quizzes).length} of ${state.course.lessons.filter(l=>l.status!=='cancelled').length} lessons checked. This step may take a few minutes.`:'Reading your materials and preparing the unit plan… This may take a few minutes.');
+      const result=await api(path(),{action:'next',id:state.id},{timeoutMs:155000});if(version!==epoch)return;state=result.preparation;render();setBusy(true);
+    }
+    if(version===epoch)message(stop?'Paused. Completed steps are saved; use Resume preparation to continue.':'Course preparation complete. Review the outline and answer keys below. Lessons needing more source material are marked.');
+  }
+  $('[data-prep-format]').onchange=()=>{const f=formats.find(f=>f.id===$('[data-prep-format]').value);if(f.lessonCount){$('[data-prep-count]').value=f.lessonCount;$('[data-prep-minutes]').value=f.lessonMinutes;$('[data-prep-length]').value=f.id==='upper-primary'?'settings':'source';}};
+  $('[data-prep-folder]').onchange=()=>{const files=[...$('[data-prep-folder]').files],supported=files.filter(f=>/\.(pdf|docx?|csv|xlsx?|txt|vtt)$/i.test(f.name));$('[data-prep-folder-note]').textContent=`${supported.length} supported documents selected; ${files.length-supported.length} other files skipped.`;};
+  $('[data-prep-start]').onclick=()=>run(async version=>{
+    if(state && !confirm('Prepare a new private draft from these resources? This replaces the previous AI preparation, but does not change the saved overview or assigned quizzes.'))return;
+    let base=useFormat(getDraft(),$('[data-prep-format]').value);
+    const count=Number($('[data-prep-count]').value),minutes=Number($('[data-prep-minutes]').value);
+    if(!Number.isInteger(count) || count<1 || count>30 || !Number.isInteger(minutes) || minutes<15 || minutes>240)throw Error('Use 1–30 lessons and 15–240 minutes per lesson.');
+    base={...base,lessonCount:count,lessonMinutes:minutes,weeks:Math.ceil(count/base.lessonsPerWeek)};
+    const template=generateLessons({...base,preset:'blank'});base.lessons=template.map((l,i)=>({...l,...base.lessons[i],week:l.week,slot:l.slot}));base=validateCourse(base);
+    const files=selectedFiles().filter(x=>!uploadedSelections.has(selectionKey(x)));if(files.length+resources.length>8 || files.some(({file})=>!file.size || file.size>20*1024*1024) || files.reduce((sum,x)=>sum+x.file.size,resources.reduce((sum,r)=>sum+r.bytes,0))>40*1024*1024)throw Error('Use up to 8 resources / 40 MiB in total, each 20 MiB or smaller. Manage existing resources in Edit Unit Plan.');
+    for(const {file,kind}of files){message('Uploading '+file.name+'…');const body=new FormData();body.append('file',file);body.append('kind',kind);const result=await api(`/api/course-resources/classes/${getClassId()}`,body,{timeoutMs:110000});if(version!==epoch)return;resources=result.resources;uploadedSelections.add(selectionKey({file,kind}));render();}
+    $('[data-prep-plan]').value='';$('[data-prep-files]').value='';$('[data-prep-folder]').value='';
+    const result=await api(path(),{action:'start',id:requestId(),previousId:state?.id || null,revision:getRevision(),course:base,lengthMode:$('[data-prep-length]').value,questionCount:Number($('[data-prep-questions]').value),brief:$('[data-prep-brief]').value});if(version!==epoch)return;state=result.preparation;appliedId=null;render();setBusy(true);await prepareSteps(version);
+  });
+  $('[data-prep-resume]').onclick=()=>run(async version=>{await refresh();await prepareSteps(version);});
+  $('[data-prep-refresh]').onclick=()=>run(async()=>{await refresh();message(state?.lastError || (state?.busy?'Preparation is running. Refresh again shortly.':state?'Saved preparation loaded.':'No preparation saved yet.'));});
+  $('[data-prep-stop]').onclick=()=>{stop=true;message('Finishing the current step, then pausing.');};
+  async function attach(){if(!state?.course)return null;const result=await api(path(),{action:'attach-quizzes',id:state.id},{timeoutMs:30000});document.dispatchEvent(new CustomEvent('inkwire:quiz-changed',{detail:{classId:getClassId()}}));message(`${result.saved.length} quiz drafts saved for review.${result.skipped.length?' '+result.skipped.length+' unchanged: existing quizzes/drafts or edited lesson content were preserved.':''}`);return result;}
+  root.addEventListener('click',event=>{
+    if(event.target.closest('[data-prep-use]') && !busy && !drive.isBusy() && state?.course){appliedId=state.id;applyDraft(structuredClone(state.course));}
+    if(event.target.closest('[data-prep-attach]') && !busy && !drive.isBusy())run(attach);
+  });
+  return {isBusy:()=>busy || drive.isBusy(),async afterSave(){if(appliedId && appliedId===state?.id)return attach();return null;},reset(){epoch++;drive.reset();uploadedSelections.clear();state=null;busy=false;onBusy(false);appliedId=null;resources=[];root.hidden=true;for(const el of root.querySelectorAll('input[type=file],textarea'))el.value='';render();},async open(){root.hidden=false;const draft=getDraft();$('[data-prep-format]').value=draft.format || 'full';$('[data-prep-count]').value=draft.lessonCount || draft.lessons.length || 15;$('[data-prep-minutes]').value=draft.lessonMinutes;try{await Promise.all([refresh(),drive.load()]);message(state?.lastError || 'Choose your materials, then prepare the whole course.');}catch(e){message(e.message);}root.scrollIntoView({block:'start'});}};
+}

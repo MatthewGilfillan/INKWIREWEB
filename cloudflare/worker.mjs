@@ -1,4 +1,5 @@
 import {handleCourseResources} from './course-resources.mjs';
+import {handleCoursePreparation} from './course-preparation.mjs';
 import {handleQuizAssistant} from './quiz-assistant.mjs';
 import {handleLessonQuiz} from './lesson-quizzes.mjs';
 import { handleLessonFeedback } from './lesson-feedback.mjs';
@@ -91,7 +92,7 @@ export default {
           if (!response.ok) return unavailable();
           const html = await response.text();
           return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8',
-            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
+            'Content-Security-Policy': role==='teacher' && env.GOOGLE_DRIVE_CLIENT_ID ? "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; font-src 'self'; img-src 'self'; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com; frame-src https://accounts.google.com/gsi/; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" : "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" } });
         } catch {
           console.error('Ink Wire workspace access check failed.');
           return unavailable();
@@ -118,9 +119,14 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
-      if (url.pathname.startsWith('/api/course-resources/') || url.pathname.startsWith('/api/quiz-assistant/')) {
+      if (url.pathname==='/api/drive-config' && request.method==='GET') {
+        const session=await auth.api.getSession({headers:request.headers});
+        if(!session?.user?.emailVerified || session.user.requestedRole!=='teacher')return fail('Teacher access required.',403,'FORBIDDEN');
+        return json({clientId:env.GOOGLE_DRIVE_CLIENT_ID || ''});
+      }
+      if (url.pathname.startsWith('/api/course-resources/') || url.pathname.startsWith('/api/quiz-assistant/') || url.pathname.startsWith('/api/course-preparation/')) {
         const session = await auth.api.getSession({headers:request.headers});
-        return await (url.pathname.startsWith('/api/course-resources/') ? handleCourseResources : handleQuizAssistant)(request,env,session?.user,{json,fail,readJSON});
+        return await (url.pathname.startsWith('/api/course-resources/') ? handleCourseResources : url.pathname.startsWith('/api/course-preparation/') ? handleCoursePreparation : handleQuizAssistant)(request,env,session?.user,{json,fail,readJSON});
       }
       if (url.pathname.startsWith('/api/lesson-quizzes/')) {
         const session = await auth.api.getSession({headers:request.headers});
