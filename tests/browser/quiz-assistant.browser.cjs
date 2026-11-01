@@ -21,7 +21,7 @@ test('teacher uploads course resources, generates private quiz drafts, edits and
   return route.fulfill({status:404,json:{message:'Not found'}});
  });
  try{
-  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.getByText('Resources & AI quizzes',{exact:true}).click();
+  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();await page.getByText('Resources & AI quizzes',{exact:true}).click();
   await page.locator('[data-resource-files]').setInputFiles([{name:'Book.txt',mimeType:'text/plain',buffer:Buffer.from('The narrator tells the story. Quotations support interpretations.')},{name:'Unit plan.csv',mimeType:'text/csv',buffer:Buffer.from('lesson,objective\n1,Narrator\n2,Textual evidence')}]);await page.getByRole('button',{name:'Upload resources',exact:true}).click();await page.getByText(/Resources ready/).waitFor();assert.equal(files,2);
   await page.getByRole('button',{name:'Draft quizzes for course',exact:true}).click();await page.getByText('2 quiz drafts ready for review.',{exact:true}).waitFor();assert.equal(generations,1);assert.equal(f.db.prepare('SELECT count(*) n FROM lesson_quizzes').get().n,0);
   await page.locator('.course-quiz-setup').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/inkwire-ai-quiz-course-resources.png'});
