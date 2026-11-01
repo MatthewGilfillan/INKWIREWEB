@@ -15,7 +15,9 @@
   "vars": {
     "APP_ORIGIN": "https://inkwire-education.com",
     "ACCOUNT_EMAIL": "accounts@inkwire-education.com",
-    "ACCOUNTS_ENABLED": "true"
+    "ACCOUNTS_ENABLED": "true",
+    "OPENAI_PLANNING_ENABLED": "true",
+    "OPENAI_PLANNING_MODEL": "gpt-6-sol"
   },
   "d1_databases": [{
     "binding": "DB", "database_name": "inkwire-education",

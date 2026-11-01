@@ -2,6 +2,7 @@ import { digest } from './auth.mjs';
 import { createLearningInvite } from './enrollment.mjs';
 import { handleCourseOverview } from './course-overviews.mjs';
 import { handleCalendar } from './calendar.mjs';
+import { handlePlanningAssistant } from './planning-assistant.mjs';
 
 export const isTeacher = user => user?.emailVerified === true && user.requestedRole === 'teacher';
 const classFields = `c.id, c.name, c.subject, c.created_at AS createdAt,
@@ -20,6 +21,8 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (!user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
   if (!isTeacher(user)) return fail('This workspace is for teacher accounts.', 403, 'FORBIDDEN');
   const path = new URL(request.url).pathname;
+  const planningMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/planning-assistant$/);
+  if (planningMatch) return handlePlanningAssistant(request, env, user, planningMatch[1], { json, fail, readJSON });
   if (path === '/api/classes/calendar') return handleCalendar(request, env, user, { json, fail });
   if (path === '/api/classes/trash' && request.method === 'GET') {
     const rows = await env.DB.prepare('SELECT id, name, subject, deleted_at AS deletedAt FROM classes WHERE owner_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id').bind(user.id).all();

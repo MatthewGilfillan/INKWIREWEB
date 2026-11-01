@@ -3,3 +3,7 @@ ACCOUNT_EMAIL=accounts@inkwire-education.com
 ACCOUNTS_ENABLED=true
 # Generate a fresh random value of at least 32 bytes. Never commit the actual secret.
 BETTER_AUTH_SECRET=
+# Server-only secret. Never put a real key in dist/, Git, or chat.
+OPENAI_API_KEY=
+OPENAI_PLANNING_ENABLED=true
+OPENAI_PLANNING_MODEL=gpt-6-sol

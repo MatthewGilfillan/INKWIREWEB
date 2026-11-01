@@ -34,6 +34,101 @@ async function fixture() {
   return { db, env, mail, request, post, token, signup, activate, cookie };
 }
 
+test('AI planning requires class access and origin, uses a private projection, and never saves a generated draft', async () => {
+  const { defaults, generateLessons } = await import('../dist/course-model.mjs');
+  const f = await fixture(), originalFetch = global.fetch;
+  let calls = 0, payload;
+  try {
+    const owner = await signInAs(f, 'ai-owner@example.invalid'), stranger = await signInAs(f, 'ai-other@example.invalid');
+    const student = await signInAs(f, 'ai-student@example.invalid', 'student');
+    const { classroom } = await (await newClass(f, owner, 'Private class name')).json();
+    const route = `/api/classes/${classroom.id}/planning-assistant`;
+    const course = { ...defaults('A fictional literature course'), weeks: 2, organization: 'Private organisation', sourceNotes: 'Private source note', startDate: '2027-01-05' };
+    course.lessons = generateLessons(course); course.lessons[0].sourcePages = 'Teacher reference';
+    const body = { course, mode: 'course', brief: 'Plan a literature and essay writing course for Grade 6.' };
+    assert.deepEqual(await (await f.request(route, undefined, owner)).json(), {available:false});
+    assert.equal((await f.request(route, body, owner)).status, 503);
+    f.env.OPENAI_API_KEY = 'test-key-never-sent-to-a-network'; f.env.OPENAI_PLANNING_ENABLED = 'true';
+    global.fetch = async (url, init) => {
+      calls++; assert.equal(url, 'https://api.openai.com/v1/responses');
+      assert.equal(init.headers.Authorization, 'Bearer test-key-never-sent-to-a-network');
+      payload = JSON.parse(init.body);
+      const prompt = JSON.parse(payload.input);
+      const result = { description: 'A generated editable course.', reviewNotes: 'Confirm reading assignments.', lessons: prompt.lessons.map(lesson => ({...lesson, title:'Generated lesson '+lesson.number, goal:'Analyse a passage.', reading:'Teacher-selected passage', homework:'Revise a paragraph', skills:'Evidence selection', activities:'10 min: retrieve ideas\n90 min: discussion and writing\n20 min: reflection', evidence:'Exit response'})) };
+      return Response.json({ status:'completed', output:[{type:'message', content:[{type:'output_text', text:JSON.stringify(result)}]}] });
+    };
+    assert.equal((await f.request(route, body)).status, 401);
+    assert.equal((await f.request(route, body, student)).status, 403);
+    assert.equal((await f.request(route, body, stranger)).status, 404);
+    assert.equal((await f.request(route, body, {...owner,Origin:'https://evil.invalid'})).status, 403);
+    assert.equal((await f.request(route, {...body,brief:'x'}, owner)).status, 400);
+    assert.equal((await f.request(route, {...body,course:{...course,lessons:[]}}, owner)).status, 400);
+    assert.equal(calls, 0);
+    const response = await f.request(route, body, owner);
+    assert.equal(response.status, 200, await response.clone().text());
+    const result = await response.json();
+    assert.equal(result.course.lessons[0].title,'Generated lesson 1');
+    assert.equal(result.course.lessons[0].date,'2027-01-05');
+    assert.equal(result.course.lessons[0].sourcePages,'Teacher reference');
+    assert.equal(result.course.organization,'Private organisation');
+    assert.equal(result.course.sourceNotes,'Private source note');
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM course_overviews').get().n,0);
+    assert.equal(payload.store,false); assert.equal(payload.text.format.strict,true); assert.equal(payload.model,'gpt-6-sol');
+    for (const privateValue of ['Private organisation','Private source note','Teacher reference','2027-01-05','ai-owner','Private class name']) assert.ok(!payload.input.includes(privateValue));
+    assert.equal((await f.request(route, body, owner)).status,429);
+    assert.equal(calls,1);
+    f.db.prepare('UPDATE ai_planning_limits SET next_at=0').run();
+    const activityResponse = await f.request(route,{...body,mode:'activities',lessonIndex:1},owner);
+    assert.equal(activityResponse.status,200);
+    const activity = await activityResponse.json();
+    assert.deepEqual(activity.course.lessons[0],course.lessons[0]);
+    for(const key of ['title','goal','reading','homework','date'])assert.equal(activity.course.lessons[1][key],course.lessons[1][key]);
+    assert.match(activity.course.lessons[1].activities,/retrieve/);
+    f.db.prepare('UPDATE ai_planning_limits SET next_at=0, count=30 WHERE key LIKE ?').run('site:%');
+    f.db.prepare('UPDATE ai_planning_limits SET next_at=0 WHERE key LIKE ?').run('teacher:%');
+    assert.equal((await f.request(route,body,owner)).status,429); assert.equal(calls,2);
+    await f.request(`/api/classes/${classroom.id}/delete`,{},owner);
+    assert.equal((await f.request(route,undefined,owner)).status,404);
+    assert.equal((await f.request(route,body,owner)).status,404); assert.equal(calls,2);
+  } finally { global.fetch=originalFetch; f.db.close(); }
+});
+
+test('AI provider errors, refusals and incomplete or malformed drafts preserve the saved course', async () => {
+  const { defaults, generateLessons } = await import('../dist/course-model.mjs');
+  const f=await fixture(), originalFetch=global.fetch;
+  try {
+    const owner=await signInAs(f,'ai-errors@example.invalid');
+    const {classroom}=await(await newClass(f,owner)).json();
+    const course={...defaults('Unchanged saved course'),weeks:1};course.lessons=generateLessons(course);
+    await f.request(`/api/classes/${classroom.id}/overview`,{course,revision:0},owner);
+    f.env.OPENAI_API_KEY='test-only';f.env.OPENAI_PLANNING_ENABLED='true';
+    const body={course,mode:'course',brief:'Create a course plan for this fictional book.'};
+    const route=`/api/classes/${classroom.id}/planning-assistant`;
+    const cases=[
+      [()=>new Response('private-provider-error',{status:500}),502,'AI_PROVIDER_ERROR'],
+      [()=>new Response('private-quota',{status:429}),429,'AI_PROVIDER_ERROR'],
+      [()=>Response.json({status:'completed',output:[{type:'message',content:[{type:'refusal',refusal:'Private reason'}]}]}),422,'AI_REFUSAL'],
+      [()=>Response.json({status:'incomplete',output:[]}),502,'AI_INCOMPLETE'],
+      [()=>Response.json({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'not JSON'}]}]}),502,'AI_GENERATION_FAILED'],
+      [()=>{throw Error('secret test-only');},502,'AI_GENERATION_FAILED'],
+    ];
+    for (const [respond,status,code] of cases) {
+      f.db.prepare('DELETE FROM ai_planning_limits').run();global.fetch=async()=>respond();
+      const response=await f.request(route,body,owner);
+      assert.equal(response.status,status);const result=await response.json();assert.equal(result.code,code);
+      assert.ok(!JSON.stringify(result).includes('private-'));assert.ok(!JSON.stringify(result).includes('test-only'));
+      const saved=await(await f.request(`/api/classes/${classroom.id}/overview`,undefined,owner)).json();
+      assert.deepEqual(saved.course,course);assert.equal(saved.revision,1);
+    }
+    f.db.prepare('DELETE FROM ai_planning_limits').run();
+    global.fetch=async()=>{throw Error('must not be called');};
+    const teacherId=f.db.prepare('SELECT id FROM user WHERE email=?').get('ai-errors@example.invalid').id;
+    const day=Math.floor(Date.now()/86400000);
+    f.db.prepare('INSERT INTO ai_planning_limits VALUES (?,5,0,?)').run(`teacher:${teacherId}:${day}`,Date.now()+86400000);
+    assert.equal((await f.request(route,body,owner)).status,429);
+  } finally {global.fetch=originalFetch;f.db.close();}
+});
+
 test('account creation, one-use activation, secure sign in, and sign out', async () => {
   const f = await fixture();
   try {
