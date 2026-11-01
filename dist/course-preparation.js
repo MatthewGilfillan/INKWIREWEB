@@ -48,11 +48,11 @@ export function createCoursePreparation({root,getClassId,getRevision,getDraft,ap
   $('[data-prep-folder]').onchange=()=>{const files=[...$('[data-prep-folder]').files],supported=files.filter(f=>/\.(pdf|docx?|csv|xlsx?|txt|vtt)$/i.test(f.name));$('[data-prep-folder-note]').textContent=`${supported.length} supported documents selected; ${files.length-supported.length} other files skipped.`;};
   $('[data-prep-start]').onclick=()=>run(async version=>{
     if(state && !confirm('Prepare a new private draft from these resources? This replaces the previous AI preparation, but does not change the saved overview or assigned quizzes.'))return;
-    let base=useFormat(getDraft(),$('[data-prep-format]').value);
+    const original=getDraft();let base=useFormat(original,$('[data-prep-format]').value);
     const count=Number($('[data-prep-count]').value),minutes=Number($('[data-prep-minutes]').value);
     if(!Number.isInteger(count) || count<1 || count>30 || !Number.isInteger(minutes) || minutes<15 || minutes>240)throw Error('Use 1–30 lessons and 15–240 minutes per lesson.');
     base={...base,lessonCount:count,lessonMinutes:minutes,weeks:Math.ceil(count/base.lessonsPerWeek)};
-    const template=generateLessons({...base,preset:'blank'});base.lessons=template.map((l,i)=>({...l,...base.lessons[i],week:l.week,slot:l.slot}));base=validateCourse(base);
+    const template=generateLessons({...base,preset:'blank'});base.lessons=template.map((l,i)=>({...l,...base.lessons[i],week:l.week,slot:l.slot,...(minutes!==original.lessonMinutes?{lessonMinutes:minutes}:{})}));base=validateCourse(base);
     const files=selectedFiles().filter(x=>!uploadedSelections.has(selectionKey(x)));if(files.length+resources.length>8 || files.some(({file})=>!file.size || file.size>20*1024*1024) || files.reduce((sum,x)=>sum+x.file.size,resources.reduce((sum,r)=>sum+r.bytes,0))>40*1024*1024)throw Error('Use up to 8 resources / 40 MiB in total, each 20 MiB or smaller. Manage existing resources in Edit Unit Plan.');
     for(const {file,kind}of files){message('Uploading '+file.name+'…');const body=new FormData();body.append('file',file);body.append('kind',kind);const result=await api(`/api/course-resources/classes/${getClassId()}`,body,{timeoutMs:110000});if(version!==epoch)return;resources=result.resources;uploadedSelections.add(selectionKey({file,kind}));render();}
     $('[data-prep-plan]').value='';$('[data-prep-files]').value='';$('[data-prep-folder]').value='';
