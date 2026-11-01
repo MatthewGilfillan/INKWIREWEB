@@ -1,3 +1,4 @@
+import {createClassSetup} from './class-setup.js';
 import {createCoursePreparation} from './course-preparation.js';
 import {createCourseQuizSetup} from './course-resources.js';
 import {courseOverviewHTML,courseIcon} from './course-overview.js';
@@ -17,8 +18,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   dialog.className = 'course-planner'; dialog.setAttribute('aria-labelledby', 'planner-title');
   dialog.innerHTML = `<button class="teacher-close" type="button" data-planner-close aria-label="Close course overview">×</button>
     <p class="teacher-eyebrow">YOUR COURSE</p><h2 id="planner-title" tabindex="-1">Course overview</h2><p id="planner-class"></p>
-    <p id="planner-message" role="status"></p><div class="overview-toolbar" hidden><button type="button" class="teacher-button secondary" data-prepare-course>Prepare Course with AI</button><button type="button" class="teacher-button" data-edit-unit-plan></button><button type="button" class="text-button" data-preview-overview hidden>Back to overview</button></div><div id="course-preparation" hidden></div><div data-course-overview hidden></div><form id="course-form" hidden>
-    <div class="planner-intro"><p>Start with a reusable format, paste your own outline, or copy a previous class. Review the lessons before saving your teacher draft.</p><label for="course-format">Teaching format</label><select id="course-format" name="format">${formats.map(f => `<option value="${f.id}">${escape(f.name)}</option>`).join('')}</select><label for="course-pacing">Lesson frequency</label><select id="course-pacing" name="pacing"><option value="weekly">Recurring weekly timetable</option><option value="lessons">Set individual class dates later</option></select><div class="planner-grid three"><div><label for="course-weeks">Total lessons</label><input id="course-weeks" name="lessonCount" type="number" min="1" max="156" required></div><div data-weekly-frequency><label for="course-frequency">Lessons per week</label><input id="course-frequency" name="lessonsPerWeek" type="number" min="1" max="7" required></div><div><label for="course-minutes">Minutes per lesson</label><input id="course-minutes" name="lessonMinutes" type="number" min="15" max="240" required></div></div>
+    <p id="planner-message" role="status"></p><div class="overview-toolbar" hidden><button type="button" class="teacher-button secondary" data-edit-schedule>Edit timetable</button><button type="button" class="teacher-button secondary" data-prepare-course>Upload unit plan / prepare with AI</button><button type="button" class="teacher-button" data-edit-unit-plan></button><button type="button" class="text-button" data-preview-overview hidden>Back to overview</button></div><div class="setup-schedule-screen" data-schedule-screen hidden><div data-class-setup></div><div class="setup-actions"><button type="button" class="teacher-button" data-save-timetable disabled>Save timetable</button><button type="button" class="text-button" data-cancel-timetable>Back to overview</button></div><p class="setup-save-note">Saving creates your calendar and timeline. Add learning goals, readings and activities afterward, or upload a unit plan.</p><p data-timetable-error role="alert"></p></div><div id="course-preparation" hidden></div><div data-course-overview hidden></div><form id="course-form" hidden>
+    <details class="planner-intro"><summary>Course details &amp; advanced options</summary><p>Start with a reusable format, paste your own outline, or copy a previous class. Review the lessons before saving your teacher draft.</p><label for="course-format">Teaching format</label><select id="course-format" name="format">${formats.map(f => `<option value="${f.id}">${escape(f.name)}</option>`).join('')}</select><label for="course-pacing">Lesson frequency</label><select id="course-pacing" name="pacing"><option value="weekly">Recurring weekly timetable</option><option value="lessons">Set individual class dates later</option></select><div class="planner-grid three"><div><label for="course-weeks">Total lessons</label><input id="course-weeks" name="lessonCount" type="number" min="1" max="156" required></div><div data-weekly-frequency><label for="course-frequency">Lessons per week</label><input id="course-frequency" name="lessonsPerWeek" type="number" min="1" max="7" required></div><div><label for="course-minutes">Minutes per lesson</label><input id="course-minutes" name="lessonMinutes" type="number" min="15" max="240" required></div></div>
     <div class="planner-grid three"><div data-weekly-start><label for="course-start">Start date <span>(optional)</span></label><input id="course-start" name="startDate" type="date" min="2000-01-01" max="2100-01-01"></div><div data-course-end><label for="course-end">End date <span>(optional)</span></label><input id="course-end" name="endDate" type="date" min="2000-01-01" max="2100-12-31"></div><div><label for="course-time">Default lesson time</label><input id="course-time" name="startTime" type="time" required></div><div><label for="course-zone">Time zone</label><select id="course-zone" name="timeZone"><option value="Asia/Shanghai">Beijing / Shanghai (UTC+8)</option><option value="Asia/Bangkok">Bangkok (UTC+7)</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></div></div>
     <div id="course-scheduling"></div><p class="planner-hint">For a weekly timetable, choose 1–7 lessons per week. Add specific weekly days and times below, or use evenly spaced suggested dates. Each lesson can be cancelled or rescheduled. Individual-date courses keep the lesson sequence without assuming how many weeks it takes.</p><label for="course-preset">Content starting point</label><select id="course-preset" name="preset">${presets.map(p => `<option value="${p.id}">${escape(p.name)}</option>`).join('')}</select><p id="preset-description"></p>
     <div class="planner-grid"><div><label for="course-organization">School / organisation</label><input id="course-organization" name="organization" maxlength="120"></div><div><label for="course-title">Course title</label><input id="course-title" name="title" maxlength="160" required></div></div>
@@ -28,7 +29,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     <details class="planner-source"><summary>Open a prepared course file</summary><label for="course-file">Ink Wire course file</label><input id="course-file" type="file" accept=".json,application/json"><p>Load a converted unit plan or a course file you saved earlier. Review it here before saving to this class. Opening a file does not upload it. For PDF, Word or spreadsheet resources, use Resources & AI quizzes below.</p></details>
     <details class="planner-source"><summary>Paste an existing outline</summary><label for="course-outline" id="outline-label">One line per week</label><textarea id="course-outline" rows="6" maxlength="30000" placeholder="Week 1: Introducing the novel&#10;Week 2: Character and motivation"></textarea><p>Paste from a document or spreadsheet. Spreadsheet columns: topic, goals, reading, homework. Choose “Generate weekly plan” to apply it.</p></details>
     <details class="planner-source"><summary>Copy from another class</summary><label for="copy-course">Source class</label><select id="copy-course"></select><button type="button" class="teacher-button secondary" id="copy-course-button">Use this overview</button><p>This copies the plan into this class. You can change its dates and content before saving.</p></details>
-    <div class="teacher-actions"><button type="button" class="teacher-button" id="generate-course">Generate weekly plan</button><button type="button" class="teacher-button secondary" id="reschedule-course">Update lesson dates</button></div></div>
+    <div class="teacher-actions"><button type="button" class="teacher-button" id="generate-course">Generate weekly plan</button><button type="button" class="teacher-button secondary" id="reschedule-course">Update lesson dates</button></div></details>
     <div id="course-ai-planning"></div><div id="course-ai-quizzes"></div>
     <div class="planner-review-heading"><div><h3>Lesson plan</h3><p id="course-summary"></p></div><span class="class-badge">Course outline</span></div>
     <p class="planner-hint">Suggested topics are editable starting points. Add the actual text, chapters and assignments for your students.</p><div id="course-lessons"></div>
@@ -47,7 +48,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     getDraft: () => currentDraft(), applyDraft: value => { fill(value); setDirty(); } });
   const quizSetup=createCourseQuizSetup({root:$('#course-ai-quizzes'),getClassId:()=>currentId,canGenerate:()=>Boolean(savedCourse) && !dirty && !saving && !assistant.isBusy()});
   const preparation=createCoursePreparation({root:$('#course-preparation'),getClassId:()=>currentId,getRevision:()=>revision,getDraft:currentDraft,applyDraft:value=>{fill(value);setDirty();$('#course-preparation').hidden=true;editPlan();message('Prepared plan loaded. Review or edit it, then save the overview to keep its quiz drafts.');},onBusy:value=>{dialog.querySelectorAll('.overview-toolbar button').forEach(b=>b.disabled=value);}});
-  $('[data-prepare-course]').onclick=()=>{if(saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())return;form.hidden=true;$('[data-course-overview]').hidden=true;$('[data-preview-overview]').hidden=false;preparation.open();};
+  $('[data-prepare-course]').onclick=()=>{if(!savedCourse){editSchedule();message('Save the timetable first, then populate it from your unit plan.');return;}if(saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())return;$('[data-schedule-screen]').hidden=true;form.hidden=true;$('[data-course-overview]').hidden=true;$('[data-preview-overview]').hidden=false;preparation.open();};
+  const timetable=createClassSetup({root:$('[data-class-setup]'),onChange:setDirty,onReady:ready=>{$('[data-save-timetable]').disabled=!ready;}});
   const scheduler=createCourseSchedule({root:$('#course-scheduling'),getCourse:currentDraft,onChange:()=>{setDirty();if(course)refreshLessonBadges();},onFrequency:n=>{field('lessonsPerWeek').value=n;},apply:value=>{course=value;renderLessons();setDirty();},});
   function renderQuizStates(){
     for(const label of dialog.querySelectorAll('[data-overview-quiz-status]')){
@@ -61,25 +63,48 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   function showOverview(focus=false){
     if(saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy()){message('Wait for the save or AI suggestion to finish before leaving the editor.');return;}
-    $('#course-preparation').hidden=true;
+    $('#course-preparation').hidden=true;$('[data-schedule-screen]').hidden=true;
     $('[data-course-overview]').innerHTML=courseOverviewHTML(dirty?currentDraft():savedCourse,{draft:dirty});
     $('[data-course-overview]').hidden=false;form.hidden=true;$('.overview-toolbar').hidden=false;
     const edit=$('[data-edit-unit-plan]');edit.hidden=false;
-    edit.innerHTML=courseIcon('pencil')+(dirty?'Continue editing':savedCourse?'Edit Unit Plan':'Create Unit Plan');
-    edit.setAttribute('aria-label',dirty?'Continue editing unit plan':savedCourse?'Edit Unit Plan':'Create Unit Plan');
+    const hasContent=savedCourse?.lessons.some(l=>l.goal||l.reading||l.activities||l.homework);
+    edit.innerHTML=courseIcon('pencil')+(dirty?'Continue editing':hasContent?'Edit Unit Plan':'Create Unit Plan');
+    edit.setAttribute('aria-label',dirty?'Continue editing unit plan':hasContent?'Edit Unit Plan':'Create Unit Plan');
     $('[data-preview-overview]').hidden=true;$('#planner-title').textContent='Course overview';
     renderQuizStates();updateFeedbackButtons();
     if(focus){$('#planner-title').focus();$('#planner-title').scrollIntoView({block:'start'});}
   }
   function editPlan(lessonIndex){
     if(!course || saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())return;
-    $('#course-preparation').hidden=true;form.hidden=false;$('[data-course-overview]').hidden=true;$('[data-edit-unit-plan]').hidden=true;$('[data-preview-overview]').hidden=false;
+    $('[data-schedule-screen]').hidden=true;$('#course-preparation').hidden=true;form.hidden=false;$('[data-course-overview]').hidden=true;$('[data-edit-unit-plan]').hidden=true;$('[data-preview-overview]').hidden=false;
     $('.overview-toolbar').hidden=false;$('#planner-title').textContent=savedCourse?'Edit unit plan':'Create unit plan';
     if(!editorsReady){editorsReady=true;assistant.open();quizSetup.load();}
     if(Number.isInteger(lessonIndex)){
       const row=$(`[data-plan-lesson="${lessonIndex}"]`);if(row){row.open=true;row.querySelector('[data-lesson-field="title"]').focus();row.scrollIntoView({block:'start'});}
     }else{$('#planner-title').focus();$('#planner-title').scrollIntoView({block:'start'});}
   }
+  function editSchedule(){
+    if(saving||assistant.isBusy()||quizSetup.isBusy()||preparation.isBusy())return;
+    const draft=dirty?currentDraft():savedCourse;
+    if(draft?.weeklySlots && new Set(draft.weeklySlots.map(s=>s.day)).size!==draft.weeklySlots.length){editPlan();message('This timetable has multiple sessions on one day. Edit its weekly times in the unit plan.');return;}
+    timetable.fill(draft);$('[data-schedule-screen]').hidden=false;form.hidden=true;$('[data-course-overview]').hidden=true;$('#course-preparation').hidden=true;$('.overview-toolbar').hidden=true;
+    $('[data-cancel-timetable]').hidden=!savedCourse;$('#planner-title').textContent=savedCourse?'Class timetable':'Set up your class';$('[data-timetable-error]').textContent='';
+  }
+  $('[data-edit-schedule]').onclick=editSchedule;
+  $('[data-cancel-timetable]').onclick=()=>{if(timetable.isDirty()&&!confirm('Discard these unsaved timetable changes?'))return;dirty=false;fill(savedCourse);showOverview(true);};
+  $('[data-save-timetable]').onclick=async()=>{
+    if(saving)return;
+    for(const el of $('[data-class-setup]').querySelectorAll('input,select'))if(!el.reportValidity())return;
+    let success=false;const controls=[...$('[data-schedule-screen]').querySelectorAll('input,select,button')],disabled=controls.map(el=>el.disabled);
+    try{
+      const next=timetable.build(savedCourse?.title||getClasses().find(c=>c.id===currentId)?.name);
+      if(savedCourse&&next.lessons.length<savedCourse.lessons.length&&!confirm(`Reduce the timetable from ${savedCourse.lessons.length} to ${next.lessons.length} classes? Content on the final removed sessions will be lost. Lessons with quizzes or feedback are protected.`))return;
+      saving=true;controls.forEach(el=>el.disabled=true);$('[data-timetable-error]').textContent='Saving timetable…';
+      const saved=await api(`/api/classes/${currentId}/overview`,{course:next,revision});revision=saved.revision;savedCourse=structuredClone(saved.course);dirty=false;serverTime=saved.serverNow||Date.now();localTime=performance.now();
+      const classroom=getClasses().find(c=>c.id===currentId);if(classroom)Object.assign(classroom,{overviewRevision:revision,courseWeeks:next.weeks,courseFrequency:next.lessonsPerWeek,courseMinutes:next.lessonMinutes,coursePacing:'weekly',courseLessonCount:next.lessonCount});
+      success=true;onSaved?.();status.textContent='Timetable saved. Calendar and timeline are ready.';
+    }catch(e){$('[data-timetable-error]').textContent=e.message;}finally{saving=false;controls.forEach((el,i)=>el.disabled=disabled[i]);if(success){fill(savedCourse);showOverview(true);loadQuizStates();message('Timetable saved. Add lesson details using the pencil icons, or upload a unit plan.');}}
+  };
   $('[data-edit-unit-plan]').onclick=()=>editPlan();
   $('[data-preview-overview]').onclick=()=>showOverview(true);
   $('[data-course-overview]').addEventListener('click',event=>{
@@ -277,16 +302,15 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     }
     assistant.reset(); quizSetup.reset(); preparation.reset();
     trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation; course = null;
-    form.hidden = true; $('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true;editorsReady=false;quizStates=null;error(''); message('Loading course overview…');
+    form.hidden = true;$('[data-schedule-screen]').hidden=true; $('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true;editorsReady=false;quizStates=null;error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
     $('#copy-course').innerHTML = '<option value="">Choose another class</option>' + getClasses().filter(c => c.id !== classId && c.overviewRevision).map(c => `<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
     if (!root) dialog.showModal();
     try {
       const result = await api(`/api/classes/${classId}/overview`); if (generation !== token || !isOpen()) return;
       revision = result.revision; savedCourse=result.course?structuredClone(result.course):null; serverTime=result.serverNow || Date.now();localTime=performance.now();
-      const initial = result.course || useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full');
-      if (!result.course) initial.lessons = generateLessons(initial).map(l=>({...l,id:crypto.randomUUID()}));
-      fill(initial);showOverview();loadQuizStates();
+      const initial = result.course || {...useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full'),preset:'blank',description:'',organization:'',lessons:[]};
+      fill(initial);if(result.course)showOverview();else editSchedule();loadQuizStates();
       message('');
       const summary = list.querySelector(`[data-course-status="${classId}"]`); if (result.course && summary) summary.textContent = courseSummary(result.course);
       if (Number.isInteger(lessonIndex)) {
@@ -296,11 +320,11 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   if (!root) list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
   window.addEventListener('beforeunload', event => { if (dirty && isOpen()) { event.preventDefault(); event.returnValue = ''; } });
-  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy(),
+  return { isOpen, open, prepare:()=>{$('[data-prepare-course]').click();}, hasUnsavedChanges: () => dirty || saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy(),
     canLeave() {
       if (saving || (assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
       return !dirty || confirm('Switch classes without saving this course overview? Your unsaved changes will be lost.');
     },
-    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); quizSetup.reset(); preparation.reset(); currentId = ''; course = null; savedCourse=null;quizStates=null;editorsReady=false;dirty = false; form.hidden = true; $('[data-course-overview]').replaceChildren();$('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true; }
+    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); quizSetup.reset(); preparation.reset(); currentId = ''; course = null; savedCourse=null;quizStates=null;editorsReady=false;dirty = false; form.hidden = true;$('[data-schedule-screen]').hidden=true; $('[data-course-overview]').replaceChildren();$('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true; }
   };
 }

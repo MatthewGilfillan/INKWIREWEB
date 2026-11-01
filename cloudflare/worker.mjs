@@ -1,3 +1,4 @@
+import {handleClassFiles} from './class-files.mjs';
 import {handleProfile} from './profiles.mjs';
 import {handleNotebooks} from './notebooks.mjs';
 import {handleWorksheets} from './worksheets.mjs';
@@ -158,6 +159,10 @@ export default {
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if (url.pathname.startsWith('/api/class-files/')) {
+        const session=await auth.api.getSession({headers:request.headers});
+        return await handleClassFiles(request,env,session?.user,{json,fail,readJSON});
+      }
       if (url.pathname.startsWith('/api/profiles/')) {
         const session=await auth.api.getSession({headers:request.headers});
         return await handleProfile(request,env,session?.user,{json,fail,readJSON});

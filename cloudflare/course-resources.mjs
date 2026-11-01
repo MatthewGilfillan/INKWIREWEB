@@ -1,6 +1,7 @@
 import {planningAvailable} from './planning-assistant.mjs';
 export const resourceAccess=(env,user,classId)=>env.DB.prepare(`SELECT c.id,o.content,o.revision FROM classes c LEFT JOIN course_overviews o ON o.class_id=c.id WHERE c.id=? AND c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?))`).bind(classId,user.id,user.id).first();
-export const resourceRows=async(env,classId)=>(await env.DB.prepare('SELECT * FROM course_resources WHERE class_id=? AND provider_file_id IS NOT NULL ORDER BY created_at,id').bind(classId).all()).results;
+export const resourceRows=async(env,classId)=>(await env.DB.prepare(`SELECT id,class_id,filename,kind,bytes,provider_file_id,created_by,created_at,'legacy' AS source FROM course_resources WHERE class_id=? AND provider_file_id IS NOT NULL
+  UNION ALL SELECT id,class_id,filename,kind,bytes,provider_file_id,created_by,created_at,'class-files' AS source FROM class_files WHERE class_id=? AND ready=1 AND ai_enabled=1 AND provider_file_id IS NOT NULL AND lock_until=0 ORDER BY created_at,id`).bind(classId,classId).all()).results;
 const MAX_FILE=20*1024*1024,MAX_COURSE=40*1024*1024;
 const types={pdf:'application/pdf',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',csv:'text/csv',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',txt:'text/plain',vtt:'text/vtt'};
 export async function reserveQuizRequest(env,userId){
@@ -19,7 +20,7 @@ async function boundedForm(request){
   finally{reader.releaseLock();}
   return new Response(new Blob(chunks),{headers:{'Content-Type':request.headers.get('Content-Type')}}).formData();
 }
-async function deleteProviderFile(env,id){
+export async function deleteProviderFile(env,id){
   const response=await fetch('https://api.openai.com/v1/files/'+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(20000)});
   await response.body?.cancel();if(!response.ok && response.status!==404)throw Error('The resource could not be removed from OpenAI. Try again.');
 }
@@ -29,7 +30,7 @@ export async function handleCourseResources(request,env,user,{json,fail,readJSON
   const match=new URL(request.url).pathname.match(/^\/api\/course-resources\/classes\/([a-f0-9-]{36})$/);
   if(!match)return fail('Not found.',404);
   const classId=match[1];if(!await resourceAccess(env,user,classId))return fail('Class not found.',404,'NOT_FOUND');
-  const output=async()=>({available:planningAvailable(env),resources:(await resourceRows(env,classId)).map(({id,filename,kind,bytes,created_at})=>({id,filename,kind,bytes,createdAt:created_at}))});
+  const output=async()=>({available:planningAvailable(env),resources:(await resourceRows(env,classId)).map(({id,filename,kind,bytes,created_at,source})=>({id,filename,kind,bytes,createdAt:created_at,source}))});
   if(request.method==='GET')return json(await output());
   if(request.method!=='POST')return fail('Use GET or POST.',405);
   if(request.headers.get('Origin')!==env.APP_ORIGIN || request.headers.get('Sec-Fetch-Site')==='cross-site')return fail('Invalid origin.',403,'INVALID_ORIGIN');
@@ -57,7 +58,7 @@ export async function handleCourseResources(request,env,user,{json,fail,readJSON
   if(!await reserveQuizRequest(env,user.id))return fail('The daily AI resource and quiz limit has been reached. Try again tomorrow.',429,'AI_RATE_LIMITED');
   const id=crypto.randomUUID(),now=Date.now();
   await env.DB.prepare('DELETE FROM course_resources WHERE provider_file_id IS NULL AND created_at<?').bind(now-300000).run();
-  const reserved=await env.DB.prepare(`INSERT INTO course_resources(id,class_id,filename,kind,bytes,created_by,created_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT count(*) FROM course_resources WHERE class_id=?)<8 AND COALESCE((SELECT sum(bytes) FROM course_resources WHERE class_id=?),0)+?<=? RETURNING id`).bind(id,classId,filename,kind,file.size,user.id,now,classId,classId,file.size,MAX_COURSE).first();
+  const reserved=await env.DB.prepare(`INSERT INTO course_resources(id,class_id,filename,kind,bytes,created_by,created_at) SELECT ?,?,?,?,?,?,? WHERE (SELECT count(*) FROM course_resources WHERE class_id=?)+(SELECT count(*) FROM class_files WHERE class_id=? AND ai_enabled=1)<8 AND COALESCE((SELECT sum(bytes) FROM course_resources WHERE class_id=?),0)+COALESCE((SELECT sum(bytes) FROM class_files WHERE class_id=? AND ai_enabled=1),0)+?<=? RETURNING id`).bind(id,classId,filename,kind,file.size,user.id,now,classId,classId,classId,classId,file.size,MAX_COURSE).first();
   if(!reserved)return fail('A course can hold up to 8 resources totalling 40 MiB. Remove an unused resource or upload a smaller chapter excerpt.',400,'RESOURCE_LIMIT');
   let providerId;
   try{

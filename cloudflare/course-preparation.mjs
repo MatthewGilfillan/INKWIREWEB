@@ -13,7 +13,7 @@ const pending=job=>job.course?.lessons.filter(l=>l.status!=='cancelled' && !Obje
 const educational=lesson=>JSON.stringify(Object.fromEntries(Object.keys(lessonFields).map(k=>[k,lesson[k] || ''])));
 export function applyPreparedPlan(base,value,lengthMode){
   if(!value || typeof value.reviewNotes!=='string' || value.reviewNotes.length>3000 || !Array.isArray(value.lessons) || !value.lessons.length || value.lessons.length>30)throw Error('OpenAI returned an incomplete unit plan. Try again.');
-  if(lengthMode==='settings' && value.lessons.length!==base.lessons.length)throw Error('The prepared plan did not match your lesson count. Try again.');
+  if((lengthMode==='settings'||base.weeklySlots?.length) && value.lessons.length!==base.lessons.length)throw Error('The prepared plan did not match your lesson count. Try again.');
   const next={...base,lessonCount:value.lessons.length,weeks:Math.ceil(value.lessons.length/base.lessonsPerWeek)};
   for(const key of ['title','description','gradeBand','themes','essentialQuestions','enduringUnderstandings'])next[key]=value[key];
   next.sourceNotes=[base.sourceNotes,value.reviewNotes].filter(Boolean).join('\n\n').slice(0,6000);

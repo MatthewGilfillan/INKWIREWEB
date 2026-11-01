@@ -1,9 +1,11 @@
+import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js';
 import {api,escape,signOut} from './workspace-shared.js';
 const role=document.body.dataset.memberRole,list=document.querySelector('#class-list'),status=document.querySelector('#dashboard-status'),retry=document.querySelector('#retry-classes');
 let loading=false;
+const fileDialog=document.createElement('dialog');fileDialog.className='class-files-dialog';fileDialog.setAttribute('aria-label','Class files');fileDialog.innerHTML='<button type="button" class="teacher-close" aria-label="Close class files">×</button><div data-member-files></div>';document.body.append(fileDialog);fileDialog.querySelector('button').onclick=()=>fileDialog.close();const files=createClassFiles({root:fileDialog.querySelector('[data-member-files]')});fileDialog.addEventListener('close',()=>files.clear());
 const timeline=createMemberCourse({parent:role==='parent'});
-const card=(c,learnerId='')=>`<article class="member-class"><span class="class-badge">Enrolled</span><h2>${escape(c.name)}</h2><p>${escape(c.subject || 'Class')}</p><button type="button" class="teacher-button" data-member-course="${escape(c.id)}" data-learner="${escape(learnerId)}">Course timeline &amp; feedback</button><a class="teacher-button secondary" href="/notebooks?classId=${escape(c.id)}${learnerId?'&amp;notebookId='+escape(c.id)+'.'+escape(learnerId):''}">${role==='parent'?'View live notebook':'Open my notebook'} →</a></article>`;
+const card=(c,learnerId='')=>`<article class="member-class"><span class="class-badge">Enrolled</span><h2>${escape(c.name)}</h2><p>${escape(c.subject || 'Class')}</p><button type="button" class="teacher-button" data-member-course="${escape(c.id)}" data-learner="${escape(learnerId)}">Course timeline &amp; feedback</button><a class="teacher-button secondary" href="/notebooks?classId=${escape(c.id)}${learnerId?'&amp;notebookId='+escape(c.id)+'.'+escape(learnerId):''}">${role==='parent'?'View live notebook':'Open my notebook'} →</a><button type="button" class="teacher-button secondary" data-member-files-open="${escape(c.id)}">Class files</button></article>`;
 async function load(){
   if(loading)return;loading=true;retry.hidden=true;
   try{
@@ -16,3 +18,5 @@ async function load(){
 signOut(document.querySelector('[data-session-signout]'),status);retry.addEventListener('click',load);window.addEventListener('pageshow',load);window.addEventListener('pagehide',()=>list.replaceChildren());document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load();});load();
 
 list.addEventListener('click',event=>{const button=event.target.closest('[data-member-course]');if(button)timeline.open(button.dataset.memberCourse,button.dataset.learner,button);});
+
+list.addEventListener('click',event=>{const button=event.target.closest('[data-member-files-open]');if(button){fileDialog.showModal();files.open(button.dataset.memberFilesOpen);}});
