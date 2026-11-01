@@ -7,8 +7,8 @@ const text=(v,max,label)=>{if(typeof v!=='string' || v.length>max)throw Error(`C
 const result=row=>({score:row.score,total:row.total,percentage:Math.round(row.score/row.total*100),submittedAt:row.submitted_at,durationSeconds:Math.max(0,Math.round((row.submitted_at-row.started_at)/1000))});
 export function quizResult(rows){
   const finished=rows.filter(r=>r.submitted_at!==null).sort((a,b)=>b.submitted_at-a.submitted_at || b.started_at-a.started_at || b.id.localeCompare(a.id));
-  const latest=finished[0],best=finished.reduce((a,b)=>!a || b.score/b.total>a.score/a.total?b:a,null);
-  return {status:latest?'submitted':rows.length?'in_progress':'not_submitted',attemptCount:finished.length,inProgress:rows.some(r=>r.submitted_at===null),latest:latest?result(latest):null,best:best?result(best):null};
+  const first=finished.at(-1),latest=finished[0],best=finished.reduce((a,b)=>!a || b.score/b.total>a.score/a.total?b:a,null);
+  return {status:latest?'submitted':rows.length?'in_progress':'not_submitted',attemptCount:finished.length,inProgress:rows.some(r=>r.submitted_at===null),first:first?result(first):null,latest:latest?result(latest):null,best:best?result(best):null};
 }
 // Family queries select only the linked learner's results, never classmates' answers.
 export async function quizTimeline(env,classId,{learnerId=null,roster=[]}={}){
@@ -45,8 +45,9 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
     const questions=JSON.parse(quiz.questions),definition={title:quiz.title,reflectionPrompt:quiz.reflection_prompt,questions:teacher?questions:questions.map(q=>({prompt:q.prompt,options:q.options}))};
     const base={teacher,lessonTitle:lesson.title,quiz:definition,revision:quiz.revision,cancelled:lesson.status==='cancelled'};
     if(teacher)return {...base,...ai,locked:Boolean(await env.DB.prepare('SELECT 1 FROM quiz_attempts WHERE class_id=? AND lesson_id=? LIMIT 1').bind(classId,lessonId).first())};
-    const rows=(await attempts()).results;
-    return {...base,result:quizResult(rows),active:rows.find(r=>r.submitted_at===null)?.id || null,attempts:rows.filter(r=>r.submitted_at!==null).map(r=>({id:r.id,...result(r),answers:JSON.parse(r.answers),reflection:r.reflection})),...(rows.some(r=>r.submitted_at!==null)?{review:questions.map(q=>({correctIndex:q.correctIndex,explanation:q.explanation}))}:{})};
+    const rows=(await attempts()).results,active=rows.find(r=>r.submitted_at===null);
+    const progress=active?JSON.parse(active.answer_progress).map((answerIndex,questionIndex)=>({questionIndex,answerIndex,correctIndex:questions[questionIndex].correctIndex,explanation:questions[questionIndex].explanation})):[];
+    return {...base,result:quizResult(rows),active:active?.id || null,progress,attempts:rows.filter(r=>r.submitted_at!==null).map(r=>({id:r.id,...result(r),answers:JSON.parse(r.answers),reflection:r.reflection})),...(rows.some(r=>r.submitted_at!==null)?{review:questions.map(q=>({correctIndex:q.correctIndex,explanation:q.explanation}))}:{})};
   };
   if(request.method==='GET')return json(await output());
   if(request.method!=='POST')return fail('Use GET or POST.',405);
@@ -80,24 +81,53 @@ export async function handleLessonQuiz(request,env,user,{json,fail,readJSON}){
   if(!quiz)return fail('No quiz has been assigned to this lesson.',404,'NOT_FOUND');
   if(input.revision!==quiz.revision)return fail('The quiz changed. Close and reopen it before starting.',409,'CONFLICT');
   if(!/^[a-f0-9-]{36}$/.test(input.attemptId || ''))return fail('Reopen the quiz and try again.',400,'INVALID_INPUT');
-  if(!['start','submit'].includes(input.action))return fail('Choose a quiz action.',400,'INVALID_INPUT');
+  if(!['start','submit','answer','reflection'].includes(input.action))return fail('Choose a quiz action.',400,'INVALID_INPUT');
   const owned=await env.DB.prepare('SELECT * FROM quiz_attempts WHERE id=? AND class_id=? AND lesson_id=? AND learner_id=?').bind(input.attemptId,classId,lessonId,learner.id).first();
-  if(owned?.submitted_at!==null && owned)return json(await output());
-  if(lesson.status==='cancelled')return fail('This lesson is cancelled. Your previous quiz results are still available.',409,'LESSON_CANCELLED');
   const questions=JSON.parse(quiz.questions);
+  const feedback=(answers)=>({questionIndex:input.questionIndex,answerIndex:answers[input.questionIndex],correctIndex:questions[input.questionIndex].correctIndex,explanation:questions[input.questionIndex].explanation});
+  if(input.action==='answer' && (!Number.isInteger(input.questionIndex) || !questions[input.questionIndex] || !Number.isInteger(input.answerIndex) || input.answerIndex<0 || input.answerIndex>=questions[input.questionIndex].options.length))return fail('Choose an answer to this question.',400,'INVALID_INPUT');
+  if(input.action==='reflection'){
+    if(!owned || owned.submitted_at===null)return fail('Complete your quiz before saving a reflection.',409,'CONFLICT');
+    let reflection;try{reflection=text(input.reflection,2000,'your reflection');}catch(e){return fail(e.message,400,'INVALID_INPUT');}
+    await env.DB.prepare('UPDATE quiz_attempts SET reflection=? WHERE id=? AND learner_id=? AND submitted_at IS NOT NULL').bind(reflection,owned.id,learner.id).run();
+    return json(await output());
+  }
+  if(owned?.submitted_at!==null && owned)return json({...await output(),...(input.action==='answer'?{feedback:feedback(JSON.parse(owned.answers))}:{})});
+  if(lesson.status==='cancelled')return fail('This lesson is cancelled. Your previous quiz results are still available.',409,'LESSON_CANCELLED');
   if(input.action==='start'){
     const inserted=await env.DB.prepare(`INSERT INTO quiz_attempts(id,class_id,lesson_id,learner_id,learner_name,quiz_revision,started_at,total)
       SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM lesson_quizzes WHERE class_id=? AND lesson_id=? AND revision=?) AND EXISTS(SELECT 1 FROM course_overviews WHERE class_id=? AND revision=?)
       AND (SELECT count(*) FROM quiz_attempts WHERE class_id=? AND lesson_id=? AND learner_id=?)<20 ON CONFLICT DO NOTHING RETURNING id`).bind(input.attemptId,classId,lessonId,learner.id,learner.name,quiz.revision,now,questions.length,classId,lessonId,quiz.revision,classId,classroom.revision,classId,lessonId,learner.id).first();
     if(!inserted && !(await attempts()).results.some(r=>r.submitted_at===null))return fail('This quiz has reached 20 attempts or has changed. Refresh to see your results.',409,'ATTEMPT_LIMIT');
+  }else if(input.action==='answer'){
+    if(!owned)return fail('Start the quiz from your own student account first.',404,'NOT_FOUND');
+    const progress=JSON.parse(owned.answer_progress);
+    // An answer is committed before its key is revealed. The compare-and-swap also
+    // prevents concurrent tabs and older batch clients from replacing that answer.
+    if(input.questionIndex>progress.length)return fail('Submit the current question first.',409,'CONFLICT');
+    if(input.questionIndex===progress.length){
+      const answers=[...progress,input.answerIndex],complete=answers.length===questions.length;
+      const score=complete?answers.reduce((n,a,i)=>n+Number(a===questions[i].correctIndex),0):null;
+      const saved=await env.DB.prepare(`UPDATE quiz_attempts SET answer_progress=?,submitted_at=?,score=?,answers=? WHERE id=? AND learner_id=? AND submitted_at IS NULL AND answer_progress=?
+        AND EXISTS(SELECT 1 FROM course_overviews WHERE class_id=? AND revision=?) RETURNING id`).bind(JSON.stringify(answers),complete?now:null,score,complete?JSON.stringify(answers):null,owned.id,learner.id,owned.answer_progress,classId,classroom.revision).first();
+      if(!saved){
+        const current=await env.DB.prepare('SELECT answer_progress,answers FROM quiz_attempts WHERE id=? AND learner_id=?').bind(owned.id,learner.id).first();
+        const recorded=JSON.parse(current.answers || current.answer_progress);
+        if(recorded[input.questionIndex]===undefined)return fail('The course changed. Reopen the quiz before submitting.',409,'CONFLICT');
+        return json({...await output(),feedback:feedback(recorded)});
+      }
+      return json({...await output(),feedback:feedback(answers)});
+    }
+    return json({...await output(),feedback:feedback(progress)});
   }else{
     if(!owned)return fail('Start the quiz from your own student account first.',404,'NOT_FOUND');
+    if(JSON.parse(owned.answer_progress).length)return fail('Continue submitting each question to finish this attempt.',409,'CONFLICT');
     let answers,reflection;try{
       answers=input.answers;reflection=text(input.reflection,2000,'your reflection',true);
       if(!Array.isArray(answers) || answers.length!==questions.length || answers.some((a,i)=>!Number.isInteger(a) || a<0 || a>=questions[i].options.length))throw Error('Answer every question before submitting.');
     }catch(e){return fail(e.message,400,'INVALID_INPUT');}
     const score=answers.reduce((n,a,i)=>n+Number(a===questions[i].correctIndex),0);
-    const saved=await env.DB.prepare(`UPDATE quiz_attempts SET submitted_at=?,score=?,answers=?,reflection=? WHERE id=? AND learner_id=? AND submitted_at IS NULL
+    const saved=await env.DB.prepare(`UPDATE quiz_attempts SET submitted_at=?,score=?,answers=?,reflection=? WHERE id=? AND learner_id=? AND submitted_at IS NULL AND answer_progress='[]'
       AND EXISTS(SELECT 1 FROM course_overviews WHERE class_id=? AND revision=?) RETURNING id`).bind(now,score,JSON.stringify(answers),reflection,owned.id,learner.id,classId,classroom.revision).first();
     if(!saved){const retry=await env.DB.prepare('SELECT submitted_at FROM quiz_attempts WHERE id=? AND learner_id=?').bind(owned.id,learner.id).first();if(retry?.submitted_at===null)return fail('The course changed. Reopen the quiz before submitting.',409,'CONFLICT');}
   }

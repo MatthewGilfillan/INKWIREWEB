@@ -44,3 +44,43 @@ test('quiz assignments protect lesson identity, survive rescheduling and refuse 
   assert.equal((await f.request(users.sa,{action:'start',revision:1,attemptId:crypto.randomUUID()})).status,409);assert.equal((await f.request(users.sa)).status,200);
  }finally{f.db.close();}
 });
+
+test('each answer is saved before feedback, resumes privately, and the first score survives replays',async()=>{
+ const f=await fixture();try{
+  await f.assign();const attemptId=crypto.randomUUID(),base={revision:1,attemptId};await f.request(users.sa,{...base,action:'start'});
+  const answer={...base,action:'answer',questionIndex:0,answerIndex:1};
+  assert.equal((await f.request(users.sb,answer)).status,404);
+  assert.equal((await f.request(users.sa,{...answer,questionIndex:1})).status,409);
+  assert.equal((await f.request(users.sa,{...answer,answerIndex:9})).status,400);
+  let state=await(await f.request(users.sa,answer)).json();
+  assert.deepEqual(state.feedback,{questionIndex:0,answerIndex:1,correctIndex:0,explanation:definition.questions[0].explanation});
+  assert.equal(state.result.first,null);assert.equal(state.review,undefined);assert.equal(state.quiz.questions[1].correctIndex,undefined);
+  state=await(await f.request(users.sa,{...answer,answerIndex:0})).json();assert.equal(state.feedback.answerIndex,1,'an already revealed answer cannot be changed');
+  assert.equal((await f.request(users.sa,{...base,action:'submit',answers:[0,0],reflection:''})).status,409,'old clients cannot overwrite individual answers');
+  state=await(await f.request(users.sa)).json();assert.equal(state.active,attemptId);assert.equal(state.progress.length,1);assert.equal(state.progress[0].answerIndex,1);
+  const other=await(await f.request(users.sb)).json();assert.deepEqual(other.progress,[]);assert.equal(other.review,undefined);
+  state=await(await f.request(users.sa,{...answer,questionIndex:1,answerIndex:0})).json();assert.equal(state.active,null);assert.equal(state.result.first.score,1);assert.equal(state.result.attemptCount,1,'last answer automatically records the score');
+  state=await(await f.request(users.sa,{...answer,questionIndex:1,answerIndex:1})).json();assert.equal(state.feedback.answerIndex,0);assert.equal(state.result.first.score,1);
+  assert.equal((await f.request(users.sa,{...base,action:'reflection',reflection:'Can we discuss the narrator?'})).status,200);assert.equal(f.db.prepare('SELECT reflection FROM quiz_attempts WHERE id=?').get(attemptId).reflection,'Can we discuss the narrator?');
+  assert.equal((await f.request(users.sb,{...base,action:'reflection',reflection:'Changed'})).status,409);
+  const replay=crypto.randomUUID();await f.request(users.sa,{action:'start',revision:1,attemptId:replay});
+  for(let i=0;i<2;i++)state=await(await f.request(users.sa,{action:'answer',revision:1,attemptId:replay,questionIndex:i,answerIndex:0})).json();
+  assert.equal(state.result.first.score,1);assert.equal(state.result.latest.score,2);assert.equal(state.result.best.score,2);
+  const teacher=await(await f.timeline()).json(),parent=await(await f.timeline(users.pa,'overview?learnerId=a')).json();
+  assert.equal(teacher.course.lessons[0].quiz.results[0].first.score,1);assert.equal(parent.course.lessons[0].quiz.result.first.score,1);assert.ok(!JSON.stringify(parent).includes('answer_progress'));
+ }finally{f.db.close();}
+});
+test('concurrent submissions commit only one answer and cannot race a legacy bulk submission',async()=>{
+ const f=await fixture();try{
+  await f.assign();let attemptId=crypto.randomUUID();await f.request(users.sa,{action:'start',revision:1,attemptId});
+  const answer={action:'answer',revision:1,attemptId,questionIndex:0,answerIndex:1};
+  const results=await Promise.all([f.request(users.sa,answer),f.request(users.sa,{...answer,answerIndex:0})]);
+  const states=await Promise.all(results.map(r=>r.json()));assert.equal(states[0].feedback.answerIndex,states[1].feedback.answerIndex);
+  assert.equal(JSON.parse(f.db.prepare('SELECT answer_progress FROM quiz_attempts WHERE id=?').get(attemptId).answer_progress).length,1);
+  await f.request(users.sa,{...answer,questionIndex:1});
+  attemptId=crypto.randomUUID();await f.request(users.sa,{action:'start',revision:1,attemptId});
+  const race=await Promise.all([f.request(users.sa,{...answer,attemptId}),f.request(users.sa,{action:'submit',revision:1,attemptId,answers:[0,0],reflection:''})]);
+  const row=f.db.prepare('SELECT * FROM quiz_attempts WHERE id=?').get(attemptId);
+  if(row.submitted_at===null){assert.deepEqual(JSON.parse(row.answer_progress),[1]);assert.equal(race[1].status,409);}else{assert.equal(row.score,2);assert.deepEqual(JSON.parse(row.answers),[0,0]);assert.equal((await race[0].json()).feedback.answerIndex,0);}
+ }finally{f.db.close();}
+});
