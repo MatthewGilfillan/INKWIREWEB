@@ -1,3 +1,4 @@
+import {createCoursePreparation} from './course-preparation.js';
 import {createCourseQuizSetup} from './course-resources.js';
 import {courseOverviewHTML,courseIcon} from './course-overview.js';
 import {createLessonQuiz} from './lesson-quiz.js';
@@ -16,7 +17,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   dialog.className = 'course-planner'; dialog.setAttribute('aria-labelledby', 'planner-title');
   dialog.innerHTML = `<button class="teacher-close" type="button" data-planner-close aria-label="Close course overview">×</button>
     <p class="teacher-eyebrow">YOUR COURSE</p><h2 id="planner-title" tabindex="-1">Course overview</h2><p id="planner-class"></p>
-    <p id="planner-message" role="status"></p><div class="overview-toolbar" hidden><button type="button" class="teacher-button" data-edit-unit-plan></button><button type="button" class="text-button" data-preview-overview hidden>Back to overview</button></div><div data-course-overview hidden></div><form id="course-form" hidden>
+    <p id="planner-message" role="status"></p><div class="overview-toolbar" hidden><button type="button" class="teacher-button secondary" data-prepare-course>Prepare Course with AI</button><button type="button" class="teacher-button" data-edit-unit-plan></button><button type="button" class="text-button" data-preview-overview hidden>Back to overview</button></div><div id="course-preparation" hidden></div><div data-course-overview hidden></div><form id="course-form" hidden>
     <div class="planner-intro"><p>Start with a reusable format, paste your own outline, or copy a previous class. Review the lessons before saving your teacher draft.</p><label for="course-format">Teaching format</label><select id="course-format" name="format">${formats.map(f => `<option value="${f.id}">${escape(f.name)}</option>`).join('')}</select><label for="course-pacing">Lesson frequency</label><select id="course-pacing" name="pacing"><option value="weekly">Recurring weekly timetable</option><option value="lessons">Set individual class dates later</option></select><div class="planner-grid three"><div><label for="course-weeks">Total lessons</label><input id="course-weeks" name="lessonCount" type="number" min="1" max="156" required></div><div data-weekly-frequency><label for="course-frequency">Lessons per week</label><input id="course-frequency" name="lessonsPerWeek" type="number" min="1" max="7" required></div><div><label for="course-minutes">Minutes per lesson</label><input id="course-minutes" name="lessonMinutes" type="number" min="15" max="240" required></div></div>
     <div class="planner-grid three"><div data-weekly-start><label for="course-start">Start date <span>(optional)</span></label><input id="course-start" name="startDate" type="date" min="2000-01-01" max="2100-01-01"></div><div data-course-end><label for="course-end">End date <span>(optional)</span></label><input id="course-end" name="endDate" type="date" min="2000-01-01" max="2100-12-31"></div><div><label for="course-time">Default lesson time</label><input id="course-time" name="startTime" type="time" required></div><div><label for="course-zone">Time zone</label><select id="course-zone" name="timeZone"><option value="Asia/Shanghai">Beijing / Shanghai (UTC+8)</option><option value="Asia/Bangkok">Bangkok (UTC+7)</option><option value="Europe/London">London</option><option value="America/New_York">New York</option><option value="UTC">UTC</option></select></div></div>
     <div id="course-scheduling"></div><p class="planner-hint">For a weekly timetable, choose 1–7 lessons per week. Add specific weekly days and times below, or use evenly spaced suggested dates. Each lesson can be cancelled or rescheduled. Individual-date courses keep the lesson sequence without assuming how many weeks it takes.</p><label for="course-preset">Content starting point</label><select id="course-preset" name="preset">${presets.map(p => `<option value="${p.id}">${escape(p.name)}</option>`).join('')}</select><p id="preset-description"></p>
@@ -45,6 +46,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   const assistant = createCourseAssistant({ root: $('#course-ai-planning'), form, getClassId: () => currentId,
     getDraft: () => currentDraft(), applyDraft: value => { fill(value); setDirty(); } });
   const quizSetup=createCourseQuizSetup({root:$('#course-ai-quizzes'),getClassId:()=>currentId,canGenerate:()=>Boolean(savedCourse) && !dirty && !saving && !assistant.isBusy()});
+  const preparation=createCoursePreparation({root:$('#course-preparation'),getClassId:()=>currentId,getRevision:()=>revision,getDraft:currentDraft,applyDraft:value=>{fill(value);setDirty();$('#course-preparation').hidden=true;editPlan();message('Prepared plan loaded. Review or edit it, then save the overview to keep its quiz drafts.');},onBusy:value=>{dialog.querySelectorAll('.overview-toolbar button').forEach(b=>b.disabled=value);}});
+  $('[data-prepare-course]').onclick=()=>{if(saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())return;form.hidden=true;$('[data-course-overview]').hidden=true;$('[data-preview-overview]').hidden=false;preparation.open();};
   const scheduler=createCourseSchedule({root:$('#course-scheduling'),getCourse:currentDraft,onChange:()=>{setDirty();if(course)refreshLessonBadges();},onFrequency:n=>{field('lessonsPerWeek').value=n;},apply:value=>{course=value;renderLessons();setDirty();},});
   function renderQuizStates(){
     for(const label of dialog.querySelectorAll('[data-overview-quiz-status]')){
@@ -57,7 +60,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     try{const result=await api(`/api/quiz-assistant/classes/${id}`);if(token!==generation)return;quizStates=result.lessons;renderQuizStates();}catch{/* Quiz setup remains available if its status cannot be loaded. */}
   }
   function showOverview(focus=false){
-    if(saving || assistant.isBusy() || quizSetup.isBusy()){message('Wait for the save or AI suggestion to finish before leaving the editor.');return;}
+    if(saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy()){message('Wait for the save or AI suggestion to finish before leaving the editor.');return;}
+    $('#course-preparation').hidden=true;
     $('[data-course-overview]').innerHTML=courseOverviewHTML(dirty?currentDraft():savedCourse,{draft:dirty});
     $('[data-course-overview]').hidden=false;form.hidden=true;$('.overview-toolbar').hidden=false;
     const edit=$('[data-edit-unit-plan]');edit.hidden=false;
@@ -68,8 +72,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     if(focus){$('#planner-title').focus();$('#planner-title').scrollIntoView({block:'start'});}
   }
   function editPlan(lessonIndex){
-    if(!course || saving || assistant.isBusy() || quizSetup.isBusy())return;
-    form.hidden=false;$('[data-course-overview]').hidden=true;$('[data-edit-unit-plan]').hidden=true;$('[data-preview-overview]').hidden=false;
+    if(!course || saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())return;
+    $('#course-preparation').hidden=true;form.hidden=false;$('[data-course-overview]').hidden=true;$('[data-edit-unit-plan]').hidden=true;$('[data-preview-overview]').hidden=false;
     $('.overview-toolbar').hidden=false;$('#planner-title').textContent=savedCourse?'Edit unit plan':'Create unit plan';
     if(!editorsReady){editorsReady=true;assistant.open();quizSetup.load();}
     if(Number.isInteger(lessonIndex)){
@@ -239,7 +243,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   $('#download-course').onclick = download;
   form.addEventListener('submit', async event => {
-    event.preventDefault(); if (saving || (assistant.isBusy() || quizSetup.isBusy())) return;
+    event.preventDefault(); if (saving || (assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())) return;
     let didSave=false;
     try {
       const next = validateCourse(currentDraft());
@@ -260,6 +264,8 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
         if (button) button.textContent = 'Edit course overview';
         onSaved?.();
         didSave=true;
+        try{const prepared=await preparation.afterSave();if(prepared)message('Course overview saved. '+prepared.saved.length+' quiz drafts saved for review.'+(prepared.skipped.length?' Existing quizzes or edited lessons were kept unchanged.':''));}
+        catch(e){message('Overview saved. Quiz drafts remain in Prepare Course with AI; open it and choose Save prepared quiz drafts to retry. '+e.message);}
       } finally { controls.forEach((el, i) => { el.disabled = disabled[i]; }); refreshScheduleControls(); }
     } catch (e) { error(e.message); message('Your draft has not been saved.'); }
     finally { saving = false; form.querySelector('button[type=submit]').disabled = false; if(didSave){fill(savedCourse);showOverview(true);loadQuizStates();} updateFeedbackButtons(); }
@@ -269,7 +275,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       if (Number.isInteger(lessonIndex)) editPlan(lessonIndex);
       return;
     }
-    assistant.reset(); quizSetup.reset();
+    assistant.reset(); quizSetup.reset(); preparation.reset();
     trigger = button; currentId = classId; revision = 0; dirty = false; const token = ++generation; course = null;
     form.hidden = true; $('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true;editorsReady=false;quizStates=null;error(''); message('Loading course overview…');
     $('#planner-class').textContent = getClasses().find(c => c.id === classId)?.name || '';
@@ -290,11 +296,11 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   }
   if (!root) list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
   window.addEventListener('beforeunload', event => { if (dirty && isOpen()) { event.preventDefault(); event.returnValue = ''; } });
-  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy() || quizSetup.isBusy(),
+  return { isOpen, open, hasUnsavedChanges: () => dirty || saving || assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy(),
     canLeave() {
-      if (saving || (assistant.isBusy() || quizSetup.isBusy())) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
+      if (saving || (assistant.isBusy() || quizSetup.isBusy() || preparation.isBusy())) { status.textContent = 'Wait for the course save or AI suggestion to finish before switching classes.'; return false; }
       return !dirty || confirm('Switch classes without saving this course overview? Your unsaved changes will be lost.');
     },
-    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); quizSetup.reset(); currentId = ''; course = null; savedCourse=null;quizStates=null;editorsReady=false;dirty = false; form.hidden = true; $('[data-course-overview]').replaceChildren();$('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true; }
+    reset() { generation++; clearTimeout(unlockTimer); assistant.reset(); quizSetup.reset(); preparation.reset(); currentId = ''; course = null; savedCourse=null;quizStates=null;editorsReady=false;dirty = false; form.hidden = true; $('[data-course-overview]').replaceChildren();$('[data-course-overview]').hidden=true;$('.overview-toolbar').hidden=true; }
   };
 }
