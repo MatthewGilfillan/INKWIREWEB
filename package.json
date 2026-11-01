@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "esbuild src/notebook-editor.js --bundle --minify --format=iife --target=es2020 --outfile=dist/notebook-editor.js --legal-comments=linked && node scripts/notebook-licenses.mjs && node scripts/build-invitations.mjs",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node --test tests/browser/*.browser.cjs"
   },
   "dependencies": {
     "@liveblocks/client": "3.24.5",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "esbuild": "0.25.12",
+    "playwright": "1.62.1",
     "wrangler": "4.156.0"
   }
 }

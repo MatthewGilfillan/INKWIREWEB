@@ -446,3 +446,109 @@ test('verification emails preserve only valid invitation context and return memb
     assert.ok(!f.mail.at(-1).text.includes('evil.invalid'));
   }finally{f.db.close();}
 });
+
+
+test('course overviews persist per class, enforce teacher membership, and preserve concurrent drafts', async () => {
+  const { defaults, generateLessons } = await import('../dist/course-model.mjs');
+  const f = await fixture();
+  try {
+    const owner = await signInAs(f, 'owner@example.invalid');
+    const guest = await signInAs(f, 'guest@example.invalid');
+    const student = await signInAs(f, 'student@example.invalid', 'student');
+    const { classroom } = await (await newClass(f, owner)).json();
+    const route = '/api/classes/' + classroom.id + '/overview';
+    const course = defaults('Rivendell literature'); course.lessons = generateLessons(course);
+    course.themes = 'Responsibility'; course.essentialQuestions = 'What makes a fair decision?';
+    Object.assign(course.lessons[0], { skills: 'Evidence selection', activities: 'Seminar', evidence: 'Exit ticket', sourcePages: '1–2' });
+    course.lessons[0].reading = 'Chapter 1: ' + 'Discuss this passage. '.repeat(300);
+    // Trim to the per-field bound but make the whole plan larger than the old 8 KiB body limit.
+    course.lessons[0].reading = course.lessons[0].reading.slice(0, 1200);
+    for (const lesson of course.lessons) lesson.homework = 'Develop your interpretation. '.repeat(25).trim();
+    const body = { revision: 0, course };
+    assert.ok(JSON.stringify(body).length > 8192);
+    assert.equal((await f.request(route, undefined, guest)).status, 404);
+    assert.equal((await f.request(route, body, guest)).status, 404);
+    assert.equal((await f.request(route, body, student)).status, 403);
+    assert.equal((await f.request(route, body, { ...owner, Origin: 'https://evil.invalid' })).status, 403);
+    assert.equal((await f.request(route, body, owner)).status, 200);
+    assert.equal((await f.request(route, body, owner)).status, 200, 'a lost-response retry does not create a conflict');
+    const saved = await (await f.request(route, undefined, owner)).json();
+    assert.deepEqual(saved.course, course); assert.equal(saved.revision, 1);
+    const invite = await (await f.request('/api/classes/' + classroom.id + '/invite', {}, owner)).json();
+    await f.request('/api/classes/join', { code: invite.code }, guest);
+    assert.equal((await f.request(route, undefined, guest)).status, 200);
+    const updated = { ...course, description: 'A revised course overview.' };
+    assert.equal((await f.request(route, { revision: 1, course: updated }, guest)).status, 200);
+    assert.equal((await f.request(route, { revision: 1, course: { ...course, description: 'Stale edit' } }, owner)).status, 409);
+    assert.equal((await (await f.request(route, undefined, owner)).json()).course.description, updated.description);
+    const listed = (await (await f.request('/api/classes', undefined, owner)).json()).classes[0];
+    assert.equal(listed.overviewRevision, 2); assert.equal(listed.courseWeeks, 15); assert.equal(listed.courseMinutes, 120);
+    f.db.prepare('DELETE FROM class_teachers').run();
+    assert.equal((await f.request(route, undefined, guest)).status, 404);
+    assert.equal((await f.request(route, { revision: 2, course: { ...course, weeks: 16 } }, owner)).status, 400);
+  } finally { f.db.close(); }
+});
+
+test('class owners can delete into Trash and restore plans/rosters while access and invitations pause',async()=>{
+  const {defaults,generateLessons}=await import('../dist/course-model.mjs');
+  const f=await fixture();try{
+    const owner=await signInAs(f,'owner@example.invalid'),guest=await signInAs(f,'guest@example.invalid'),outsider=await signInAs(f,'other@example.invalid');
+    const student=await signInAs(f,'student@example.invalid','student'),parent=await signInAs(f,'parent@example.invalid','parent');
+    const {classroom}=await(await newClass(f,owner,'Trash test')).json(),id=classroom.id,route='/api/classes/'+id;
+    const course=defaults('Preserved course');course.lessons=generateLessons(course);await f.request(route+'/overview',{revision:0,course},owner);
+    const learner=await addLearner(f,owner,id),family=await inviteLearner(f,owner,id,'family',learner),personal=await inviteLearner(f,owner,id,'student',learner);
+    await joinLearner(f,parent,family);await joinLearner(f,student,personal);
+    const code=await(await f.request(route+'/invite',{},owner)).json();await f.request('/api/classes/join',{code:code.code},guest);
+    const classInvite=await inviteLearner(f,owner,id,'class');
+    assert.equal((await f.request(route+'/delete',{},guest)).status,404);assert.equal((await f.request(route+'/delete',{},outsider)).status,404);
+    assert.equal((await f.request(route+'/delete',{},student)).status,403);
+    assert.equal((await f.request(route+'/delete',{}, {...owner,Origin:'https://evil.invalid'})).status,403);
+    const first=await(await f.request(route+'/delete',{},owner)).json();assert.ok(first.classroom.deletedAt);
+    assert.deepEqual(await(await f.request(route+'/delete',{},owner)).json(),first,'repeat deletion keeps its original time');
+    for(const headers of [owner,guest])assert.deepEqual((await(await f.request('/api/classes',undefined,headers)).json()).classes,[]);
+    assert.equal((await(await f.request('/api/classes/trash',undefined,owner)).json()).classes.length,1);
+    assert.equal((await(await f.request('/api/classes/trash',undefined,guest)).json()).classes.length,0);
+    assert.equal((await f.request(route+'/overview',undefined,owner)).status,404);
+    assert.equal((await enroll(f,'/classes/'+id+'/roster',undefined,guest)).status,404);
+    assert.equal((await f.request('/api/classes/join',{code:code.code},outsider)).status,400);
+    assert.equal((await enroll(f,'/preview',classInvite,student)).status,400);
+    assert.equal((await joinLearner(f,student,personal)).status,400);
+    assert.equal((await joinLearner(f,parent,family)).status,400);
+    assert.deepEqual((await(await enroll(f,'/mine',undefined,student)).json()).classes,[]);
+    const familyView=await(await enroll(f,'/mine',undefined,parent)).json();assert.equal(familyView.children.length,1);assert.deepEqual(familyView.children[0].classes,[]);
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM class_students').get().n,1);
+    assert.equal((await f.request(route+'/restore',{},guest)).status,404);
+    assert.equal((await f.request(route+'/restore',{},owner)).status,200);
+    assert.equal((await f.request(route+'/restore',{},owner)).status,200);
+    assert.deepEqual((await(await f.request(route+'/overview',undefined,owner)).json()).course,course);
+    assert.equal((await(await enroll(f,'/mine',undefined,student)).json()).classes.length,1);
+    assert.equal((await(await enroll(f,'/classes/'+id+'/roster',undefined,owner)).json()).students[0].parents.length,1);
+    assert.equal((await(await f.request('/api/classes',undefined,guest)).json()).classes.length,1);
+    assert.equal((await enroll(f,'/preview',classInvite,student)).status,200,'unexpired invitations work again after restore');
+  }finally{f.db.close();}
+});
+
+test('calendar includes only accessible active classes, converts course times and validates query ranges',async()=>{
+  const {defaults,generateLessons}=await import('../dist/course-model.mjs');
+  const f=await fixture();try{
+    const owner=await signInAs(f,'owner@example.invalid'),guest=await signInAs(f,'guest@example.invalid'),student=await signInAs(f,'student@example.invalid','student');
+    const {classroom}=await(await newClass(f,owner,'Calendar test')).json();
+    const course={...defaults('Scheduled course'),weeks:1,startTime:'00:30',startDate:'2026-11-01'};course.lessons=generateLessons(course);
+    await f.request('/api/classes/'+classroom.id+'/overview',{revision:0,course},owner);
+    const route='/api/classes/calendar?from=2026-10-01&to=2026-11-01&timeZone=Asia/Bangkok';
+    assert.equal((await f.request(route)).status,401);assert.equal((await f.request(route,undefined,student)).status,403);
+    assert.deepEqual((await(await f.request(route,undefined,guest)).json()).events,[]);
+    const events=(await(await f.request(route,undefined,owner)).json()).events;
+    assert.equal(events.length,1);assert.equal(events[0].date,'2026-10-31');assert.equal(events[0].startsAt,'2026-10-31T16:30:00.000Z');
+    assert.equal(events[0].endsAt,'2026-10-31T18:30:00.000Z');assert.equal(events[0].feedback,undefined);assert.equal(events[0].sourceNotes,undefined);
+    assert.equal((await f.request('/api/classes/calendar?from=2026-01-01&to=2027-01-01',undefined,owner)).status,400);
+    assert.equal((await f.request('/api/classes/calendar?from=2026-02-30&to=2026-03-31',undefined,owner)).status,400);
+    assert.equal((await f.request(route.replace('Asia/Bangkok','Nowhere'),undefined,owner)).status,400);
+    const invite=await(await f.request('/api/classes/'+classroom.id+'/invite',{},owner)).json();await f.request('/api/classes/join',{code:invite.code},guest);
+    assert.equal((await(await f.request(route,undefined,guest)).json()).events.length,1);
+    await f.request('/api/classes/'+classroom.id+'/delete',{},owner);
+    assert.deepEqual((await(await f.request(route,undefined,guest)).json()).events,[]);
+    await f.request('/api/classes/'+classroom.id+'/restore',{},owner);
+    assert.equal((await(await f.request(route,undefined,guest)).json()).events.length,1);
+  }finally{f.db.close();}
+});
