@@ -73,7 +73,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     $('.overview-toolbar').hidden=false;$('#planner-title').textContent=savedCourse?'Edit unit plan':'Create unit plan';
     if(!editorsReady){editorsReady=true;assistant.open();quizSetup.load();}
     if(Number.isInteger(lessonIndex)){
-      const row=$(`[data-plan-lesson="${lessonIndex}"]`);if(row){row.open=true;row.querySelector('input').focus();row.scrollIntoView({block:'start'});}
+      const row=$(`[data-plan-lesson="${lessonIndex}"]`);if(row){row.open=true;row.querySelector('[data-lesson-field="title"]').focus();row.scrollIntoView({block:'start'});}
     }else{$('#planner-title').focus();$('#planner-title').scrollIntoView({block:'start'});}
   }
   $('[data-edit-unit-plan]').onclick=()=>editPlan();

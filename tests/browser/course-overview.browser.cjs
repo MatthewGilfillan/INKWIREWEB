@@ -46,6 +46,9 @@ test('course overview defaults to a readable outline; editing, draft preview, sa
     await page.getByRole('button',{name:'Close pre-lesson quiz',exact:true}).click();
     await page.getByRole('button',{name:'Edit lesson 2',exact:true}).click();
     assert.equal(await page.locator('#course-form').isVisible(),true);assert.equal(await page.locator('[data-plan-lesson="1"]').getAttribute('open'),'');
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'lesson-1-title');
+    assert.equal(await page.locator('[data-plan-lesson="1"] [data-charge-cancellation]').isVisible(),true);
+    assert.equal(await page.locator('[data-plan-lesson="0"] [data-charge-cancellation]').isVisible(),false);
     await page.locator('#lesson-1-title').fill('Chapters 1–4: a change of perspective');
     failSave=true;await page.getByRole('button',{name:'Save course overview',exact:true}).click();await page.getByText('Please try saving again.',{exact:true}).waitFor();
     assert.equal(await page.locator('#course-form').isVisible(),true);assert.equal(await page.locator('#lesson-1-title').inputValue(),'Chapters 1–4: a change of perspective');
