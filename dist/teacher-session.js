@@ -2,15 +2,18 @@ import {createMemberCourse} from './member-course.js';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
 import {createTeacherCalendar} from './teacher-calendar.js';
+import {createTeacherToday} from './teacher-today.js';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
 const rosters=new Map();
-let currentView='classes',deletingClass='',activeClassId='',activeTab='students';
+let currentView='today',deletingClass='',activeClassId='',activeTab='students';
 const classTabs=new Map();
 function problem(error) {status.textContent=error.message;if(error.status===401){list.replaceChildren();location.replace('/account');}}
 function openDialog(id,button){returnFocus=button;document.getElementById(id).showModal();}
-document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openDialog(button.dataset.open,button)));
+document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>{const menu=button.closest('.today-account');if(menu)menu.open=false;openDialog(button.dataset.open,button);}));
+document.addEventListener('click',event=>{const menu=$('.today-account');if(menu&&!menu.contains(event.target))menu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')$('.today-account').open=false;});
 document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
@@ -22,11 +25,12 @@ list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classe
   ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='students'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Homework completion will appear when submission tracking is connected.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
-const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onSaved:()=>{calendar.refresh();classCalendar.refresh();}});
+const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onSaved:()=>{calendar.refresh();classCalendar.refresh();today.refresh();}});
 const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-timeline'),onEditLesson:openCourseTab});
 const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
+const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('students',button);$('.teacher-heading h1').focus();},problem});
 function renderClasses(){
   $('#selected-class').innerHTML=classrooms.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
   $('#class-empty').hidden=Boolean(classrooms.length);$('#class-workspace').hidden=!classrooms.length;
@@ -60,7 +64,7 @@ async function showClassTab(tab,button,lessonIndex){
   if(tab==='timeline')await teacherTimeline.open(activeClassId,null,button);
 }
 async function openCourseTab(id,button,lessonIndex){
-  if(!await selectClass(id))return;showView('classes');await showClassTab('overview',button,lessonIndex);
+  if(!await selectClass(id))return;showView('classes');await showClassTab('overview',button,lessonIndex);if(!Number.isInteger(lessonIndex))$('.teacher-heading h1').focus();
 }
 $('#selected-class').onchange=event=>selectClass(event.target.value);
 list.querySelector('[role=tablist]').addEventListener('click',event=>{const button=event.target.closest('[data-class-tab]');if(button)showClassTab(button.dataset.classTab,button);});
@@ -78,7 +82,9 @@ async function loadTrash(){
   }catch(error){$('#trash-list').textContent=error.message;$('#retry-trash').hidden=false;if(error.status===401)problem(error);}
 }
 function showView(view){
-  $('.teacher-heading h1').textContent=view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':'My classes';
+  $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':'My classes';
+  $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':'Restore classes and their course plans.';
+  $('#teacher-today').hidden=view!=='today';
   currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
   document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
   if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();
@@ -117,7 +123,7 @@ async function loadRoster(classId){
 }
 async function loadClasses(force=false){
   if(loading||(!force && coursePlanner.hasUnsavedChanges()))return;loading=true;retry.hidden=true;status.textContent='Loading your classes…';
-  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();if(currentView==='trash')await loadTrash();status.textContent='';}
+  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();today.refresh();if(currentView==='trash')await loadTrash();status.textContent='';}
   catch(error){problem(error);retry.hidden=false;}finally{loading=false;}
 }
 for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes/join']]){
@@ -183,6 +189,6 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();

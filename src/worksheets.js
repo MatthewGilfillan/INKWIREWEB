@@ -1,7 +1,9 @@
+import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
 import {fontName} from './text-format.mjs';
 import * as pdfjs from 'pdfjs-dist';
 import {escape,requestId} from '../dist/workspace-shared.js';
 export async function mountWorksheet(root=document,options={}){
+const toolWidgets=[];
 const controller=new AbortController();const listen=(target,type,handler)=>target.addEventListener(type,handler,{signal:controller.signal});
 pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
 const $=selector=>root.querySelector(selector);
@@ -36,6 +38,8 @@ const realAdapter={
   publish:()=>request(endpoint('/publish'),{method:'POST'}),
   upload:(file,pages,title,id)=>request('/api/worksheets?'+new URLSearchParams({classId,title}),{method:'POST',headers:{'Content-Type':'application/pdf','X-PDF-Pages':JSON.stringify(pages),'X-Worksheet-Id':id},body:file}),
 };
+let textInkColor='#243556';
+const strokeSettings={pen:{color:'#243556',size:1.42},highlight:{color:'#fff176',size:14.17}};
 let adapter=realAdapter;
 if(demo){
   const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');adapter=await createPreviewAdapter(query.get('role')||'teacher',notebookContext?{classId,learnerId:requestedLearner,liveParent:true}:{});
@@ -97,9 +101,15 @@ function applyZoom(){for(let i=0;i<pageNodes.length;i++){const {width,height}=me
 function fitWidth(){if(!meta)return;const width=Math.max(200,$('#page-scroll').clientWidth-70);zoom=Math.min(1.4,width/Math.max(...meta.pages.map(p=>p.width)));fit=true;applyZoom();}
 $('#zoom-in').onclick=()=>{zoom=Math.min(2.5,zoom+.15);fit=false;applyZoom();};$('#zoom-out').onclick=()=>{zoom=Math.max(.25,zoom-.15);fit=false;applyZoom();};$('#fit-page').onclick=fitWidth;const resizeObserver=new ResizeObserver(()=>{if(fit&&meta&&!printing)fitWidth();});resizeObserver.observe($('#page-scroll'));
 $('#page-navigation').onclick=event=>{const b=event.target.closest('[data-page]');if(b){activePage=Number(b.dataset.page);pageNodes[activePage].wrap.scrollIntoView({block:'start',behavior:'smooth'});$('#page-navigation .active')?.classList.remove('active');b.classList.add('active');}};
-function setTool(next){if(editing)document.activeElement?.blur();tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);document.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
+function setTool(next){if(editing)document.activeElement?.blur();if(tool!==next){if(tool==='text')textInkColor=$('#ink-color').value;selected=null;renderMarks();}tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);root.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});if(strokeSettings[next])$('#ink-color').value=strokeSettings[next].color;else if(next==='text')$('#ink-color').value=textInkColor;toolWidgets.forEach(w=>w.sync?.());renderStrokePresets();$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
+function renderStrokePresets(){const drawing=tool==='pen'||tool==='highlight';$('#draw-presets').hidden=!drawing;for(const id of ['text-font','text-size','text-highlight'])$('#'+id).closest('label').hidden=drawing;for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).hidden=drawing;$('#ink-size').closest('label').hidden=true;if(!drawing)return;
+ const colors=tool==='highlight'?[['Yellow','#fff176'],['Pink','#ff6ec7'],['Cyan','#67e8f9'],['Lime','#a3e635']]:[['Black','#243556'],['Blue','#0070c0'],['Green','#008000'],['Red','#ff0000']];
+ const widths=tool==='highlight'?[2.5,3.5,5,6.5,8]:[0.25,0.35,0.5,0.7,1];
+ $('#draw-presets').innerHTML='<span class="stroke-quick-colors" role="group" aria-label="Quick ink colours">'+colors.map(([name,color])=>`<button type="button" data-ink-preset="${color}" aria-label="${name} ink" aria-pressed="${$('#ink-color').value===color}" style="--ink-swatch:${color}"></button>`).join('')+'</span><span class="stroke-widths" role="group" aria-label="Stroke width">'+widths.map(mm=>{const width=Math.round(mm*72/25.4*100)/100;return `<button type="button" data-stroke-width="${width}" aria-label="${mm} millimetre ${tool==='highlight'?'highlighter':'pen'}" aria-pressed="${Math.abs(strokeSettings[tool].size-width)<.02}"><svg width="40" height="18" viewBox="0 0 40 18" aria-hidden="true"><path d="M2 13C10 0 14 20 22 10S30 2 38 5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="${tool==='highlight'?Math.min(9,width/2):Math.max(1,width)}"/></svg><span>${mm} mm</span></button>`;}).join('')+'</span>';
+}
+
 $('#drawing-tools').onclick=event=>{const b=event.target.closest('button[data-tool]');if(b)setTool(b.dataset.tool);};
-function select(id){if(editing&&editing!==id)document.activeElement?.blur();selected=id;const mark=marks.get(id);if(mark?.kind==='text'){$('#text-font').value=mark.fontFamily||'Calibri';$('#text-size').value=mark.fontSize;$('#ink-color').value=mark.color;$('#text-highlight').value=mark.backgroundColor||'#fff176';for(const [key,control]of [['bold','text-bold'],['italic','text-italic'],['underline','text-underline'],['backgroundColor','text-highlight-toggle']])$('#'+control).setAttribute('aria-pressed',String(!!mark[key]));}renderMarks();$('#delete-mark').disabled=!own(marks.get(id));}
+function select(id){if(editing&&editing!==id)document.activeElement?.blur();selected=id;const mark=marks.get(id);if(mark?.kind==='text'){$('#text-font').value=mark.fontFamily||'Calibri';$('#text-size').value=mark.fontSize;$('#ink-color').value=mark.color;$('#text-highlight').value=mark.backgroundColor||'#fff176';for(const [key,control]of [['bold','text-bold'],['italic','text-italic'],['underline','text-underline'],['backgroundColor','text-highlight-toggle']])$('#'+control).setAttribute('aria-pressed',String(!!mark[key]));}toolWidgets.forEach(w=>w.sync?.());renderMarks();$('#delete-mark').disabled=!own(marks.get(id));}
 function makeStroke(mark){const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',mark.points.map(p=>p.join(',')).join(' '));line.setAttribute('fill','none');line.setAttribute('stroke',mark.color);line.setAttribute('stroke-width',mark.size);line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');if(mark.kind==='highlight')line.setAttribute('opacity','.32');line.classList.add('stroke');if(mark.id===selected)line.classList.add('selected-stroke');line.dataset.mark=mark.id||'';return line;}
 function renderMarks(){
   if(!meta)return;
@@ -147,7 +157,7 @@ function pointerDown(event){
     const size=Number($('#text-size').value),pageSize=meta.pages[page],width=Math.min(220,pageSize.width),height=Math.min(90,pageSize.height);const id=create({kind:'text',page,x:Math.min(p[0],pageSize.width-width),y:Math.min(p[1],pageSize.height-height),width,height,fontSize:size,...textAppearance(),color:$('#ink-color').value,text:queuedFeedback||''});queuedFeedback='';$('#feedback-select').value='';select(id);startText(id);return;
   }
   if(tool==='erase'){const found=hit(page,p);if(found)remove(found.id);gesture={kind:'erase',page,pointerId:event.pointerId};}
-  else gesture={kind:'draw',page,pointerId:event.pointerId,mark:{kind:tool,page,color:$('#ink-color').value,size:tool==='highlight'?Number($('#ink-size').value)*4:Number($('#ink-size').value),points:[p,p]}};
+  else gesture={kind:'draw',page,pointerId:event.pointerId,mark:{kind:tool,page,color:$('#ink-color').value,size:strokeSettings[tool].size,points:[p,p]}};
   event.currentTarget.setPointerCapture(event.pointerId);renderMarks();
 }
 function pointerMove(event){
@@ -163,9 +173,13 @@ function pointerCancel(event){if(!gesture||event.pointerId!==gesture.pointerId)r
 $('#delete-mark').onclick=()=>remove(selected);
 function undo(direction){if(editing)document.activeElement?.blur();const from=direction==='undo'?history:redo,to=direction==='undo'?redo:history,step=from.pop();if(!step)return;const current=marks.get(step.id),desired=direction==='undo'?step.before:step.after;if(!own(current))return;const next=desired?{...clone(desired),version:current.version}:{...current,deleted:true};marks.set(step.id,next);queue(next);to.push(step);renderMarks();}
 $('#undo-mark').onclick=()=>undo('undo');$('#redo-mark').onclick=()=>undo('redo');
-function styleSelection(){const m=marks.get(selected);if(!own(m))return;const next={...m,color:$('#ink-color').value,...(m.kind==='text'?{fontSize:textAppearance().fontSize,...textAppearance()}:{size:Number($('#ink-size').value)*(m.kind==='highlight'?4:1)})};change(next);}
+function styleSelection(){const m=marks.get(selected);if(!own(m))return;const next={...m,color:$('#ink-color').value,...(m.kind==='text'?{fontSize:textAppearance().fontSize,...textAppearance()}:{size:strokeSettings[m.kind]?.size||m.size})};change(next);}
 function textAppearance(){let family='Calibri';try{family=fontName($('#text-font').value)||'Calibri';}catch{}return {fontSize:Math.max(8,Math.min(96,Number($('#text-size').value)||16)),fontFamily:family,bold:$('#text-bold').getAttribute('aria-pressed')==='true',italic:$('#text-italic').getAttribute('aria-pressed')==='true',underline:$('#text-underline').getAttribute('aria-pressed')==='true',backgroundColor:$('#text-highlight-toggle').getAttribute('aria-pressed')==='true'?$('#text-highlight').value:null};}
-for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=styleSelection;
+for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=()=>{if(strokeSettings[tool]&&id==='ink-color')strokeSettings[tool].color=$('#ink-color').value;styleSelection();if(strokeSettings[tool])renderStrokePresets();};
+const presets=document.createElement('div');presets.id='draw-presets';presets.className='draw-presets';$('#style-tools').append(presets);presets.onclick=event=>{const button=event.target.closest('button');if(!button||!strokeSettings[tool])return;if(button.dataset.inkPreset){$('#ink-color').value=button.dataset.inkPreset;strokeSettings[tool].color=button.dataset.inkPreset;}if(button.dataset.strokeWidth)strokeSettings[tool].size=Number(button.dataset.strokeWidth);toolWidgets.forEach(w=>w.sync?.());styleSelection();renderStrokePresets();};
+toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection();}}),addSizePresets($('#text-size')),addDeviceFonts($('#text-font'),$('#pdf-fonts'),Array.from($('#pdf-fonts').options,o=>o.value)));
+$('#ink-color').addEventListener('clear-text-color',()=>{$('#ink-color').value='#243556';toolWidgets.forEach(w=>w.sync?.());styleSelection();});
+$('#text-highlight').addEventListener('clear-text-color',()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','false');styleSelection();});
 for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).onclick=()=>{$('#'+id).setAttribute('aria-pressed',String($('#'+id).getAttribute('aria-pressed')!=='true'));styleSelection();};
 $('#feedback-select').onchange=event=>{queuedFeedback=event.target.value;if(queuedFeedback){setTool('text');$('#tool-hint').textContent='Click on the page to place this feedback. You can edit its wording.';}};
 listen(window,'keydown',event=>{if(!meta||!editable()||event.target.matches('input,textarea,select')||event.target.isContentEditable)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey?'redo':'undo');}else if(['Delete','Backspace'].includes(event.key)&&selected){event.preventDefault();remove(selected);}});
@@ -204,6 +218,6 @@ $('#upload-form').onsubmit=async event=>{
   finally{await task?.destroy();button.disabled=false;button.textContent='Add worksheet';}
 };
 await loadLibrary();
-return {destroy(){resetWorkspace();controller.abort();resizeObserver.disconnect();}};
+return {destroy(){resetWorkspace();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
 }
 if(document.body.classList.contains('worksheet-app'))await mountWorksheet();

@@ -25,3 +25,14 @@ Run `npm test && npm run build`. Apply `cloudflare/migrations/0014_notebooks.sql
 For the hosted practice workspace, open `/notebooks.html?preview=1`. Teacher, student and parent links share fictional records through this browser's IndexedDB; they do not sync across devices or upload practice data to Cloudflare. Practice mode is disabled on `inkwire-education.com` and its www host. Dashboard links for real accounts use `/notebooks` with class/notebook IDs; the Worker protects that route and its aliases.
 
 Automated checks cover session-protected routes, membership revocation, parent read-only access, concurrent teacher/student merges, live parent PDF reads, stable PDF references, malformed formatting, notebook limits and cross-origin write rejection.
+
+
+### Text and ink controls
+
+Notebook text and PDF annotations offer theme shades and standard colour swatches, with More colours for a custom colour. Font size presets include 9.5, 10.5 and 11.5 points; custom sizes remain available from 8 to 96. The Device fonts button lists installed font families through the browser Local Font Access API after a user click and browser consent. The font list stays in page memory; only a selected font name is saved with shared text. Unsupported browsers retain a font-name field. Other devices require the same font to render it identically.
+
+PDF Pen and Highlight modes show separate remembered colour and width presets with stroke previews. Text mode retains font controls, and stays selected after a text box is created.
+
+### Teacher landing page
+
+The teacher dashboard opens on Today: next scheduled or current lesson, class list, review links into each class notebook collection, and master notebooks. Details use existing authenticated course and roster APIs. Cancelled and completed-by-time lessons are excluded from Up next; invalid or ambiguous local times are not guessed. Display times use Bangkok (UTC+7). Classes retains the existing students, overview, calendar, timeline and notebook tools. Account and class-join controls are in the avatar menu.

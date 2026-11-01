@@ -1,3 +1,4 @@
+import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
 import {TextFrame,placeTextFrame} from './text-frame.mjs';
 import {TextFormat,fontChoices,fontName,textSize,textColor} from './text-format.mjs';
 import { Editor } from '@tiptap/core';
@@ -37,9 +38,9 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     activeProvider = getYjsProviderForRoom(connection.room);
     cleanup = connection.leave;
   }
-  const buttons = [],formatControls=[];
+  const buttons = [],formatControls=[],toolWidgets=[];
   function updateToolbar(editor) {
-    const attrs=editor.getAttributes('textStyle');for(const c of formatControls){c.input.disabled=!editor.isEditable;if(window.document.activeElement!==c.input)c.input.value=c.key==='fontSize'?parseFloat(attrs.fontSize)||16:attrs[c.key]||c.fallback;}
+    const attrs=editor.getAttributes('textStyle');for(const c of formatControls){c.input.disabled=!editor.isEditable;if(window.document.activeElement!==c.input)c.input.value=c.key==='fontSize'?parseFloat(attrs.fontSize)||16:attrs[c.key]||c.fallback;c.widget?.sync?.();}
     for (const { button, active, available } of buttons) {
       if (active) button.setAttribute('aria-pressed', String(active(editor)));
       button.disabled = !editor.isEditable || (available ? !available(editor) : false);
@@ -91,8 +92,8 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   const fonts=window.document.createElement('datalist');fonts.id='folio-font-families';for(const name of fontChoices){const option=window.document.createElement('option');option.value=name;fonts.append(option);}toolbar.append(fonts);
   for(const spec of [{key:'fontFamily',label:'Font family',type:'text',fallback:'Calibri',clean:fontName},{key:'fontSize',label:'Font size',type:'number',fallback:'16',clean:textSize},{key:'color',label:'Text color',type:'color',fallback:'#243556',clean:textColor},{key:'backgroundColor',label:'Text highlight color',type:'color',fallback:'#fff176',clean:textColor}]){
     const label=window.document.createElement('label');label.className='format-control';label.textContent=spec.label;const input=window.document.createElement('input');input.type=spec.type;input.setAttribute('aria-label',spec.label);input.value=spec.fallback;
-    if(spec.key==='fontFamily'){input.setAttribute('list',fonts.id);input.placeholder='Font name';}if(spec.type==='number'){input.min='8';input.max='96';input.step='1';}
-    input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');activeEditor.chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);toolbar.append(label);formatControls.push({...spec,input});
+    if(spec.key==='fontFamily'){input.setAttribute('list',fonts.id);input.placeholder='Font name';}if(spec.type==='number'){input.min='8';input.max='96';input.step='0.5';}
+    input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');activeEditor.chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);toolbar.append(label);let widget;if(spec.type==='color'){widget=addColorPalette(input,{label:spec.label,highlight:spec.key==='backgroundColor'});input.addEventListener('clear-text-color',()=>activeEditor.chain().focus().setMark('textStyle',{[spec.key]:spec.key==='color'?'#243556':null}).run());}else if(spec.key==='fontSize')widget=addSizePresets(input);else if(spec.key==='fontFamily')widget=addDeviceFonts(input,fonts,fontChoices);if(widget)toolWidgets.push(widget);formatControls.push({...spec,input,widget});
   }
   const clear=window.document.createElement('button');clear.type='button';clear.textContent='Clear highlight';clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>activeEditor.chain().focus().setMark('textStyle',{backgroundColor:null}).run();toolbar.append(clear);buttons.push({button:clear});
 
@@ -125,6 +126,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     cleanup = () => { provider.off('status', refresh); unsubs.forEach(fn => fn()); leave(); };
     refresh(); people();
   }
+  const previousCleanup=cleanup;cleanup=()=>{toolWidgets.forEach(w=>w.destroy());previousCleanup();};
 }
 
 window.InkWireEditor = { mount, destroy, hasPendingChanges,
