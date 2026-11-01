@@ -117,9 +117,13 @@ export function validateCourse(value) {
   catch { throw Error('Choose a valid time zone.'); }
   Object.assign(course, { startDate: value.startDate, startTime: value.startTime, timeZone: value.timeZone });
   if (!Array.isArray(value.lessons) || value.lessons.length !== (course.lessonCount ?? course.weeks * course.lessonsPerWeek) || value.lessons.length > 156) throw Error('Generate the weekly plan after changing the course length.');
+  const lessonIds = new Set();
   course.lessons = value.lessons.map((lesson, i) => {
     if (lesson.week !== Math.floor(i / course.lessonsPerWeek) + 1 || lesson.slot !== i % course.lessonsPerWeek + 1 || (lesson.date !== '' && !validDate(lesson.date))) throw Error('Check the lesson dates and order.');
-    const result = { week: lesson.week, slot: lesson.slot, date: lesson.date, title: text(lesson.title, 160, 'lesson topic', true), goal: text(lesson.goal, 1200, 'learning goals'), reading: text(lesson.reading, 1200, 'reading'), homework: text(lesson.homework, 1200, 'homework') };
+    const id = lesson.id || `legacy-${i + 1}`;
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(id) || lessonIds.has(id)) throw Error('Lesson identifiers must be unique.');
+    lessonIds.add(id);
+    const result = { ...(lesson.id ? {id:lesson.id} : {}), week: lesson.week, slot: lesson.slot, date: lesson.date, title: text(lesson.title, 160, 'lesson topic', true), goal: text(lesson.goal, 1200, 'learning goals'), reading: text(lesson.reading, 1200, 'reading'), homework: text(lesson.homework, 1200, 'homework') };
     for (const [key, max] of [['section', 160], ['skills', 2000], ['activities', 4000], ['evidence', 2000], ['sourcePages', 80]]) if (lesson[key] !== undefined) result[key] = text(lesson[key], max, key);
     return result;
   });
