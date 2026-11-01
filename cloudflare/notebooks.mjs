@@ -27,7 +27,7 @@ export async function handleNotebooks(request,env,user) {
     return json({userId:user.id,role:user.requestedRole,notebooks:rows.results.map(r=>({...r,id:notebookKey(r.classId,r.learnerId),title:r.learnerName})),classes:teacher?(await env.DB.prepare(`SELECT c.id,c.name FROM classes c WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ORDER BY c.name`).bind(user.id,user.id).all()).results:[]});
   }
   const [classId,learnerId,kind,id]=parts;
-  if(!ID.test(classId||'')||!ID.test(learnerId||''))return fail('Notebook not found.',404,'NOT_FOUND');
+  if(!ID.test(classId||'')||!(ID.test(learnerId||'')||/^[a-f0-9]{32}$/.test(learnerId||'')))return fail('Notebook not found.',404,'NOT_FOUND');
   if(teacher&&!await canTeach(env,user,classId))return fail('Notebook not found.',404,'NOT_FOUND');
   const learner=await env.DB.prepare(`SELECT l.id,l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? AND l.id=? ${student?'AND l.user_id=?':parent?'AND EXISTS (SELECT 1 FROM learner_parents p WHERE p.learner_id=l.id AND p.parent_id=?)':''}`).bind(classId,learnerId,...(!teacher?[user.id]:[])).first();
   if(!learner)return fail('Notebook not found.',404,'NOT_FOUND');
