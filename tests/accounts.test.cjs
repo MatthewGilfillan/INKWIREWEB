@@ -684,7 +684,8 @@ test('notebook and PDF routes require the website session, including HTML aliase
   for(const path of ['/notebooks','/notebooks/','/notebooks.html','/worksheets','/worksheets/','/worksheets.html'])assert.equal((await f.request(path)).headers.get('Location'),'/account');
   for(const path of ['/api/notebooks','/api/worksheets'])assert.equal((await f.request(path)).status,401);
   await f.signup();await f.activate();const cookies=f.cookie(await f.post('signin',{email:EMAIL,password:PASSWORD}));
-  for(const path of ['/notebooks','/worksheets']){const page=await f.request(path,undefined,{Cookie:cookies});assert.equal(page.status,200);assert.equal(page.headers.get('Cache-Control'),'no-store');assert.match(page.headers.get('Content-Security-Policy'),/frame-ancestors 'self'/);}
+  for(const path of ['/notebooks']){const page=await f.request(path,undefined,{Cookie:cookies});assert.equal(page.status,200);assert.equal(page.headers.get('Cache-Control'),'no-store');assert.match(page.headers.get('Content-Security-Policy'),/frame-ancestors 'self'/);}
+ const redirected=await f.request('/worksheets?class=sample-class&learner=sample-student&worksheet=sample-pdf',undefined,{Cookie:cookies});assert.equal(redirected.status,302);const target=new URL(redirected.headers.get('Location'),'https://inkwire-education.com');assert.equal(target.pathname,'/notebooks');assert.equal(target.searchParams.get('classId'),'sample-class');assert.equal(target.searchParams.get('notebookId'),'sample-class.sample-student');assert.equal(target.searchParams.get('pageId'),'sample-pdf');assert.equal(target.searchParams.get('sectionId'),'printouts');
  }finally{f.db.close();}
 });
 

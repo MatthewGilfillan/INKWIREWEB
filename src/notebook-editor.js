@@ -1,6 +1,5 @@
-import {createTypingCaret} from './typing-caret.mjs';
 import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
-import {TextFrame,insertTypedFrame} from './text-frame.mjs';
+import {TextFrame,placeCanvasCaret,ensureCanvasCaret,wrapPositionedParagraph} from './text-frame.mjs';
 import {TextFormat,fontChoices,fontName,textSize,textColor} from './text-format.mjs';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -40,18 +39,13 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     cleanup = connection.leave;
   }
   const buttons = [],formatControls=[],toolWidgets=[];
-  let caret;
-  const currentEditor=()=>caret?.editor||activeEditor;
-  const dismissCaret=()=>{caret?.destroy();caret=null;};
-  const showCaret=(attrs={x:24,y:24,width:340,height:30})=>{
-    if(!activeEditor?.isEditable)return;dismissCaret();
-    const canvas=activeEditor.view.dom,r=canvas.getBoundingClientRect(),base=element.getBoundingClientRect();
-    caret=createTypingCaret({parent:element,x:attrs.x+r.left-base.left+element.scrollLeft,y:attrs.y+r.top-base.top+element.scrollTop,width:attrs.width,onDismiss:dismissCaret,onSelection:updateToolbar,onCommit:(doc,selection)=>{const main=activeEditor;dismissCaret();insertTypedFrame(main,attrs,doc,selection);}});
-  };
+  const currentEditor=()=>activeEditor;
+  const showCaret=(attrs={x:24,y:24,width:340,height:30})=>{if(activeEditor?.isEditable)placeCanvasCaret(activeEditor.view,attrs);};
   const placeCaret=(view,event)=>{
-    if(!view.editable||event.button!==0||event.target.closest('.folio-text-frame,.ink-typing-caret,button,input,select,textarea'))return false;
+    if(!view.editable||event.button!==0||event.target.closest('.folio-text-frame,button,input,select,textarea'))return false;
     const empty=view.state.doc.childCount===1&&view.state.doc.firstChild.type.name==='paragraph'&&!view.state.doc.firstChild.content.size;
-    if(event.target!==view.dom&&!empty)return false;
+    const paragraph=event.target.closest('.ink-paragraph');const blank=paragraph&&!paragraph.classList.contains('folio-text-frame')&&!paragraph.querySelector('.ink-paragraph-content')?.textContent;
+    if(event.target!==view.dom&&!empty&&!blank)return false;
     event.preventDefault();const r=view.dom.getBoundingClientRect(),width=Math.min(340,Math.max(140,r.width-20));
     showCaret({x:Math.max(0,Math.min(r.width-width,event.clientX-r.left)),y:Math.max(0,event.clientY-r.top),width,height:30});return true;
   };
@@ -65,7 +59,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [TextFrame.configure({onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [TextFrame.configure({canvas:!!ydoc,onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -125,14 +119,12 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     button.setAttribute('aria-label', item.label);
     button.dataset.format = item.mark || item.label.toLowerCase();
     button.addEventListener('mousedown', event => event.preventDefault());
-    button.addEventListener('click', () => item.run(currentEditor().chain().focus()).run());
+    button.addEventListener('click', () => {if(['Heading','Bullet list','Numbered list','Quotation'].includes(item.label))wrapPositionedParagraph(activeEditor);item.run(currentEditor().chain().focus()).run();});
     buttons.push({ button, active: item.active || (item.mark ? e => e.isActive(item.mark) : null), available: item.available });
     (['Bold','Italic','Underline','Undo','Redo'].includes(item.label)?toolbar:formatBody).append(button);
   }
   updateToolbar(activeEditor);
-  const dismissOutside=event=>{if(!element.contains(event.target)&&!toolbar.contains(event.target))dismissCaret();};
-  window.document.addEventListener('pointerdown',dismissOutside);
-  const typingCleanup=cleanup;cleanup=()=>{dismissCaret();window.document.removeEventListener('pointerdown',dismissOutside);typingCleanup();};
+  if(ydoc&&!readOnly)ensureCanvasCaret(activeEditor.view);
   activeEditor.focusPage=()=>showCaret();
   if (shared) {
     const editor = activeEditor, provider = activeProvider, { room, leave } = connection;

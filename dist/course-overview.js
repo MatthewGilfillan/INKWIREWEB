@@ -32,12 +32,12 @@ export function courseOverviewHTML(course,{draft=false}={}) {
       ${lesson.section?`<p class="overview-section">${escape(lesson.section)}</p>`:''}${cancelled?'<span class="overview-cancelled">Cancelled</span>':''}
       ${lesson.goal?`<p class="overview-goal">${escape(lesson.goal)}</p>`:''}
       <ul class="overview-activities">
-      ${activity('book','Reading before class',lesson.reading)}
       <li class="overview-activity">${courseIcon('quiz')}<div><button type="button" class="overview-activity-link" data-overview-quiz="${escape(id)}" ${draft?'disabled':''}>Pre-lesson quiz</button><span class="overview-item-meta" data-overview-quiz-status="${escape(id)}">View / set up quiz</span></div></li>
       <li class="overview-activity">${courseIcon('video')}<div><span>Lesson ${i+1} · Live class</span><span class="overview-item-meta">${escape(date)}${timing.startTime?' · '+escape(timing.startTime):''} · ${timing.lessonMinutes} min</span>${lesson.rescheduledFrom?`<p class="overview-rescheduled">Rescheduled from ${escape(lesson.rescheduledFrom.date)} · ${escape(lesson.rescheduledFrom.startTime)}</p>`:''}${billing.get(id)?.label?`<p class="overview-billing">${escape(billing.get(id).label)}</p>`:''}</div></li>
+      <li class="overview-activity overview-feedback">${courseIcon('chart')}<div><button type="button" class="overview-activity-link" data-feedback-open="${escape(id)}" disabled>Summary &amp; Feedback</button><span class="overview-item-meta" data-feedback-unlock></span></div></li>
+      ${activity('book','Reading before class',lesson.reading)}
       ${activity('checklist','Lesson activities',lesson.activities)}
       ${activity('pencil','Homework & writing',lesson.homework)}
-      <li class="overview-activity overview-feedback">${courseIcon('chart')}<div><button type="button" class="overview-activity-link" data-feedback-open="${escape(id)}" disabled>Summary &amp; Feedback</button><span class="overview-item-meta" data-feedback-unlock></span></div></li>
       </ul></div></li>`;
   }).join('')}</ol>`;
 }

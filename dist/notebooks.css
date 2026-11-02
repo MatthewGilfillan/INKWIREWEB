@@ -25,3 +25,7 @@
 .folio-canvas:focus,.folio-canvas:focus-visible{outline:none!important;box-shadow:none!important}
 
 .folio-canvas{line-height:1.45}.ink-typing-caret{font-size:16pt}
+
+.folio-canvas .ink-page-caret{padding:3px;min-height:1.45em;z-index:2}.folio-canvas .ink-page-caret:empty{pointer-events:auto}
+
+.ink-paragraph.ink-page-caret{display:block!important}.ink-paragraph-content{margin:0!important}.ink-paragraph:not(.folio-text-frame):not(.ink-page-caret)>button{display:none!important}.ink-paragraph.folio-text-frame:hover>.frame-handle,.ink-paragraph.folio-text-frame:hover>.frame-resize,.ink-paragraph.folio-text-frame:focus-within>.frame-handle,.ink-paragraph.folio-text-frame:focus-within>.frame-resize{opacity:1}

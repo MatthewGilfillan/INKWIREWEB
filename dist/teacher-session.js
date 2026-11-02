@@ -60,11 +60,10 @@ async function selectClass(id){
   await showClassTab(classTabs.get(id)||'students');if(activeClassId!==id)return false;if(activeTab!=='students')loadRoster(id);return true;
 }
 async function showClassTab(tab,button,lessonIndex){
-  if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}activeTab=tab;classTabs.set(activeClassId,tab);
+  if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}if(tab==='notebooks'){if(!coursePlanner.canLeave())return;coursePlanner.reset();location.assign('/notebooks?'+new URLSearchParams({classId:activeClassId}));return;}activeTab=tab;classTabs.set(activeClassId,tab);
   for(const [id]of tabs){const selected=id===tab;$('#class-tab-'+id).setAttribute('aria-selected',String(selected));$('#class-tab-'+id).tabIndex=selected?0:-1;$('#class-panel-'+id).hidden=!selected;}
   if(tab==='students')await loadRoster(activeClassId);
   if(tab==='overview')await coursePlanner.open(activeClassId,button,lessonIndex);
-  if(tab==='notebooks')$('#class-panel-notebooks').innerHTML=`<h2>Class notebooks</h2><p>Open student notebooks for this class. Edits appear in the student and linked parent views.</p><a class="teacher-button" href="/notebooks?classId=${escape(activeClassId)}">Open class notebooks →</a><p><a class="text-button" href="/worksheets?class=${escape(activeClassId)}">PDF worksheet library →</a></p>`;
   if(tab==='files')await classFiles.open(activeClassId);
   if(tab==='calendar')await classCalendar.refresh();
   if(tab==='timeline')await teacherTimeline.open(activeClassId,null,button);

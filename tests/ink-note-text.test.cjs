@@ -37,3 +37,13 @@ test('committing the first typed content creates one positioned outline with an 
  insertTypedFrame(editor,{x:140,y:90,width:340,height:30},{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Ready'}]}]},{anchor:6,head:6});
  assert.equal(state.doc.firstChild.type.name,'textFrame');assert.equal(state.doc.textContent,'Ready');assert.equal(state.doc.firstChild.attrs.height,30);assert.equal(state.selection.from,7);assert.equal(focused,true);
 });
+test('placing the canvas caret does not change the document; first input preserves the same paragraph',async()=>{
+ const {schema,EditorState,TextSelection}=await setup();const {canvasTyping,canvasCaretKey,textFrameCleanup}=await import('../src/text-frame.mjs');
+ let state=EditorState.create({schema,doc:schema.nodes.doc.create(null,schema.nodes.paragraph.create()),plugins:[canvasTyping(),textFrameCleanup(()=>true)]});
+ const before=state.doc.toJSON(),attrs={x:140,y:90,width:340,height:30,pos:0};
+ state=state.applyTransaction(state.tr.setMeta(canvasCaretKey,attrs).setSelection(TextSelection.create(state.doc,1))).state;assert.deepEqual(state.doc.toJSON(),before);
+ state=state.applyTransaction(state.tr.insertText('M')).state;assert.equal(state.doc.firstChild.type.name,'paragraph');assert.deepEqual(state.doc.firstChild.attrs.inkFrame,{x:140,y:90,width:340,height:30});
+ state=state.applyTransaction(state.tr.insertText('ac')).state;assert.equal(state.doc.textContent,'Mac');assert.equal(state.doc.childCount,2);
+ const {seedState,mergeState,encodeState}=await import('../src/notebook-sync.mjs');const bytes=seedState(state.doc.toJSON()),shared=mergeState(bytes,encodeState(bytes));assert.equal(shared.document.content[0].attrs.inkFrame.x,140);
+ state=state.applyTransaction(state.tr.delete(1,4)).state;assert.equal(state.doc.childCount,1);assert.equal(state.doc.firstChild.attrs.inkFrame,null);assert.equal(state.doc.textContent,'');
+});

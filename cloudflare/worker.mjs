@@ -111,10 +111,11 @@ export default {
         try {
         const session=await createAuth(env).api.getSession({headers:request.headers});
         if(!session?.user?.emailVerified)return privateRedirect('/account');
-        if(url.pathname!=='/worksheets')return privateRedirect('/worksheets'+url.search);
-        const response=await env.ASSETS.fetch(new Request(new URL('/worksheets',env.APP_ORIGIN)));
-        return new Response(response.body,{status:response.status,headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
-          'Content-Security-Policy':"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' blob: data:; img-src 'self' blob: data:; connect-src 'self' blob:; form-action 'self'; frame-ancestors 'self'; base-uri 'none'"}});
+        const destination=new URL('/notebooks',env.APP_ORIGIN),classId=url.searchParams.get('class'),learnerId=url.searchParams.get('learner')||url.searchParams.get('learnerId');
+        if(classId)destination.searchParams.set('classId',classId);
+        if(classId&&learnerId)destination.searchParams.set('notebookId',classId+'.'+learnerId);
+        if(url.searchParams.get('worksheet')){destination.searchParams.set('pageId',url.searchParams.get('worksheet'));destination.searchParams.set('sectionId','printouts');}
+        return privateRedirect(destination.pathname+destination.search);
         } catch { return unavailable(); }
       }
       const workspaceMatch = url.pathname.match(/^\/(teacher|student|parent)(?:\.html)?\/?$/);
