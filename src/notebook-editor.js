@@ -1,5 +1,6 @@
+import {createTypingCaret} from './typing-caret.mjs';
 import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
-import {TextFrame,placeTextFrame} from './text-frame.mjs';
+import {TextFrame,insertTypedFrame} from './text-frame.mjs';
 import {TextFormat,fontChoices,fontName,textSize,textColor} from './text-format.mjs';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -39,6 +40,22 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     cleanup = connection.leave;
   }
   const buttons = [],formatControls=[],toolWidgets=[];
+  let caret;
+  const currentEditor=()=>caret?.editor||activeEditor;
+  const dismissCaret=()=>{caret?.destroy();caret=null;};
+  const showCaret=(attrs={x:24,y:24,width:340,height:30})=>{
+    if(!activeEditor?.isEditable)return;dismissCaret();
+    const canvas=activeEditor.view.dom,r=canvas.getBoundingClientRect(),base=element.getBoundingClientRect();
+    caret=createTypingCaret({parent:element,x:attrs.x+r.left-base.left+element.scrollLeft,y:attrs.y+r.top-base.top+element.scrollTop,width:attrs.width,onDismiss:dismissCaret,onSelection:updateToolbar,onCommit:(doc,selection)=>{const main=activeEditor;dismissCaret();insertTypedFrame(main,attrs,doc,selection);}});
+  };
+  const placeCaret=(view,event)=>{
+    if(!view.editable||event.button!==0||event.target.closest('.folio-text-frame,.ink-typing-caret,button,input,select,textarea'))return false;
+    const empty=view.state.doc.childCount===1&&view.state.doc.firstChild.type.name==='paragraph'&&!view.state.doc.firstChild.content.size;
+    if(event.target!==view.dom&&!empty)return false;
+    event.preventDefault();const r=view.dom.getBoundingClientRect(),width=Math.min(340,Math.max(140,r.width-20));
+    showCaret({x:Math.max(0,Math.min(r.width-width,event.clientX-r.left)),y:Math.max(0,event.clientY-r.top),width,height:30});return true;
+  };
+
   function updateToolbar(editor) {
     const attrs=editor.getAttributes('textStyle');for(const c of formatControls){c.input.disabled=!editor.isEditable;if(window.document.activeElement!==c.input)c.input.value=c.key==='fontSize'?parseFloat(attrs.fontSize)||16:attrs[c.key]||c.fallback;c.widget?.sync?.();}
     for (const { button, active, available } of buttons) {
@@ -48,7 +65,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [TextFrame,TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [TextFrame.configure({onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -60,7 +77,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     ...(shared ? { editable: false } : ydoc ? { editable: !readOnly } : { editable: !readOnly, content: notebookContent(document, text) }),
     enableContentCheck: true,
     editorProps: {
-      handleDOMEvents:ydoc?{pointerdown:placeTextFrame}:{},
+      handleDOMEvents:ydoc?{mousedown:placeCaret,keydown:(view,event)=>{if(event.key==='Escape'){event.preventDefault();view.dom.blur();return true;}return false;}}:{},
       attributes: { class: 'inkwire-editor'+(ydoc?' folio-canvas':''), role: 'textbox', 'aria-label': label,
         'aria-multiline': 'true', spellcheck: 'true' },
     },
@@ -89,13 +106,16 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     { label: 'Redo', display: '↷', available: e => e.can().redo(), run: c => c.redo() },
   ];
   toolbar.replaceChildren();
-  const fonts=window.document.createElement('datalist');fonts.id='folio-font-families';for(const name of fontChoices){const option=window.document.createElement('option');option.value=name;fonts.append(option);}toolbar.append(fonts);
+  const panel=window.document.createElement('details');panel.className='note-format-panel';const summary=window.document.createElement('summary');summary.textContent='Aa';summary.setAttribute('aria-label','Text formatting');summary.title='Text formatting';const formatBody=window.document.createElement('div');formatBody.className='note-format-content';panel.append(summary,formatBody);toolbar.append(panel);
+  const closePanel=event=>{if(!panel.contains(event.target))panel.open=false;};window.document.addEventListener('pointerdown',closePanel);const panelCleanup=cleanup;cleanup=()=>{window.document.removeEventListener('pointerdown',closePanel);panelCleanup();};
+  panel.addEventListener('keydown',event=>{if(event.key==='Escape'){panel.open=false;summary.focus();event.stopPropagation();}});
+  const fonts=window.document.createElement('datalist');fonts.id='folio-font-families';for(const name of fontChoices){const option=window.document.createElement('option');option.value=name;fonts.append(option);}formatBody.append(fonts);
   for(const spec of [{key:'fontFamily',label:'Font family',type:'text',fallback:'Calibri',clean:fontName},{key:'fontSize',label:'Font size',type:'number',fallback:'16',clean:textSize},{key:'color',label:'Text color',type:'color',fallback:'#243556',clean:textColor},{key:'backgroundColor',label:'Text highlight color',type:'color',fallback:'#fff176',clean:textColor}]){
     const label=window.document.createElement('label');label.className='format-control';label.textContent=spec.label;const input=window.document.createElement('input');input.type=spec.type;input.setAttribute('aria-label',spec.label);input.value=spec.fallback;
     if(spec.key==='fontFamily'){input.setAttribute('list',fonts.id);input.placeholder='Font name';}if(spec.type==='number'){input.min='8';input.max='96';input.step='0.5';}
-    input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');activeEditor.chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);toolbar.append(label);let widget;if(spec.type==='color'){widget=addColorPalette(input,{label:spec.label,highlight:spec.key==='backgroundColor'});input.addEventListener('clear-text-color',()=>activeEditor.chain().focus().setMark('textStyle',{[spec.key]:spec.key==='color'?'#243556':null}).run());}else if(spec.key==='fontSize')widget=addSizePresets(input);else if(spec.key==='fontFamily')widget=addDeviceFonts(input,fonts,fontChoices);if(widget)toolWidgets.push(widget);formatControls.push({...spec,input,widget});
+    input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');currentEditor().chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);formatBody.append(label);let widget;if(spec.type==='color'){widget=addColorPalette(input,{label:spec.label,highlight:spec.key==='backgroundColor'});input.addEventListener('clear-text-color',()=>currentEditor().chain().focus().setMark('textStyle',{[spec.key]:spec.key==='color'?'#243556':null}).run());}else if(spec.key==='fontSize')widget=addSizePresets(input);else if(spec.key==='fontFamily')widget=addDeviceFonts(input,fonts,fontChoices);if(widget)toolWidgets.push(widget);formatControls.push({...spec,input,widget});
   }
-  const clear=window.document.createElement('button');clear.type='button';clear.textContent='Clear highlight';clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>activeEditor.chain().focus().setMark('textStyle',{backgroundColor:null}).run();toolbar.append(clear);buttons.push({button:clear});
+  const clear=window.document.createElement('button');clear.type='button';clear.textContent='Clear highlight';clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>currentEditor().chain().focus().setMark('textStyle',{backgroundColor:null}).run();formatBody.append(clear);buttons.push({button:clear});
 
   for (const item of items) {
     const button = window.document.createElement('button');
@@ -105,11 +125,15 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     button.setAttribute('aria-label', item.label);
     button.dataset.format = item.mark || item.label.toLowerCase();
     button.addEventListener('mousedown', event => event.preventDefault());
-    button.addEventListener('click', () => item.run(activeEditor.chain().focus()).run());
+    button.addEventListener('click', () => item.run(currentEditor().chain().focus()).run());
     buttons.push({ button, active: item.active || (item.mark ? e => e.isActive(item.mark) : null), available: item.available });
-    toolbar.append(button);
+    (['Bold','Italic','Underline','Undo','Redo'].includes(item.label)?toolbar:formatBody).append(button);
   }
   updateToolbar(activeEditor);
+  const dismissOutside=event=>{if(!element.contains(event.target)&&!toolbar.contains(event.target))dismissCaret();};
+  window.document.addEventListener('pointerdown',dismissOutside);
+  const typingCleanup=cleanup;cleanup=()=>{dismissCaret();window.document.removeEventListener('pointerdown',dismissOutside);typingCleanup();};
+  activeEditor.focusPage=()=>showCaret();
   if (shared) {
     const editor = activeEditor, provider = activeProvider, { room, leave } = connection;
     let failed = false;
@@ -130,4 +154,4 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
 }
 
 window.InkWireEditor = { mount, destroy, hasPendingChanges,
-  getText: () => activeEditor?.getText() || '', setEditable: value => activeEditor?.setEditable(value) };
+  focusPage:()=>activeEditor?.focusPage?.(), getText: () => activeEditor?.getText() || '', setEditable: value => activeEditor?.setEditable(value) };

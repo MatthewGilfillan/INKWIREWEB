@@ -22,6 +22,7 @@ export async function previewAdapter(role='teacher') {
     async section(bookId,input){check(bookId,true,true);await transaction(bookId,b=>({...b,sections:[...b.sections,{id:input.id,title:input.title}]}));},
     async create(bookId,input){check(bookId,true,true);await transaction(bookId,b=>({...b,pages:[...b.pages,{...input,kind:'note',document:emptyDocument(),syncState:encodeState(seedState(emptyDocument())),version:1,updatedAt:Date.now()}]}));},
     async save(bookId,id,update){check(bookId,true);let result;await transaction(bookId,b=>{const p=b.pages.find(p=>p.id===id);if(!p)throw Error('Page not found.');const merged=mergeState(Uint8Array.from(atob(p.syncState),c=>c.charCodeAt(0)),update);p.document=merged.document;p.syncState=encodeState(merged.state);p.version++;p.updatedAt=Date.now();result={syncState:p.syncState,version:p.version};return b;});return result;},
+    async rename(bookId,id,title,expectedTitle){check(bookId,true,true);await transaction(bookId,b=>{const page=b.pages.find(p=>p.id===id);if(!page||page.title!==expectedTitle)throw Error('Page title changed. Reload before renaming it.');page.title=title;return b;});},
     async move(bookId,id,sectionId){check(bookId,true,true);const data=await this.book(bookId),page=data.pages.find(p=>p.id===id);await transaction(bookId,b=>{const existing=b.pages.find(p=>p.id===id);if(existing)existing.sectionId=sectionId;else b.pages.push({...page,sectionId});return b;});},
   };
 }

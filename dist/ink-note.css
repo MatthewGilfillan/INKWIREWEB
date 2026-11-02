@@ -1,0 +1,41 @@
+/* Ink Note shared visual language: quiet surfaces and clear paper. */
+body.folio-app{--folio-ink:#172b49;--folio-muted:#6d7889;--folio-line:#dfe4e9;--folio-purple:#327c7b;--folio-teal:#327c7b;background:#f1f3f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.folio-app .folio-header{background:#f7f8fa;border-color:#dfe4e9;gap:28px}
+.folio-app .folio-brand,.folio-app .folio-heading h1,.folio-app .page-heading h2{color:#172b49}
+.folio-app .folio-brand b{color:#477d7d}.folio-app #view-label{background:#e5eeee;color:#325f62}
+.folio-app .folio-column{background:#f1f3f5}.folio-app .section-column{background:#f4f5f7}.folio-app .page-column{background:#f7f8fa}
+.folio-app .folio-row{border-radius:8px}.folio-app .folio-row[aria-current=true]{background:#dceceb;color:#174d50;box-shadow:inset 0 0 0 1px #cadfdf}
+.folio-app .folio-content,.folio-app .note-editor{background:white}
+.folio-app button,.worksheet-app button{box-shadow:none}
+.folio-app button:hover:not(:disabled),.worksheet-app button:hover:not(:disabled){background:#eaf1f1}
+.folio-app button.primary,.worksheet-app button.primary{background:#327c7b;border-color:#327c7b;color:white}
+.folio-app button[aria-pressed=true],.worksheet-app button[aria-pressed=true]{background:#dceceb;color:#174d50}
+.folio-app .note-toolbar{background:#fafbfc;border-color:#e6e9ed;box-shadow:0 1px 3px #172b4905}
+.folio-app :focus-visible,.worksheet-app :focus-visible{outline:2px solid #4b9797;outline-offset:2px}
+.folio-app dialog,.worksheet-app dialog{box-shadow:0 8px 25px #172b4912;border-color:#dfe4e9}
+.folio-app .pdf-drop-overlay{border-color:#72a4a4;background:#eef5f4ed}.folio-app .pdf-drop-overlay span{box-shadow:0 3px 12px #172b490e}
+.folio-app .printout-picker{border-color:#b6cdcd;background:#f5f9f9}.folio-app .printout-picker.dragover{border-color:#5e9292;background:#e7f1f0}
+.worksheet-app{--ws-lavender:#dceceb;--ws-navy:#172b49;--ws-line:#dfe4e9}
+.worksheet-app .ws-toolbar{background:#fafbfc;border-color:#dfe4e9}.worksheet-app .page-scroll{background:#eef1f4}
+.worksheet-app .worksheet-page-wrap{box-shadow:0 2px 9px #15243d0e}.worksheet-app .tool-group button[aria-pressed=true]{border-color:#cadfdf}
+.worksheet-app #page-navigation{background:#f1f3f5}.worksheet-app .ink-canvas .selected-stroke{filter:drop-shadow(0 0 1px #7b9fa8)}
+@media(prefers-contrast:more){.folio-app .folio-row[aria-current=true]{background:#c5dfdd;outline:1px solid #387270}}
+@media(prefers-reduced-motion:reduce){.folio-app *,.worksheet-app *{scroll-behavior:auto!important;transition:none!important}}
+@media print{.folio-app .note-toolbar,.folio-app .folio-column{display:none!important}.worksheet-app .worksheet-page-wrap{box-shadow:none}}
+
+/* Formatting is available on demand, leaving more room for the page. */
+.note-toolbar{position:relative;align-items:center}
+.note-format-panel,.annotation-settings{position:relative;font-size:12px}
+.note-format-panel>summary,.annotation-settings>summary{cursor:pointer;list-style:none;padding:8px 12px;border:1px solid #dfe4e9;border-radius:8px;background:#fff;color:#243b58;white-space:nowrap;user-select:none}
+.note-format-panel>summary::-webkit-details-marker,.annotation-settings>summary::-webkit-details-marker{display:none}
+.note-format-panel[open]>summary,.annotation-settings[open]>summary{background:#e8f1f0;border-color:#bdd3d3}
+.note-format-content,.annotation-settings-content{position:absolute;top:calc(100% + 7px);left:0;z-index:60;display:flex;flex-wrap:wrap;align-items:center;gap:9px;width:380px;max-width:calc(100vw - 50px);padding:16px;border:1px solid #dfe4e9;border-radius:12px;background:#fcfdfe;box-shadow:0 5px 20px #172b4914}
+.note-format-content .format-control{width:100%;justify-content:space-between;font-size:12px}
+.note-format-content .format-control input{max-width:190px}.note-format-content .format-control input[type=number]{width:65px}
+.annotation-settings-content .tool-group{flex-wrap:wrap;gap:8px;border:0;padding:0;width:100%}.annotation-settings-content #feedback-tools{display:flex}
+.annotation-settings-content #style-tools{background:transparent!important}.annotation-settings-content .draw-presets{flex-wrap:wrap;gap:10px}.annotation-settings-content .stroke-widths{flex-wrap:wrap}
+.worksheet-app .ws-toolbar{overflow:visible;position:relative;z-index:3;align-items:center}
+.annotation-history{gap:4px}.annotation-history button{font-size:11px;padding:7px 9px}
+@media(max-width:850px){.note-format-content,.annotation-settings-content{width:310px}.annotation-settings-content #feedback-tools{display:flex}.worksheet-app .ws-toolbar{padding:7px}}
+
+.folio-heading-title{display:flex;align-items:center;gap:10px}.notebook-home{display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;border-radius:7px;color:#27475c;text-decoration:none}.notebook-home:hover{background:#e1e9ec}.notebook-home:focus-visible{outline:2px solid #4b9797;outline-offset:2px}

@@ -32,8 +32,9 @@ export function addSizePresets(input){
 export function addDeviceFonts(input,datalist,defaultNames){
   css();const button=document.createElement('button');button.type='button';button.className='device-fonts-button';button.textContent='Device fonts';button.title='Add installed font families to this list';input.parentElement.append(button);const status=document.createElement('span');status.className='text-font-status';status.setAttribute('role','status');input.parentElement.append(status);
   function fill(){datalist.replaceChildren();for(const name of [...new Set([...defaultNames,...deviceFamilies])].sort((a,b)=>a.localeCompare(b))){const option=document.createElement('option');option.value=name;datalist.append(option);}}
+  if(Array.isArray(window.inkNoteFontFamilies))deviceFamilies=window.inkNoteFontFamilies;
   fill();
-  if(!('queryLocalFonts' in window)){button.hidden=true;input.title='Type any installed font family name. This browser cannot list device fonts.';}
+  if(!('queryLocalFonts' in window)){button.hidden=true;input.title=deviceFamilies.length?'Installed font families are available in this list.':'Type any installed font family name. This browser cannot list device fonts.';}
   else button.onclick=async()=>{button.disabled=true;try{const fonts=await window.queryLocalFonts();deviceFamilies=[...new Set(fonts.map(f=>f.family))];fill();status.textContent=deviceFamilies.length+' device font families available. Other devices need the same font.';button.textContent='Fonts loaded';}catch{status.textContent='Font access was not granted. You can still type an installed font name.';}finally{button.disabled=input.disabled;}};
   const unwatch=watchDisabled(input,button);return {destroy(){unwatch();}};
 }

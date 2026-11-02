@@ -72,3 +72,16 @@ test('notebook limits and CRDT formatting validation reject oversized or unsuppo
   assert.throws(()=>mergeState(state,encodeState(Y.encodeStateAsUpdate(d))),/heading/);d.destroy();
  }finally{f.db.close();}
 });
+test('a blank page can be named later, and a concurrent rename cannot overwrite its title',async()=>{
+ const f=await fixture();try{
+  const section=randomUUID(),id=randomUUID();
+  await f.call('teacher',f.base+'/sections',{id:section,title:'Lessons'});
+  assert.equal((await f.call('teacher',f.base+'/pages',{id,sectionId:section,title:'Untitled page'})).status,201);
+  const path=f.base+'/pages/'+id;
+  assert.equal((await f.call('parent',path,{action:'rename',title:'Private',expectedTitle:'Untitled page'})).status,403);
+  assert.equal((await f.call('student',path,{action:'rename',title:'Private',expectedTitle:'Untitled page'})).status,403);
+  assert.equal((await f.call('teacher',path,{action:'rename',title:'Lesson notes',expectedTitle:'Untitled page'})).status,200);
+  assert.equal((await f.call('invitedTeacher',path,{action:'rename',title:'Old edit',expectedTitle:'Untitled page'})).status,409);
+  assert.equal((await(await f.call('parent',path)).json()).page.title,'Lesson notes');
+ }finally{f.db.close();}
+});

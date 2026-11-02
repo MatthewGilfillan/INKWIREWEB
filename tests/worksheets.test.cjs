@@ -109,3 +109,16 @@ test('PDF attachment mode stays downloadable and existing printouts remain the d
   const styled=f.cleanMark({kind:'text',page:0,x:10,y:10,width:200,height:80,text:'Feedback',fontSize:48,fontFamily:'Calibri',italic:true,underline:true,backgroundColor:'#ffdd00',color:'#225588'},pages);assert.equal(styled.fontFamily,'Calibri');assert.equal(styled.backgroundColor,'#ffdd00');assert.equal(styled.italic,true);
  }finally{f.db.close();}
 });
+test('character formatting synchronizes through student, teacher and live parent views without changing ownership',async()=>{
+ const f=await fixture();try{
+  const worksheet=(await(await f.upload()).json()).id,id=randomUUID();
+  const document={type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Clear '},{type:'text',text:'evidence',marks:[{type:'textStyle',attrs:{backgroundColor:'#fff176',fontSize:'20pt'}}]}]}]};
+  const mark={...text,text:'Clear evidence',height:30,document};
+  const saved=await f.call('student','/'+worksheet+'/marks',{id,version:0,deleted:false,mark});assert.equal(saved.status,200);
+  for(const who of ['student','teacher','parent']){
+   const state=await(await f.call(who,'/'+worksheet+'/state?learnerId='+f.learner+'&notebook=1')).json();assert.deepEqual(state.marks[0].document,document);assert.equal(state.marks[0].ownerId,'student');
+  }
+  assert.equal((await f.call('parent','/'+worksheet+'/marks?learnerId='+f.learner+'&notebook=1',{id,version:1,deleted:false,mark})).status,403);
+  assert.equal((await f.call('teacher','/'+worksheet+'/marks?learnerId='+f.learner,{id,version:1,deleted:false,mark})).status,403);
+ }finally{f.db.close();}
+});

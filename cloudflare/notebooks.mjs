@@ -62,6 +62,14 @@ export async function handleNotebooks(request,env,user) {
   }
   if(kind==='pages'&&parts.length===4&&ID.test(id||'')) {
     const current=await env.DB.prepare('SELECT * FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first();
+    if(input.action==='rename'){
+      if(!teacher)return fail('Only teachers can rename pages.',403,'FORBIDDEN');
+      if(!current||current.kind!=='note')return fail('Page not found.',404,'NOT_FOUND');
+      if(!title(input.title)||typeof input.expectedTitle!=='string')return fail('Enter a page name of up to 120 characters.');
+      const changed=await env.DB.prepare('UPDATE notebook_pages SET title=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=? AND title=?').bind(title(input.title),Date.now(),...scope,id,input.expectedTitle).run();
+      if(!changed.meta.changes)return fail('This page title changed. Reload before renaming it.',409,'CONFLICT');
+      return json({title:title(input.title)});
+    }
     if(input.action==='move'&&teacher) {
       if(!(await sections()).some(s=>s.id===input.sectionId))return fail('Section not found.',404,'NOT_FOUND');
       if(current)await env.DB.prepare('UPDATE notebook_pages SET section_id=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=?').bind(input.sectionId,Date.now(),...scope,id).run();

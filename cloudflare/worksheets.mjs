@@ -1,3 +1,4 @@
+import {cleanAnnotationDocument,annotationPlainText} from '../src/annotation-text.mjs';
 import {fontName,textColor} from '../src/text-format.mjs';
 import {limitClassAction} from './classes.mjs';
 
@@ -43,7 +44,8 @@ export function cleanMark(value,pages) {
   const page=pages[value.page],base={page:value.page,kind:value.kind,color:value.color};
   if(value.kind==='text') {
     if(typeof value.text!=='string'||value.text.length>4000||!finite(value.x,0,page.width)||!finite(value.y,0,page.height)||!finite(value.width,20,page.width)||!finite(value.height,20,page.height)||value.x+value.width>page.width+1||value.y+value.height>page.height+1||!finite(value.fontSize,8,96))throw Error('INVALID_TEXT');
-    return {...base,text:value.text,x:value.x,y:value.y,width:value.width,height:value.height,fontSize:value.fontSize,bold:value.bold===true,italic:value.italic===true,underline:value.underline===true,fontFamily:fontName(value.fontFamily)||'Calibri',backgroundColor:textColor(value.backgroundColor)};
+    const document=value.document?cleanAnnotationDocument(value.document):null;if(document&&annotationPlainText(document)!==value.text)throw Error('INVALID_TEXT');
+    return {...(document?{document}:{}),...base,text:value.text,x:value.x,y:value.y,width:value.width,height:value.height,fontSize:value.fontSize,bold:value.bold===true,italic:value.italic===true,underline:value.underline===true,fontFamily:fontName(value.fontFamily)||'Calibri',backgroundColor:textColor(value.backgroundColor)};
   }
   if(!['pen','highlight'].includes(value.kind)||!finite(value.size,0.5,30)||!Array.isArray(value.points)||value.points.length<2||value.points.length>1500||!value.points.every(p=>Array.isArray(p)&&p.length===2&&finite(p[0],0,page.width)&&finite(p[1],0,page.height)))throw Error('INVALID_STROKE');
   return {...base,size:value.size,points:value.points.map(p=>[p[0],p[1]])};

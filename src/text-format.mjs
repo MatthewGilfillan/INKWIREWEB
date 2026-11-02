@@ -8,7 +8,7 @@ const parsers={fontFamily:fontName,fontSize:textSize,color:textColor,backgroundC
 const css={fontFamily:'font-family',fontSize:'font-size',color:'color',backgroundColor:'background-color'};
 export const TextFormat=Mark.create({
  name:'textStyle',
- addAttributes(){return Object.fromEntries(Object.entries(parsers).map(([key,clean])=>[key,{default:null,parseHTML:element=>{try{return clean(element.style[key]);}catch{return null;}},renderHTML:attrs=>{try{const v=clean(attrs[key]);return v?{style:css[key]+': '+v}:{};}catch{return {};}}}]));},
+ addAttributes(){return Object.fromEntries(Object.entries(parsers).map(([key,clean])=>[key,{default:null,parseHTML:element=>{try{return clean(element.style[key]);}catch{return null;}},renderHTML:attrs=>{try{const v=clean(attrs[key]);return v?{style:css[key]+': '+v+(key==='fontFamily'?', Arial, sans-serif':'')}:{};}catch{return {};}}}]));},
  parseHTML(){return [{tag:'span[style]'}];},
  renderHTML({HTMLAttributes}){return ['span',HTMLAttributes,0];},
 });
