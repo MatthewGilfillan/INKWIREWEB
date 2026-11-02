@@ -4,7 +4,7 @@ import {TextFormat} from './text-format.mjs';
 import {annotationDocument,annotationPlainText,cleanAnnotationDocument} from './annotation-text.mjs';
 const richExtensions=()=>[TextFormat,StarterKit.configure({link:false,heading:{levels:[2,3]}})];
 import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
-import {fontName} from './text-format.mjs';
+import {fontName,fontChoices} from './text-format.mjs';
 import * as pdfjs from 'pdfjs-dist';
 import {escape,requestId} from '../dist/workspace-shared.js';
 export async function mountWorksheet(root=document,options={}){
@@ -232,7 +232,7 @@ function styleSelection(control){
 function textAppearance(){let family='Calibri';try{family=fontName($('#text-font').value)||'Calibri';}catch{}return {fontSize:Math.max(8,Math.min(96,Number($('#text-size').value)||16)),fontFamily:family,bold:$('#text-bold').getAttribute('aria-pressed')==='true',italic:$('#text-italic').getAttribute('aria-pressed')==='true',underline:$('#text-underline').getAttribute('aria-pressed')==='true',backgroundColor:$('#text-highlight-toggle').getAttribute('aria-pressed')==='true'?$('#text-highlight').value:null};}
 for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=()=>{if(strokeSettings[tool]&&id==='ink-color')strokeSettings[tool].color=$('#ink-color').value;styleSelection(id);if(strokeSettings[tool])renderStrokePresets();};
 const presets=document.createElement('div');presets.id='draw-presets';presets.className='draw-presets';$('#style-tools').append(presets);presets.onclick=event=>{const button=event.target.closest('button');if(!button||!strokeSettings[tool])return;if(button.dataset.inkPreset){$('#ink-color').value=button.dataset.inkPreset;strokeSettings[tool].color=button.dataset.inkPreset;}if(button.dataset.strokeWidth)strokeSettings[tool].size=Number(button.dataset.strokeWidth);toolWidgets.forEach(w=>w.sync?.());styleSelection();renderStrokePresets();};
-toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection('text-highlight');}}),addSizePresets($('#text-size')),addDeviceFonts($('#text-font'),$('#pdf-fonts'),Array.from($('#pdf-fonts').options,o=>o.value)));
+toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection('text-highlight');}}),addSizePresets($('#text-size')),addDeviceFonts($('#text-font'),$('#pdf-fonts'),fontChoices));
 const fontRow=document.createElement('div');fontRow.className='pdf-font-row';const characterRow=document.createElement('div');characterRow.className='pdf-character-row';
 fontRow.append($('#text-font').closest('label'),$('#text-size').closest('label'),$('#pdf-fonts'));
 characterRow.append($('#text-bold'),$('#text-italic'),$('#text-underline'),$('#ink-color').closest('label'),$('#text-highlight').closest('label'),$('#text-highlight-toggle'));

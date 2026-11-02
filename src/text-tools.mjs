@@ -1,8 +1,8 @@
-export const sizeChoices=[8,9,9.5,10,10.5,11,11.5,12,14,16,18,20,22,24,26,28,36,48,72,96];
+export const sizeChoices=[8,9,9.5,10,10.5,11,11.5,12,14,16,18,20,24,28,32,36,48,72,96];
 export const standardColors=[['Red','#ff0000'],['Orange','#ed7d31'],['Yellow','#ffff00'],['Light green','#92d050'],['Green','#008000'],['Teal','#008080'],['Sky blue','#00b0f0'],['Blue','#0070c0'],['Navy','#002060'],['Purple','#7030a0']];
 const themes=[['Black','#000000'],['White','#ffffff'],['Charcoal','#404040'],['Grey','#808080'],['Ink','#243556'],['Slate','#52647c'],['Mint','#64e6be'],['Lavender','#b39ac7'],['Rose','#e39aa5'],['Gold','#bf9000']];
 let deviceFamilies=[];
-function css(){if(document.querySelector('link[data-text-tools]'))return;const link=document.createElement('link');link.rel='stylesheet';link.href='/text-tools.css';link.dataset.textTools='';document.head.append(link);}
+function css(){if(document.querySelector('link[data-text-tools]'))return;const link=document.createElement('link');link.rel='stylesheet';link.href='/text-tools.css?v=20261102-size-buttons';link.dataset.textTools='';document.head.append(link);}
 function popup(trigger){
   const panel=document.createElement('div');panel.className='text-tools-popover';panel.setAttribute('popover','auto');panel.setAttribute('aria-label',trigger.getAttribute('aria-label')+' options');
   document.body.append(panel);trigger.setAttribute('aria-expanded','false');
@@ -25,16 +25,23 @@ export function addColorPalette(input,{label=input.getAttribute('aria-label')||'
   const unwatch=watchDisabled(input,trigger);return {sync(){trigger.style.setProperty('--chosen-color',input.value);},destroy(){unwatch();menu.destroy();}};
 }
 export function addSizePresets(input){
-  css();input.step='0.5';const wrapper=document.createElement('span');wrapper.className='text-size-control';input.replaceWith(wrapper);wrapper.append(input);const trigger=document.createElement('button');trigger.type='button';trigger.className='text-size-trigger';trigger.textContent='⌄';trigger.title='Font size presets';trigger.setAttribute('aria-label','Font size presets');wrapper.append(trigger);const menu=popup(trigger);menu.panel.classList.add('text-size-options');
-  for(const size of sizeChoices){const b=document.createElement('button');b.type='button';b.textContent=String(size);b.setAttribute('aria-label',size+' points');b.addEventListener('mousedown',e=>e.preventDefault());b.onclick=()=>{input.value=String(size);menu.close();input.dispatchEvent(new Event('change',{bubbles:true}));};menu.panel.append(b);}
-  const unwatch=watchDisabled(input,trigger);return {destroy(){unwatch();menu.destroy();}};
+  css();input.step='any';input.classList.add('text-size-input');const wrapper=document.createElement('span');wrapper.className='text-size-control';input.replaceWith(wrapper);
+  const smaller=document.createElement('button'),larger=document.createElement('button');for(const [button,label,text]of [[smaller,'Decrease font size','−'],[larger,'Increase font size','+']]){button.type='button';button.className='text-size-step';button.textContent=text;button.title=label;button.setAttribute('aria-label',label);button.addEventListener('mousedown',e=>e.preventDefault());}
+  wrapper.append(smaller,input,larger);
+  const change=direction=>{if(input.disabled)return;const value=Number(input.value),next=direction>0?sizeChoices.find(size=>size>value):[...sizeChoices].reverse().find(size=>size<value);if(next!==undefined){input.value=String(next);input.dispatchEvent(new Event('change',{bubbles:true}));}sync();};smaller.onclick=()=>change(-1);larger.onclick=()=>change(1);
+  const trigger=document.createElement('button');trigger.type='button';trigger.className='text-size-trigger';trigger.textContent='⌄';trigger.title='Font size presets';trigger.setAttribute('aria-label','Font size presets');wrapper.append(trigger);const menu=popup(trigger);menu.panel.classList.add('text-size-options');
+  for(const size of sizeChoices){const b=document.createElement('button');b.type='button';b.textContent=String(size);b.setAttribute('aria-label',size+' points');b.addEventListener('mousedown',e=>e.preventDefault());b.onclick=()=>{input.value=String(size);menu.close();input.dispatchEvent(new Event('change',{bubbles:true}));sync();};menu.panel.append(b);}
+  function sync(){const value=Number(input.value);smaller.disabled=input.disabled||value<=sizeChoices[0];larger.disabled=input.disabled||value>=sizeChoices.at(-1);trigger.disabled=input.disabled;}
+  input.addEventListener('keydown',event=>{if(['ArrowUp','ArrowDown'].includes(event.key)){event.preventDefault();change(event.key==='ArrowUp'?1:-1);}});
+  input.addEventListener('change',sync);const observer=new MutationObserver(sync);observer.observe(input,{attributes:true,attributeFilter:['disabled']});sync();return {sync,destroy(){input.removeEventListener('change',sync);observer.disconnect();menu.destroy();}};
 }
 export function addDeviceFonts(input,datalist,defaultNames){
   css();const button=document.createElement('button');button.type='button';button.className='device-fonts-button';button.textContent='Device fonts';button.title='Add installed font families to this list';input.parentElement.append(button);const status=document.createElement('span');status.className='text-font-status';status.setAttribute('role','status');input.parentElement.append(status);
-  function fill(){datalist.replaceChildren();for(const name of [...new Set([...defaultNames,...deviceFamilies])].sort((a,b)=>a.localeCompare(b))){const option=document.createElement('option');option.value=name;datalist.append(option);}}
+  const choose=document.createElement('button');choose.type='button';choose.className='text-font-trigger';choose.textContent='⌄';choose.title='Choose font';choose.setAttribute('aria-label','Font families');input.after(choose);const fontMenu=popup(choose);fontMenu.panel.classList.add('text-font-options');
+  function fill(){datalist.replaceChildren();fontMenu.panel.replaceChildren();const bundled=['Poppins','Sofia Sans Condensed','Roboto','Fira Sans','Merriweather'];const names=[...bundled,...[...new Set([...defaultNames,...deviceFamilies])].filter(name=>!bundled.includes(name)).sort((a,b)=>a.localeCompare(b))];for(const name of names){const option=document.createElement('option');option.value=name;datalist.append(option);const row=document.createElement('button');row.type='button';row.textContent=name;row.style.fontFamily='"'+name.replace(/["\\]/g,'')+'",sans-serif';row.addEventListener('mousedown',e=>e.preventDefault());row.onclick=()=>{input.value=name;fontMenu.close();input.dispatchEvent(new Event('change',{bubbles:true}));};fontMenu.panel.append(row);}}
   if(Array.isArray(window.inkNoteFontFamilies))deviceFamilies=window.inkNoteFontFamilies;
   fill();
   if(!('queryLocalFonts' in window)){button.hidden=true;input.title=deviceFamilies.length?'Installed font families are available in this list.':'Type any installed font family name. This browser cannot list device fonts.';}
   else button.onclick=async()=>{button.disabled=true;try{const fonts=await window.queryLocalFonts();deviceFamilies=[...new Set(fonts.map(f=>f.family))];fill();status.textContent=deviceFamilies.length+' device font families available. Other devices need the same font.';button.textContent='Fonts loaded';}catch{status.textContent='Font access was not granted. You can still type an installed font name.';}finally{button.disabled=input.disabled;}};
-  const unwatch=watchDisabled(input,button);return {destroy(){unwatch();}};
+  const unwatch=watchDisabled(input,button),unwatchChoose=watchDisabled(input,choose);return {destroy(){unwatch();unwatchChoose();fontMenu.destroy();}};
 }

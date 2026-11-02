@@ -1,0 +1,266 @@
+[
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-5ea3c4a7f13f.woff2",
+    "bytes": 33912,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9C4kDNxMZdWfMOD5VvkrjHYTLVdlTOr0s.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-13f6e1d9ec71.woff2",
+    "bytes": 18296,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9C4kDNxMZdWfMOD5VvkrjJYTLVdlTO.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-8593199617f7.woff2",
+    "bytes": 34596,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrA6Qif2VFnklULWJXg.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-89690a64e640.woff2",
+    "bytes": 18552,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrA6Qif4VFnklULW.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-dca61652e753.woff2",
+    "bytes": 34664,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrAWRSf2VFnklULWJXg.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-f8372a5360e9.woff2",
+    "bytes": 18528,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrAWRSf4VFnklULW.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-6d359342a18e.woff2",
+    "bytes": 34664,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrByRCf2VFnklULWJXg.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-3145f789e430.woff2",
+    "bytes": 18708,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9f4kDNxMZdWfMOD5VvkrByRCf4VFnklULW.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-ca7b1757feb6.woff2",
+    "bytes": 32120,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5VvmYjLazX3dGTP.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-0480e4a5bdc9.woff2",
+    "bytes": 17464,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5Vvl4jLazX3dA.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-98cfc8c5f3c0.woff2",
+    "bytes": 32952,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveSBf6Xl7Gl3LX.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-b85fd5659542.woff2",
+    "bytes": 17820,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveRhf6Xl7Glw.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-2a48b5ade575.woff2",
+    "bytes": 32932,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeSBf6Xl7Gl3LX.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-0b48a7c454d7.woff2",
+    "bytes": 17680,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeRhf6Xl7Glw.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-33c2e0fbdaa5.woff2",
+    "bytes": 32900,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eSBf6Xl7Gl3LX.woff2"
+  },
+  {
+    "family": "Fira Sans",
+    "file": "fira-sans-f8973b59263c.woff2",
+    "bytes": 17744,
+    "source": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eRhf6Xl7Glw.woff2"
+  },
+  {
+    "family": "Merriweather",
+    "file": "merriweather-9e2d56621786.woff2",
+    "bytes": 78032,
+    "source": "https://fonts.gstatic.com/s/merriweather/v33/u-4c0qyriQwlOrhSvowK_l5-eTxCVx0ZbwLvKH2Gk9hLmp0v5yA-xXPqCzLvF-WdrHOg7iDTFw.woff2"
+  },
+  {
+    "family": "Merriweather",
+    "file": "merriweather-a292b3f95db6.woff2",
+    "bytes": 100620,
+    "source": "https://fonts.gstatic.com/s/merriweather/v33/u-4c0qyriQwlOrhSvowK_l5-eTxCVx0ZbwLvKH2Gk9hLmp0v5yA-xXPqCzLvF-udrHOg7iA.woff2"
+  },
+  {
+    "family": "Merriweather",
+    "file": "merriweather-40540c5ea9b0.woff2",
+    "bytes": 74940,
+    "source": "https://fonts.gstatic.com/s/merriweather/v33/u-4e0qyriQwlOrhSvowK_l5UcA6zuSYEqOzpPe3HOZJ5eX1WtLaQwmYiSeqkJ-mXq1Gi3iE.woff2"
+  },
+  {
+    "family": "Merriweather",
+    "file": "merriweather-8bef1850e4ab.woff2",
+    "bytes": 97608,
+    "source": "https://fonts.gstatic.com/s/merriweather/v33/u-4e0qyriQwlOrhSvowK_l5UcA6zuSYEqOzpPe3HOZJ5eX1WtLaQwmYiSeqqJ-mXq1Gi.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-f82772729a7f.woff2",
+    "bytes": 6012,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiGyp8kv8JHgFVrJJLufntAOvWDSHFF.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-4bf0757b21a7.woff2",
+    "bytes": 8676,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiGyp8kv8JHgFVrJJLucHtAOvWDSA.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-a5464279b999.woff2",
+    "bytes": 5872,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmg1hVGdeOYktMqlap.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-b1f7a3c9f416.woff2",
+    "bytes": 8516,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmg1hVF9eOYktMqg.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-8fb4181d53b2.woff2",
+    "bytes": 6012,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmr19VGdeOYktMqlap.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-437e848d8e2c.woff2",
+    "bytes": 8740,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmr19VF9eOYktMqg.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-387f68e1b276.woff2",
+    "bytes": 5912,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmy15VGdeOYktMqlap.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-743a6c6a4a41.woff2",
+    "bytes": 8628,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiDyp8kv8JHgFVrJJLmy15VF9eOYktMqg.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-0ff0d30c6068.woff2",
+    "bytes": 5640,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJnecnFHGPezSQ.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-13045147df4a.woff2",
+    "bytes": 7900,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-1db57cd9fd19.woff2",
+    "bytes": 5496,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1JlFd2JQEl8qw.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-f5e57db43303.woff2",
+    "bytes": 7740,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1xlFd2JQEk.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-39e7f079fca6.woff2",
+    "bytes": 5552,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1JlFd2JQEl8qw.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-2cf2a9022258.woff2",
+    "bytes": 7992,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1xlFd2JQEk.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-054df55a41b0.woff2",
+    "bytes": 5448,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1JlFd2JQEl8qw.woff2"
+  },
+  {
+    "family": "Poppins",
+    "file": "poppins-0ee5dc9af34c.woff2",
+    "bytes": 7848,
+    "source": "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1xlFd2JQEk.woff2"
+  },
+  {
+    "family": "Roboto",
+    "file": "roboto-d1030b879a6c.woff2",
+    "bytes": 26784,
+    "source": "https://fonts.gstatic.com/s/roboto/v51/KFO5CnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmkCHkaSTbQWt4N.woff2"
+  },
+  {
+    "family": "Roboto",
+    "file": "roboto-3436e07c70f9.woff2",
+    "bytes": 41748,
+    "source": "https://fonts.gstatic.com/s/roboto/v51/KFO5CnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmkBnkaSTbQWg.woff2"
+  },
+  {
+    "family": "Roboto",
+    "file": "roboto-5eea78602aec.woff2",
+    "bytes": 24444,
+    "source": "https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3KUBHMdazTgWw.woff2"
+  },
+  {
+    "family": "Roboto",
+    "file": "roboto-5fac139c681d.woff2",
+    "bytes": 37520,
+    "source": "https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBHMdazQ.woff2"
+  },
+  {
+    "family": "Sofia Sans Condensed",
+    "file": "sofia-sans-condensed-e2261aee78f3.woff2",
+    "bytes": 19276,
+    "source": "https://fonts.gstatic.com/s/sofiasanscondensed/v6/r05KGKVS5aVKd567NYXawnFKJaTtoAuLnIcNlt39fl5HegUSTg.woff2"
+  },
+  {
+    "family": "Sofia Sans Condensed",
+    "file": "sofia-sans-condensed-b8a5d6302407.woff2",
+    "bytes": 41348,
+    "source": "https://fonts.gstatic.com/s/sofiasanscondensed/v6/r05KGKVS5aVKd567NYXawnFKJaTtoAuLnIcNltP9fl5HegU.woff2"
+  },
+  {
+    "family": "Sofia Sans Condensed",
+    "file": "sofia-sans-condensed-1eb43cde5eda.woff2",
+    "bytes": 18528,
+    "source": "https://fonts.gstatic.com/s/sofiasanscondensed/v6/r05EGKVS5aVKd567NYXawnFKJaTtoAuLnIcGptH3eXxFSgQ.woff2"
+  },
+  {
+    "family": "Sofia Sans Condensed",
+    "file": "sofia-sans-condensed-941ea9f5b096.woff2",
+    "bytes": 41184,
+    "source": "https://fonts.gstatic.com/s/sofiasanscondensed/v6/r05EGKVS5aVKd567NYXawnFKJaTtoAuLnIcIptH3eXxF.woff2"
+  }
+]
