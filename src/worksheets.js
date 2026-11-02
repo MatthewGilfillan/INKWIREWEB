@@ -18,8 +18,8 @@ const classId=query.get('class')||'',requestedLearner=query.get('learner')||'';
 const notebookContext=query.get('notebook')==='1',embedded=notebookContext&&query.get('embed')==='1';
 if(embedded)(root===document?document.body:root).classList.add('notebook-embed');
 const pdfOptions={cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/',isEvalSupported:false};
-const hints={select:'Drag the handle to move text. Click text to edit.',text:'Click anywhere to type. Drag the handle to move text. Esc finishes editing.',pen:'Draw with your mouse or stylus. Choose Select to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
-let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='select',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
+const hints={select:'Drag the handle to move text. Click text to edit.',text:'Click anywhere to type. Drag the handle to move text. Esc finishes editing.',pen:'Draw with your mouse or stylus. Switch to Text to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
+let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='text',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
 let activeText=null;
 let pageNodes=[],rendering=new Map(),visible=new Set(),pdfTask,fileToUpload,uploadRequestId,queuedFeedback='',textBefore=null;
 const own=m=>meta&&meta.role!=='parent'&&m?.ownerId===meta.userId&&m.layer===meta.role;
@@ -28,7 +28,7 @@ const raw=m=>{if(!m)return null;const {id,ownerId,layer,version,deleted,...data}
 const clone=m=>m?structuredClone(m):null;
 function error(message=''){ $('#workspace-error').textContent=message;$('#workspace-error').hidden=!message; }
 function status(message){$('#save-status').textContent=message;}
-function updateStatus(){if(embedded){if(options.onDirty)options.onDirty(!!(pending.size||conflicts.size));else window.parent.postMessage({type:'inkwire:worksheet-status',dirty:!!(pending.size||conflicts.size)},location.origin);}if(conflicts.size)status('Needs review');else if(pending.size)status(navigator.onLine?'Saving…':'Offline · changes in this tab');else status(meta?.role==='parent'?'Read-only copy':'All changes saved');$('#download-recovery').hidden=!pending.size&&!conflicts.size;$('#publish-parent').disabled=!!pending.size||!!conflicts.size||saving||!meta?.learnerId;}
+function updateStatus(){if(embedded){if(options.onDirty)options.onDirty(!!(pending.size||conflicts.size));else window.parent.postMessage({type:'inkwire:worksheet-status',dirty:!!(pending.size||conflicts.size)},location.origin);}if(conflicts.size)status('Needs review');else if(pending.size)status(navigator.onLine?'Saving…':'Offline · changes in this tab');else status(meta?.role==='parent'?'Read only':'Saved');$('#download-recovery').hidden=!pending.size&&!conflicts.size;$('#publish-parent').disabled=!!pending.size||!!conflicts.size||saving||!meta?.learnerId;}
 async function request(path,options={}) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,signal:AbortSignal.timeout(options.body instanceof File?90000:20000)});
   if(!response.ok){const data=await response.json().catch(()=>({}));throw Object.assign(new Error(data.message||'Unable to complete this request.'),{status:response.status,code:data.code,current:data.current});}
@@ -107,7 +107,7 @@ function applyZoom(){for(let i=0;i<pageNodes.length;i++){const {width,height}=me
 function fitWidth(){if(!meta)return;const width=Math.max(200,$('#page-scroll').clientWidth-70);zoom=Math.min(1.4,width/Math.max(...meta.pages.map(p=>p.width)));fit=true;applyZoom();}
 $('#zoom-in').onclick=()=>{zoom=Math.min(2.5,zoom+.15);fit=false;applyZoom();};$('#zoom-out').onclick=()=>{zoom=Math.max(.25,zoom-.15);fit=false;applyZoom();};$('#fit-page').onclick=fitWidth;const resizeObserver=new ResizeObserver(()=>{if(fit&&meta&&!printing)fitWidth();});resizeObserver.observe($('#page-scroll'));
 $('#page-navigation').onclick=event=>{const b=event.target.closest('[data-page]');if(b){activePage=Number(b.dataset.page);pageNodes[activePage].wrap.scrollIntoView({block:'start',behavior:'smooth'});$('#page-navigation .active')?.classList.remove('active');b.classList.add('active');}};
-function setTool(next){if(tool!==next)$('#annotation-settings').open=false;$('#annotation-settings-label').textContent=['pen','highlight','erase'].includes(next)?'Ink style':'Text style';if(editing)stopText();if(tool!==next){if(tool==='text')textInkColor=$('#ink-color').value;selected=null;renderMarks();}tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);root.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});if(strokeSettings[next])$('#ink-color').value=strokeSettings[next].color;else if(next==='text')$('#ink-color').value=textInkColor;toolWidgets.forEach(w=>w.sync?.());renderStrokePresets();$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
+function setTool(next){if(editing)stopText();if(tool!==next){if(tool==='text')textInkColor=$('#ink-color').value;selected=null;renderMarks();}tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);root.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});if(strokeSettings[next])$('#ink-color').value=strokeSettings[next].color;else if(next==='text')$('#ink-color').value=textInkColor;toolWidgets.forEach(w=>w.sync?.());renderStrokePresets();$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
 function renderStrokePresets(){const drawing=tool==='pen'||tool==='highlight';$('#draw-presets').hidden=!drawing;for(const id of ['text-font','text-size','text-highlight'])$('#'+id).closest('label').hidden=drawing;for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).hidden=drawing;$('#ink-size').closest('label').hidden=true;if(!drawing)return;
  const colors=tool==='highlight'?[['Yellow','#fff176'],['Pink','#ff6ec7'],['Cyan','#67e8f9'],['Lime','#a3e635']]:[['Black','#243556'],['Blue','#0070c0'],['Green','#008000'],['Red','#ff0000']];
  const widths=tool==='highlight'?[2.5,3.5,5,6.5,8]:[0.25,0.35,0.5,0.7,1];
@@ -147,7 +147,7 @@ function startText(id,position,selectAll=false){
  if(!editable())return;
  if(activeText?.id===id&&id){if(selectAll)activeText.editor.commands.selectAll();return;}
  stopText();const mark=id?marks.get(id):null;if(id&&!own(mark))return;
- const attrs=mark||position,n=pageNodes[attrs.page];
+ const attrs=mark||position,n=pageNodes[attrs.page],clickY=attrs.clickY;delete attrs.clickY;
  if(id){selected=id;renderMarks();}
  let box=id?[...n.text.children].find(x=>x.dataset.mark===id):document.createElement('div');
  box.className='note-box';box.dataset.draft='1';if(!id)n.text.append(box);
@@ -166,6 +166,7 @@ function startText(id,position,selectAll=false){
    marks.set(session.id,next);queue(next);
  };
  const editor=new Editor({element,extensions:richExtensions(),content:mark?annotationDocument(mark):{type:'doc',content:[{type:'paragraph'}]},editorProps:{attributes:{class:'ink-annotation-editor',role:'textbox','aria-label':mark?'Text annotation':'Type on page',spellcheck:'true'},handleKeyDown:(view,event)=>{if(event.key==='Escape'){event.preventDefault();stopText();return true;}return false;},handleDOMEvents:{compositionend:()=>{queueMicrotask(()=>capture({editor}));return false;}}},onUpdate:capture});session.editor=editor;
+ if(!mark&&Number.isFinite(clickY)){const paragraph=editor.view.dom.querySelector('p'),r=paragraph.getBoundingClientRect(),b=box.getBoundingClientRect();attrs.y=Math.max(0,Math.min(clickY-(r.top+r.height/2-b.top)/zoom,meta.pages[attrs.page].height-attrs.height));box.style.top=attrs.y+'px';}
  if(!mark){editor.commands.setMark('textStyle',{fontFamily:attrs.fontFamily,fontSize:attrs.fontSize+'pt',color:attrs.color,backgroundColor:attrs.backgroundColor});for(const style of ['bold','italic','underline'])if(attrs[style])editor.commands.setMark(style);}
  element.onpointerdown=e=>e.stopPropagation();
  const handle=document.createElement('button');handle.type='button';handle.className='note-handle';handle.textContent='⠿';handle.setAttribute('aria-label','Move text');
@@ -182,13 +183,13 @@ function point(event,page){const rect=pageNodes[page].stage.getBoundingClientRec
 function hit(page,p){return [...marks.values()].reverse().find(m=>{if(m.page!==page||m.deleted||!own(m))return false;if(m.kind==='text')return p[0]>=m.x&&p[0]<=m.x+m.width&&p[1]>=m.y&&p[1]<=m.y+m.height;return m.points.some((b,i)=>{const a=m.points[Math.max(0,i-1)],dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy,t=length?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/length)):0;return Math.hypot(a[0]+t*dx-p[0],a[1]+t*dy-p[1])<Math.max(8,m.size/2);});});}
 function highlightText(id){const mark=marks.get(id);if(mark?.kind!=='text'||editing===id)return;const display=[...pageNodes[mark.page].text.children].find(x=>x.dataset.mark===id)?.querySelector('.note-display');if(display){const range=document.createRange();range.selectNodeContents(display);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);}}
 function placeText(event,page,p){
- const size=Number($('#text-size').value),pageSize=meta.pages[page],width=Math.min(220,pageSize.width),height=30;
- startText(null,{kind:'text',page,x:Math.min(p[0],pageSize.width-width),y:Math.min(p[1],pageSize.height-height),width,height,...textAppearance(),color:$('#ink-color').value,text:''});
+ const size=Number($('#text-size').value),pageSize=meta.pages[page],width=Math.min(220,pageSize.width),lineHeight=size*4/3*1.45,height=Math.max(30,lineHeight+6);
+ startText(null,{kind:'text',page,x:Math.min(p[0],pageSize.width-width),y:Math.max(0,Math.min(p[1]-lineHeight/2-3,pageSize.height-height)),width,height,clickY:p[1],...textAppearance(),color:$('#ink-color').value,text:''});
  if(queuedFeedback){activeText.editor.commands.insertContent(queuedFeedback);queuedFeedback='';$('#feedback-select').value='';}
 }
 function pointerDown(event){
   if(!editable()||event.button!==0||gesture)return;
-  const page=Number(event.currentTarget.dataset.page),p=point(event,page),target=event.target.closest('[data-mark]'),m=target?marks.get(target.dataset.mark):(tool==='select'?hit(page,p):null);activePage=page;
+  const page=Number(event.currentTarget.dataset.page),p=point(event,page),target=event.target.closest('[data-mark]'),m=target?marks.get(target.dataset.mark):(['select','text'].includes(tool)?hit(page,p):null);activePage=page;
   if(tool==='select'||tool==='text'){
     if(editing)stopText();
     if(m&&own(m)&&!m.deleted){
@@ -232,6 +233,11 @@ function textAppearance(){let family='Calibri';try{family=fontName($('#text-font
 for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=()=>{if(strokeSettings[tool]&&id==='ink-color')strokeSettings[tool].color=$('#ink-color').value;styleSelection(id);if(strokeSettings[tool])renderStrokePresets();};
 const presets=document.createElement('div');presets.id='draw-presets';presets.className='draw-presets';$('#style-tools').append(presets);presets.onclick=event=>{const button=event.target.closest('button');if(!button||!strokeSettings[tool])return;if(button.dataset.inkPreset){$('#ink-color').value=button.dataset.inkPreset;strokeSettings[tool].color=button.dataset.inkPreset;}if(button.dataset.strokeWidth)strokeSettings[tool].size=Number(button.dataset.strokeWidth);toolWidgets.forEach(w=>w.sync?.());styleSelection();renderStrokePresets();};
 toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection('text-highlight');}}),addSizePresets($('#text-size')),addDeviceFonts($('#text-font'),$('#pdf-fonts'),Array.from($('#pdf-fonts').options,o=>o.value)));
+const fontRow=document.createElement('div');fontRow.className='pdf-font-row';const characterRow=document.createElement('div');characterRow.className='pdf-character-row';
+fontRow.append($('#text-font').closest('label'),$('#text-size').closest('label'),$('#pdf-fonts'));
+characterRow.append($('#text-bold'),$('#text-italic'),$('#text-underline'),$('#ink-color').closest('label'),$('#text-highlight').closest('label'),$('#text-highlight-toggle'));
+$('#style-tools').prepend(fontRow,characterRow);$('#print-worksheet').before($('#feedback-tools'));
+$('#text-highlight-toggle').textContent='Apply';$('#text-highlight-toggle').setAttribute('aria-label','Apply text highlight');
 $('#ink-color').addEventListener('clear-text-color',()=>{$('#ink-color').value='#243556';toolWidgets.forEach(w=>w.sync?.());styleSelection('ink-color');});
 $('#text-highlight').addEventListener('clear-text-color',()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','false');styleSelection('text-highlight-toggle');});
 for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).onclick=()=>{$('#'+id).setAttribute('aria-pressed',String($('#'+id).getAttribute('aria-pressed')!=='true'));styleSelection(id);};

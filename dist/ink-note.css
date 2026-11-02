@@ -23,19 +23,84 @@ body.folio-app{--folio-ink:#172b49;--folio-muted:#6d7889;--folio-line:#dfe4e9;--
 @media(prefers-reduced-motion:reduce){.folio-app *,.worksheet-app *{scroll-behavior:auto!important;transition:none!important}}
 @media print{.folio-app .note-toolbar,.folio-app .folio-column{display:none!important}.worksheet-app .worksheet-page-wrap{box-shadow:none}}
 
-/* Formatting is available on demand, leaving more room for the page. */
-.note-toolbar{position:relative;align-items:center}
-.note-format-panel,.annotation-settings{position:relative;font-size:12px}
-.note-format-panel>summary,.annotation-settings>summary{cursor:pointer;list-style:none;padding:8px 12px;border:1px solid #dfe4e9;border-radius:8px;background:#fff;color:#243b58;white-space:nowrap;user-select:none}
-.note-format-panel>summary::-webkit-details-marker,.annotation-settings>summary::-webkit-details-marker{display:none}
-.note-format-panel[open]>summary,.annotation-settings[open]>summary{background:#e8f1f0;border-color:#bdd3d3}
-.note-format-content,.annotation-settings-content{position:absolute;top:calc(100% + 7px);left:0;z-index:60;display:flex;flex-wrap:wrap;align-items:center;gap:9px;width:380px;max-width:calc(100vw - 50px);padding:16px;border:1px solid #dfe4e9;border-radius:12px;background:#fcfdfe;box-shadow:0 5px 20px #172b4914}
-.note-format-content .format-control{width:100%;justify-content:space-between;font-size:12px}
-.note-format-content .format-control input{max-width:190px}.note-format-content .format-control input[type=number]{width:65px}
-.annotation-settings-content .tool-group{flex-wrap:wrap;gap:8px;border:0;padding:0;width:100%}.annotation-settings-content #feedback-tools{display:flex}
-.annotation-settings-content #style-tools{background:transparent!important}.annotation-settings-content .draw-presets{flex-wrap:wrap;gap:10px}.annotation-settings-content .stroke-widths{flex-wrap:wrap}
-.worksheet-app .ws-toolbar{overflow:visible;position:relative;z-index:3;align-items:center}
-.annotation-history{gap:4px}.annotation-history button{font-size:11px;padding:7px 9px}
-@media(max-width:850px){.note-format-content,.annotation-settings-content{width:310px}.annotation-settings-content #feedback-tools{display:flex}.worksheet-app .ws-toolbar{padding:7px}}
+/* Essential formatting stays in view. Only secondary paragraph actions use More. */
+.note-toolbar{position:relative;align-items:center;gap:5px}
+.note-format-content,.annotation-settings-content{display:flex;align-items:center;flex-wrap:wrap;gap:7px;position:static;width:auto;max-width:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.note-format-content .format-control{display:flex;align-items:center;gap:5px;width:auto;font-size:11px;white-space:nowrap}
+.note-format-content .format-control input{max-width:150px}.note-format-content .format-control input[type=number]{width:53px}
+.note-format-content .device-fonts-button{font-size:10px;padding:5px}.note-format-content .text-font-status:empty{display:none}
+.annotation-settings{display:flex;align-items:center;flex:1 1 430px;min-width:0}
+.annotation-settings-content{width:100%;gap:5px 12px}.annotation-settings-content .tool-group{flex-wrap:wrap;gap:4px;border:0;padding:0;max-width:100%}
+.annotation-settings-content #feedback-tools{display:flex}.annotation-settings-content .draw-presets{flex-wrap:wrap;gap:8px}
+.worksheet-app .ws-toolbar{position:relative;z-index:3;align-items:center;gap:5px 10px;padding:7px 12px}
+.worksheet-app .tool-group button{font-size:11px;padding:6px 8px}.worksheet-app .tool-group label{font-size:10px}
+.worksheet-app #text-font{width:125px}.worksheet-app .annotation-history{gap:2px}.worksheet-app .annotation-history button{font-size:11px;padding:6px 8px}
+.note-more-format{position:relative}.note-more-format>summary{list-style:none;cursor:pointer;padding:4px 9px;font-size:18px;border-radius:6px}.note-more-format>summary::-webkit-details-marker{display:none}
+.note-more-content{position:absolute;top:100%;right:0;z-index:50;display:flex;gap:5px;flex-wrap:wrap;width:280px;padding:10px;border:1px solid #dfe4e9;border-radius:9px;background:#fff;box-shadow:0 4px 12px #172b4912}
+/* Notebook identity lives in the navigation. Keep the page itself for work. */
+.folio-app .folio-header{display:none}.folio-app{height:100dvh;overflow:hidden}.folio-app>main{height:100%;display:flex;flex-direction:column;min-height:0}
+.folio-app .folio-heading{padding:9px 16px;gap:12px;min-height:52px;background:#f4f5f7}
+.folio-app .folio-heading h1{font-size:17px;letter-spacing:-.3px;margin:0}.folio-app .folio-heading-actions{flex-direction:row;gap:12px}.folio-app #toggle-navigation{font-size:11px;padding:6px 9px}
+.folio-app .folio-grid{flex:1;height:auto;min-height:0}.folio-app .folio-content{overflow:hidden}
+.folio-app #page-heading{padding:5px 12px;min-height:0;gap:0;justify-content:flex-end;flex-direction:row}.folio-app #page-heading>div:first-child{display:none}
+.folio-app #page-heading:has(.page-actions>:not([hidden])){min-height:30px}.folio-app .page-actions{width:auto;gap:9px;align-items:center;flex-wrap:wrap}
+.folio-app #page-status{padding:0;margin:0;min-height:0;font-size:11px}.folio-app #page-status:empty{display:none}.folio-app .page-actions label{display:flex;align-items:center;gap:5px}.folio-app .page-actions select{display:inline-block;margin:0;padding:3px 6px}
+.folio-app #download-page{padding:4px 8px}.folio-app .printout-hint{display:none!important}
+.folio-app .folio-row small:empty{display:none}.folio-app #worksheet-embed{min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.folio-app #worksheet-embed #worksheet-workspace{display:flex;flex-direction:column;flex:1;min-height:0}
+.folio-app #worksheet-embed .ws-content{height:auto;min-height:0;flex:1}.folio-app #worksheet-embed .ws-document-heading{padding:5px 12px;gap:10px;min-height:32px}
+.folio-app #worksheet-embed .ws-document-heading button{font-size:11px;padding:4px 8px}.folio-app #worksheet-embed .ws-bottom #tool-hint{display:none}.folio-app #worksheet-embed .ws-bottom:not(:has(button:not([hidden]))):not(:has(#published-label:not(:empty))){display:none}
+@media(max-width:850px){.folio-app .folio-grid{display:block}.folio-app .folio-column,.folio-app .folio-content{height:100%}.folio-app .folio-heading{padding:8px 12px}.folio-app .folio-heading h1{font-size:15px}.folio-app .folio-heading-actions{gap:5px}.folio-app .folio-mobile-nav{padding:5px 12px}.folio-app .folio-heading-actions #connection{font-size:10px}.note-format-content .device-fonts-button{display:none}.note-format-content .format-control{font-size:10px}.annotation-settings{flex-basis:100%}.folio-app .note-toolbar{padding:7px 10px}}
+@media print{.folio-app .folio-heading,.folio-app #page-heading{display:none}.folio-app{height:auto;overflow:visible}}
 
 .folio-heading-title{display:flex;align-items:center;gap:10px}.notebook-home{display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;border-radius:7px;color:#27475c;text-decoration:none}.notebook-home:hover{background:#e1e9ec}.notebook-home:focus-visible{outline:2px solid #4b9797;outline-offset:2px}
+
+.folio-app #selected-book,.folio-app #selected-section{display:none}
+.note-format-content .format-control:has(.device-fonts-button),.annotation-settings-content .tool-group label:has(.device-fonts-button){max-width:none;flex-wrap:nowrap}.note-format-content .format-control input[list]{width:120px}
+
+/* Spread related tools into a horizontal ribbon, with room for comfortable targets. */
+.folio-app #toggle-navigation{display:inline-flex!important;align-items:center;white-space:nowrap}
+.folio-app .note-toolbar{gap:10px 16px;padding:9px 14px;align-items:center}
+.note-toolbar .note-format-content{gap:12px;flex:0 1 auto}.note-toolbar .format-control{gap:6px;font-size:11px}
+.note-toolbar .format-control input[list]{width:145px;max-width:145px;padding:7px 9px;font-size:13px}.note-toolbar .format-control input[type=number]{font-size:13px;padding:7px 6px;width:57px}
+.note-emphasis-group,.note-drawing-group,.note-history-group{display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
+.note-toolbar .note-emphasis-group,.note-toolbar .note-drawing-group{border-left:1px solid #dce3e8;padding-left:12px}
+.note-toolbar .note-history-group{margin-left:auto;gap:5px}.note-toolbar button{font-size:12px;min-height:32px;padding:6px 10px}
+.note-toolbar .note-emphasis-group button{font-size:14px;min-width:32px}.note-toolbar .note-drawing-group>input[type=color]{width:30px;height:32px;padding:2px;border:1px solid #d8e2e8;border-radius:5px}
+.note-toolbar .note-more-format>summary{padding:5px 9px;line-height:22px}
+.worksheet-app .ws-toolbar{gap:9px 16px}.worksheet-app .annotation-settings{flex:0 1 auto}.worksheet-app .annotation-settings-content{gap:7px 14px}.worksheet-app .annotation-settings-content .tool-group{gap:7px}.worksheet-app .annotation-settings-content label{font-size:11px}.worksheet-app .tool-group button{min-height:32px;padding:6px 10px;font-size:12px}.worksheet-app .annotation-history{margin-left:auto}.worksheet-app .zoom-tools{margin-left:0}
+@media(max-width:850px){.folio-app .note-toolbar{gap:8px 12px}.note-toolbar .note-format-content{gap:9px}.note-toolbar .note-drawing-group{padding-left:0;border-left:0}.note-toolbar .note-history-group{margin-left:auto}.worksheet-app .annotation-settings{flex-basis:100%}}
+
+/* A two-row ribbon: font above character tools; paragraph and drawing groups alongside. */
+.folio-app .note-toolbar{align-items:stretch;gap:10px 18px;padding:10px 16px}
+.note-type-group{display:flex;flex-direction:column;justify-content:center;gap:7px;flex:0 0 auto}
+.note-font-row,.note-character-row{display:flex;align-items:center;gap:9px;flex-wrap:nowrap}
+.note-type-group .format-control{display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.note-type-group .format-control input{padding:6px 8px;border:1px solid #d1dae2;border-radius:5px;background:white;color:#243556;font-size:13px}
+.note-type-group .format-control input[list]{width:155px;max-width:155px}.note-type-group .format-control input[type=number]{width:56px}
+.note-type-group .format-control:has(.device-fonts-button){flex-wrap:nowrap;max-width:none}.note-type-group .device-fonts-button{font-size:10px!important;padding:5px 6px!important}
+.note-character-row .format-control{font-size:10px;gap:4px}.note-character-row .note-emphasis-group{padding:0;border:0;gap:2px}
+.note-toolbar .note-paragraph-group{display:grid;grid-template-columns:repeat(2,max-content);gap:5px 8px;align-content:center;border-left:1px solid #dce3e8;padding-left:16px}
+.note-toolbar .note-paragraph-group button{padding:5px 9px;text-align:left;min-height:30px}
+.note-toolbar .note-drawing-group{display:grid;grid-template-columns:repeat(2,max-content);gap:5px;align-content:center;padding-left:16px}.note-toolbar .note-drawing-group input{grid-column:3;grid-row:1/span 2;align-self:center}
+.note-toolbar .note-history-group{flex-direction:column;justify-content:center;align-items:stretch;margin-left:auto}
+.note-toolbar .note-history-group button{padding:3px 9px;min-height:28px;font-size:16px}
+@media(max-width:1050px){.folio-app .note-toolbar{gap:10px 14px}.note-toolbar .note-paragraph-group{padding-left:12px}.note-type-group .device-fonts-button{display:none}.note-type-group .format-control input[list]{width:135px}}
+@media(max-width:650px){.note-type-group{flex-basis:100%;max-width:100%}.note-font-row,.note-character-row{gap:6px;flex-wrap:wrap}.note-toolbar .note-paragraph-group{padding-left:0;border-left:0}}
+
+.worksheet-app .ws-toolbar{align-items:stretch;padding:9px 14px;gap:10px 18px}
+.worksheet-app #drawing-tools{display:grid;grid-template-columns:repeat(3,max-content);align-content:center;gap:5px;border-right:1px solid #dce3e8;padding-right:14px}
+.worksheet-app .annotation-settings-content #style-tools{display:flex;flex-direction:column;align-items:flex-start;gap:7px}
+.pdf-font-row,.pdf-character-row{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}.pdf-font-row:not(:has(label:not([hidden]))){display:none}
+.worksheet-app .pdf-font-row label:has(.device-fonts-button){max-width:none;flex-wrap:nowrap}.worksheet-app .pdf-font-row #text-font{width:145px;font-size:13px}.worksheet-app .pdf-font-row #text-size{font-size:13px}
+.worksheet-app .pdf-character-row label{font-size:10px;margin:0 2px}.worksheet-app .pdf-character-row button{min-width:30px}
+.worksheet-app .annotation-history{display:grid;grid-template-columns:repeat(2,max-content);align-content:center;gap:4px}.worksheet-app .zoom-tools{align-self:center;gap:5px}.worksheet-app #feedback-tools{border-left:1px solid #dce3e8;padding-left:14px}
+@media(max-width:1050px){.worksheet-app .device-fonts-button{display:none}.worksheet-app #feedback-tools{display:none!important}.worksheet-app .ws-toolbar{gap:9px 12px}}
+@media(max-width:650px){.pdf-font-row,.pdf-character-row{flex-wrap:wrap;gap:5px}.worksheet-app .annotation-settings{flex-basis:100%}.worksheet-app .annotation-history{margin-left:0}}
+
+.folio-app .folio-grid.focus-page{grid-template-columns:minmax(0,1fr)!important}.folio-app .folio-grid.focus-page>.folio-content{grid-column:1/-1;width:100%}
+.worksheet-app #drawing-tools{grid-template-columns:repeat(2,max-content)}
+
+.folio-app #page-heading:has(#page-status:empty):not(:has(.page-actions>label:not([hidden]))):not(:has(.page-actions>button:not([hidden]))){display:none}
+.worksheet-app .ws-document-heading #feedback-tools{border:0;padding:0;margin-left:auto}.worksheet-app .ws-document-heading #feedback-tools label{display:flex;gap:6px;align-items:center;font-size:10px}.worksheet-app .ws-document-heading #feedback-tools select{padding:4px 7px;font-size:11px}
+.note-toolbar .note-type-group{gap:8px}.note-toolbar .note-font-row,.note-toolbar .note-character-row{gap:10px}.note-toolbar .note-type-group input,.note-toolbar .note-paragraph-group button,.note-toolbar .note-drawing-group button{font-size:13px}.note-toolbar .note-emphasis-group button{font-size:15px;min-width:35px}

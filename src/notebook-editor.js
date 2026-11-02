@@ -49,7 +49,8 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     const paragraph=event.target.closest('.ink-paragraph');const blank=paragraph&&!paragraph.classList.contains('folio-text-frame')&&!paragraph.querySelector('.ink-paragraph-content')?.textContent;
     if(event.target!==view.dom&&!empty&&!blank)return false;
     event.preventDefault();const r=view.dom.getBoundingClientRect(),width=Math.min(340,Math.max(140,r.width-20));
-    showCaret({x:Math.max(0,Math.min(r.width-width,event.clientX-r.left)),y:Math.max(0,event.clientY-r.top),width,height:30});return true;
+    const style=getComputedStyle(view.dom.querySelector('.ink-paragraph-content')||view.dom),fontSize=parseFloat(activeEditor.getAttributes('textStyle').fontSize)||parseFloat(style.fontSize)*.75,lineRatio=parseFloat(style.lineHeight)/parseFloat(style.fontSize)||1.45,lineHeight=fontSize*4/3*lineRatio;
+    showCaret({x:Math.max(0,Math.min(r.width-width,event.clientX-r.left)),y:Math.max(0,event.clientY-r.top-lineHeight/2-4),width,height:Math.max(30,lineHeight+6)});return true;
   };
 
   function updateToolbar(editor) {
@@ -94,7 +95,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     { label: 'Italic', display: 'I', mark: 'italic', run: c => c.toggleItalic() },
     { label: 'Underline', display: 'U', mark: 'underline', run: c => c.toggleUnderline() },
     { label:'Strikethrough',display:'S̶',mark:'strike',run:c=>c.toggleStrike() },
-    { label: 'Heading', display: 'H2', active: e => e.isActive('heading', { level: 2 }), run: c => c.toggleHeading({ level: 2 }) },
+    { label: 'Heading', display: 'Heading', active: e => e.isActive('heading', { level: 2 }), run: c => c.toggleHeading({ level: 2 }) },
     { label: 'Bullet list', display: '• List', mark: 'bulletList', run: c => c.toggleBulletList() },
     { label: 'Numbered list', display: '1. List', mark: 'orderedList', run: c => c.toggleOrderedList() },
     { label: 'Quotation', display: '“ Quote', mark: 'blockquote', run: c => c.toggleBlockquote() },
@@ -102,17 +103,18 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     { label: 'Redo', display: '↷', available: e => e.can().redo(), run: c => c.redo() },
   ];
   toolbar.replaceChildren();
-  const panel=window.document.createElement('details');panel.className='note-format-panel';const summary=window.document.createElement('summary');summary.textContent='Aa';summary.setAttribute('aria-label','Text formatting');summary.title='Text formatting';const formatBody=window.document.createElement('div');formatBody.className='note-format-content';panel.append(summary,formatBody);toolbar.append(panel);
-  const closePanel=event=>{if(!panel.contains(event.target))panel.open=false;};window.document.addEventListener('pointerdown',closePanel);const panelCleanup=cleanup;cleanup=()=>{window.document.removeEventListener('pointerdown',closePanel);panelCleanup();};
-  panel.addEventListener('keydown',event=>{if(event.key==='Escape'){panel.open=false;summary.focus();event.stopPropagation();}});
+  const formatBody=window.document.createElement('div');formatBody.className='note-format-content';formatBody.setAttribute('role','group');formatBody.setAttribute('aria-label','Text formatting');toolbar.append(formatBody);
+  const more=window.document.createElement('details');more.className='note-more-format';const moreLabel=window.document.createElement('summary');moreLabel.textContent='⋯';moreLabel.title='More text formatting';moreLabel.setAttribute('aria-label','More text formatting');const advanced=window.document.createElement('div');advanced.className='note-more-content';more.append(moreLabel,advanced);
   const fonts=window.document.createElement('datalist');fonts.id='folio-font-families';for(const name of fontChoices){const option=window.document.createElement('option');option.value=name;fonts.append(option);}formatBody.append(fonts);
   for(const spec of [{key:'fontFamily',label:'Font family',type:'text',fallback:'Calibri',clean:fontName},{key:'fontSize',label:'Font size',type:'number',fallback:'16',clean:textSize},{key:'color',label:'Text color',type:'color',fallback:'#243556',clean:textColor},{key:'backgroundColor',label:'Text highlight color',type:'color',fallback:'#fff176',clean:textColor}]){
-    const label=window.document.createElement('label');label.className='format-control';label.textContent=spec.label;const input=window.document.createElement('input');input.type=spec.type;input.setAttribute('aria-label',spec.label);input.value=spec.fallback;
+    const label=window.document.createElement('label');label.className='format-control';label.dataset.style=spec.key;label.textContent=({fontFamily:'Font',fontSize:'Size',color:'Color',backgroundColor:'Highlight'})[spec.key];const input=window.document.createElement('input');input.type=spec.type;input.setAttribute('aria-label',spec.label);input.value=spec.fallback;
     if(spec.key==='fontFamily'){input.setAttribute('list',fonts.id);input.placeholder='Font name';}if(spec.type==='number'){input.min='8';input.max='96';input.step='0.5';}
     input.addEventListener('change',()=>{try{const value=spec.clean(input.value);input.setCustomValidity('');currentEditor().chain().focus().setMark('textStyle',{[spec.key]:value}).run();}catch(error){input.setCustomValidity(error.message);input.reportValidity();}});label.append(input);formatBody.append(label);let widget;if(spec.type==='color'){widget=addColorPalette(input,{label:spec.label,highlight:spec.key==='backgroundColor'});input.addEventListener('clear-text-color',()=>currentEditor().chain().focus().setMark('textStyle',{[spec.key]:spec.key==='color'?'#243556':null}).run());}else if(spec.key==='fontSize')widget=addSizePresets(input);else if(spec.key==='fontFamily')widget=addDeviceFonts(input,fonts,fontChoices);if(widget)toolWidgets.push(widget);formatControls.push({...spec,input,widget});
   }
-  const clear=window.document.createElement('button');clear.type='button';clear.textContent='Clear highlight';clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>currentEditor().chain().focus().setMark('textStyle',{backgroundColor:null}).run();formatBody.append(clear);buttons.push({button:clear});
+  const clear=window.document.createElement('button');clear.type='button';clear.textContent='A×';clear.title='Clear highlight';clear.setAttribute('aria-label','Clear highlight');clear.addEventListener('mousedown',e=>e.preventDefault());clear.onclick=()=>currentEditor().chain().focus().setMark('textStyle',{backgroundColor:null}).run();advanced.append(clear);buttons.push({button:clear});
 
+  const emphasis=window.document.createElement('div');emphasis.className='note-emphasis-group';emphasis.setAttribute('role','group');emphasis.setAttribute('aria-label','Text emphasis');const history=window.document.createElement('div');history.className='note-history-group';history.setAttribute('role','group');history.setAttribute('aria-label','Undo and redo');
+  toolbar.append(emphasis);
   for (const item of items) {
     const button = window.document.createElement('button');
     button.type = 'button';
@@ -123,12 +125,14 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     button.addEventListener('mousedown', event => event.preventDefault());
     button.addEventListener('click', () => {if(['Heading','Bullet list','Numbered list','Quotation'].includes(item.label))wrapPositionedParagraph(activeEditor);item.run(currentEditor().chain().focus()).run();});
     buttons.push({ button, active: item.active || (item.mark ? e => e.isActive(item.mark) : null), available: item.available });
-    (['Bold','Italic','Underline','Undo','Redo'].includes(item.label)?toolbar:formatBody).append(button);
+    (['Bold','Italic','Underline'].includes(item.label)?emphasis:['Undo','Redo'].includes(item.label)?history:advanced).append(button);
   }
+  history.append(more);
   if(ydoc&&!readOnly){
     const editor=activeEditor,root=editor.view.dom,ns='http://www.w3.org/2000/svg';let tool='text',color='#18395d';
-    const modes=[];for(const [value,label] of [['text','Text'],['pen','Pen'],['highlight','Highlighter'],['eraser','Eraser']]){const b=window.document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('aria-pressed',String(value===tool));b.onmousedown=e=>e.preventDefault();b.onclick=()=>{tool=value;root.dataset.tool=value;editor.storage.inkStroke.tool=value;modes.forEach(([v,button])=>button.setAttribute('aria-pressed',String(v===value)));if(value==='text')ensureCanvasCaret(editor.view);else root.blur();};modes.push([value,b]);toolbar.append(b);}
-    const ink=window.document.createElement('input');ink.type='color';ink.value=color;ink.setAttribute('aria-label','Ink color');ink.onchange=()=>{color=ink.value;};toolbar.append(ink);
+    const drawing=window.document.createElement('div');drawing.className='note-drawing-group';drawing.setAttribute('role','group');drawing.setAttribute('aria-label','Writing and drawing tools');toolbar.append(drawing);
+    const modes=[];for(const [value,label] of [['text','Text'],['pen','Pen'],['highlight','Highlighter'],['eraser','Eraser']]){const b=window.document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('aria-pressed',String(value===tool));b.onmousedown=e=>e.preventDefault();b.onclick=()=>{tool=value;root.dataset.tool=value;editor.storage.inkStroke.tool=value;modes.forEach(([v,button])=>button.setAttribute('aria-pressed',String(v===value)));if(value==='text')ensureCanvasCaret(editor.view);else root.blur();};modes.push([value,b]);drawing.append(b);}
+    const ink=window.document.createElement('input');ink.type='color';ink.value=color;ink.setAttribute('aria-label','Ink color');ink.onchange=()=>{color=ink.value;};drawing.append(ink);
     const draw=event=>{if(!editor.isEditable||!['pen','highlight'].includes(tool)||event.button!==0||event.target.closest('button'))return;event.preventDefault();event.stopPropagation();
       const bounds=root.getBoundingClientRect(),point=e=>[Math.round(Math.max(0,Math.min(10000,e.clientX-bounds.left))*10)/10,Math.round(Math.max(0,Math.min(200000,e.clientY-bounds.top))*10)/10],points=[point(event)],svg=window.document.createElementNS(ns,'svg'),line=window.document.createElementNS(ns,'polyline'),size=tool==='highlight'?16:2,highlight=tool==='highlight',strokeColor=highlight&&color==='#18395d'?'#ffe45c':color;
       svg.classList.add('ink-stroke','ink-stroke-preview');svg.append(line);line.setAttribute('stroke',strokeColor);line.setAttribute('stroke-width',size);line.setAttribute('fill','none');line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');line.setAttribute('opacity',highlight?'.32':'1');element.append(svg);const r=element.getBoundingClientRect();Object.assign(svg.style,{left:bounds.left-r.left+element.scrollLeft+'px',top:bounds.top-r.top+element.scrollTop+'px'});root.setPointerCapture(event.pointerId);
@@ -137,6 +141,12 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
       const cancel=e=>{points.length=0;root.removeEventListener('pointermove',motion,true);root.removeEventListener('pointerup',finish,true);root.removeEventListener('pointercancel',cancel,true);svg.remove();if(root.hasPointerCapture(e.pointerId))root.releasePointerCapture(e.pointerId);};root.addEventListener('pointermove',motion,true);root.addEventListener('pointerup',finish,true);root.addEventListener('pointercancel',cancel,true);
     };root.addEventListener('pointerdown',draw,true);const previous=cleanup;cleanup=()=>{root.removeEventListener('pointerdown',draw,true);previous();};
   }
+  toolbar.append(history);
+  const typography=window.document.createElement('div');typography.className='note-type-group';typography.setAttribute('role','group');typography.setAttribute('aria-label','Font and character formatting');
+  const fontRow=window.document.createElement('div');fontRow.className='note-font-row';const characterRow=window.document.createElement('div');characterRow.className='note-character-row';typography.append(fontRow,characterRow);
+  for(const label of formatBody.querySelectorAll('.format-control'))(['fontFamily','fontSize'].includes(label.dataset.style)?fontRow:characterRow).append(label);
+  characterRow.prepend(emphasis);characterRow.append(clear);const strike=advanced.querySelector('[data-format="strike"]');if(strike)emphasis.append(strike);fontRow.append(fonts);formatBody.remove();toolbar.prepend(typography);
+  advanced.className='note-paragraph-group';advanced.setAttribute('role','group');advanced.setAttribute('aria-label','Paragraph formatting');toolbar.insertBefore(advanced,toolbar.querySelector('.note-drawing-group')||history);more.remove();
   updateToolbar(activeEditor);
   if(ydoc&&!readOnly)ensureCanvasCaret(activeEditor.view);
   activeEditor.focusPage=()=>showCaret();
