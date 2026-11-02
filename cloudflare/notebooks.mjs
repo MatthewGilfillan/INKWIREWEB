@@ -33,7 +33,30 @@ export async function handleNotebooks(request,env,user) {
   if(!learner)return fail('Notebook not found.',404,'NOT_FOUND');
   if(!await env.DB.prepare('SELECT id FROM classes WHERE id=? AND deleted_at IS NULL').bind(classId).first())return fail('Notebook not found.',404,'NOT_FOUND');
   const scope=[classId,learnerId];
-  const sections=async()=>[{id:PRINT_SECTION,title:'PDF printouts'},...(await env.DB.prepare('SELECT id,title FROM notebook_sections WHERE class_id=? AND learner_id=? ORDER BY created_at,id').bind(...scope).all()).results];
+  // PDF assets belong to a particular notebook page, never to a separate class library.
+  if(kind==='pages'&&ID.test(id||'')&&parts[4]==='pdfs'&&ID.test(parts[5]||'')&&parts.length===6){
+    const page=await env.DB.prepare("SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=? AND kind='note'").bind(...scope,id).first();
+    if(!page)return fail('Page not found.',404,'NOT_FOUND');
+    if(!env.WORKSHEETS)return fail('PDF storage is unavailable. Try again shortly.',503);
+    const key='notebook-pdfs/'+classId+'/'+learnerId+'/'+id+'/'+parts[5]+'.pdf';
+    if(request.method==='GET'){
+      const object=await env.WORKSHEETS.get(key);if(!object)return fail('PDF not found.',404,'NOT_FOUND');
+      return new Response(object.body,{headers:{...headers,'Content-Type':'application/pdf','Content-Disposition':'inline; filename="printout.pdf"','Content-Security-Policy':"sandbox; default-src 'none'"}});
+    }
+    if(request.method!=='POST')return fail('Not found.',404,'NOT_FOUND');
+    if(!teacher)return fail('Only teachers can insert PDFs.',403,'FORBIDDEN');
+    if(request.headers.get('Origin')!==env.APP_ORIGIN||request.headers.get('Sec-Fetch-Site')==='cross-site')return fail('Invalid origin.',403,'INVALID_ORIGIN');
+    if(request.headers.get('Content-Type')!=='application/pdf')return fail('Choose a PDF.');
+    if(!await limitClassAction(env,user.id,'notebook-pdf',20))return fail('Please wait before inserting more PDFs.',429,'RATE_LIMITED');
+    const existing=await env.WORKSHEETS.get(key);if(existing)return json({id:parts[5]},200);
+    const reader=request.body?.getReader();if(!reader)return fail('Choose a PDF.');
+    let length=0;const chunks=[];
+    while(true){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>10*1024*1024){await reader.cancel();return fail('Choose a PDF of up to 10 MB.',413);}chunks.push(value);}
+    const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+    if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')return fail('Choose a valid PDF.');
+    await env.WORKSHEETS.put(key,bytes,{httpMetadata:{contentType:'application/pdf'}});return json({id:parts[5]},201);
+  }
+  const sections=async()=>[{id:PRINT_SECTION,title:'Notes'},...(await env.DB.prepare('SELECT id,title FROM notebook_sections WHERE class_id=? AND learner_id=? ORDER BY created_at,id').bind(...scope).all()).results];
   if(parts.length===2&&request.method==='GET') {
     const worksheets=(await env.DB.prepare('SELECT id,title,display_mode AS displayMode,created_at AS createdAt FROM worksheets WHERE class_id=? ORDER BY created_at,id').bind(classId).all()).results;
     const pages=(await env.DB.prepare('SELECT id,section_id AS sectionId,title,kind,version,updated_at AS updatedAt FROM notebook_pages WHERE class_id=? AND learner_id=? ORDER BY updated_at,id').bind(...scope).all()).results;

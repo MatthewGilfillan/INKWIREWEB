@@ -1,0 +1,2 @@
+const open=()=>new Promise((resolve,reject)=>{const r=indexedDB.open('inkwire-notebook-pdf-practice',1);r.onupgradeneeded=()=>r.result.createObjectStore('assets');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+export async function previewPdf(key,file){const db=await open();try{return await new Promise((resolve,reject)=>{const tx=db.transaction('assets',file?'readwrite':'readonly'),store=tx.objectStore('assets'),r=file?store.put(file,key):store.get(key);tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(tx.error);});}finally{db.close();}}

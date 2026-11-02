@@ -13,7 +13,7 @@ export function enhanceScheduleInputs(root){
    if(i){const colon=document.createElement('span');colon.className='schedule-colon';colon.textContent=':';colon.setAttribute('aria-hidden','true');wrap.append(colon);}
    const segment=document.createElement('span');segment.className='schedule-segment';const button=document.createElement('button');button.type='button';button.className='schedule-value';button.setAttribute('aria-label',label+' '+part.name);button.title='Click to scroll · double-click to type';
    const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.maxLength=time?2:3;input.className='schedule-custom';input.hidden=true;input.setAttribute('aria-label','Type '+label+' '+part.name);
-   const panel=document.createElement('div');panel.className='schedule-wheel-panel';panel.setAttribute('popover','auto');panel.setAttribute('aria-label',label+' '+part.name+' choices');document.body.append(panel);
+   const panel=document.createElement('div');panel.className='schedule-wheel-panel';panel.setAttribute('popover','auto');panel.setAttribute('aria-label',label+' '+part.name+' choices');(backing.closest('dialog')||document.body).append(panel);
    const wheel=document.createElement('div');wheel.className='schedule-wheel';wheel.setAttribute('role','listbox');wheel.setAttribute('aria-label',label+' '+part.name);wheel.tabIndex=0;
    const title=document.createElement('p');title.textContent=time?(part.name==='hour'?'Hour':'Minute'):'Lesson length · minutes';panel.append(title,wheel);
    let timer,opening=false,disposed=false;

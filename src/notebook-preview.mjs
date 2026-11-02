@@ -17,7 +17,7 @@ export async function previewAdapter(role='teacher') {
   function check(id,write=false,manage=false){const book=notebooks.find(b=>b.id===id);if(!book||!allowed(book)||write&&role==='parent'||manage&&role!=='teacher')throw Error('This view does not have permission for that action.');return book;}
   return {
     async list(){return {role,classes,notebooks:notebooks.filter(allowed)};},
-    async book(id){const b=check(id),data=await transaction(id);const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const w=await createPreviewAdapter(role,{classId:b.classId,learnerId:b.learnerId,liveParent:true});const ws=(await w.list()).worksheets;return {...data,pages:catalogPages(ws,data.pages),role,learnerName:b.learnerName};},
+    async book(id){const b=check(id),data=await transaction(id);const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const w=await createPreviewAdapter(role,{classId:b.classId,learnerId:b.learnerId,liveParent:true});const ws=(await w.list()).worksheets;return {...data,sections:data.sections.map(s=>s.id===PRINT_SECTION?{...s,title:'Notes'}:s),pages:catalogPages(ws,data.pages),role,learnerName:b.learnerName};},
     async page(bookId,id){check(bookId);return {page:(await transaction(bookId)).pages.find(p=>p.id===id)};},
     async section(bookId,input){check(bookId,true,true);await transaction(bookId,b=>({...b,sections:[...b.sections,{id:input.id,title:input.title}]}));},
     async create(bookId,input){check(bookId,true,true);await transaction(bookId,b=>({...b,pages:[...b.pages,{...input,kind:'note',document:emptyDocument(),syncState:encodeState(seedState(emptyDocument())),version:1,updatedAt:Date.now()}]}));},

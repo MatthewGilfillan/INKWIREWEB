@@ -85,3 +85,19 @@ test('a blank page can be named later, and a concurrent rename cannot overwrite 
   assert.equal((await(await f.call('parent',path)).json()).page.title,'Lesson notes');
  }finally{f.db.close();}
 });
+test('PDF printout assets stay inside the selected notebook page and respect family and teacher permissions',async()=>{
+ const f=await fixture();try{
+  const storage=new Map();f.env.WORKSHEETS={async get(key){const bytes=storage.get(key);return bytes?{body:bytes}:null;},async put(key,bytes){storage.set(key,bytes);}};
+  const page=randomUUID(),asset=randomUUID();await f.call('teacher',f.base+'/pages',{id:page,sectionId:'printouts',title:'Lesson'});
+  const route='/api/notebooks'+f.base+'/pages/'+page+'/pdfs/'+asset;
+  const request=(who,body,extra={})=>import('../cloudflare/notebooks.mjs').then(({handleNotebooks})=>handleNotebooks(new Request(origin+route,{method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/pdf',...extra},...(body?{body}:{} )}),f.env,f.users[who]));
+  const pdf=new TextEncoder().encode('%PDF-1.7\nTest printout');
+  assert.equal((await request('student',pdf)).status,403);assert.equal((await request('parent',pdf)).status,403);
+  assert.equal((await request('teacher',pdf,{Origin:'https://evil.invalid'})).status,403);
+  assert.equal((await request('teacher',new TextEncoder().encode('invalid'))).status,400);
+  assert.equal((await request('teacher',pdf)).status,201);assert.equal((await request('teacher',pdf)).status,200);assert.equal(storage.size,1);
+  for(const who of ['teacher','student','parent'])assert.equal((await request(who)).status,200);
+  for(const who of ['otherTeacher','otherStudent','otherParent'])assert.equal((await request(who)).status,404);
+  const book=await(await f.call('teacher',f.base)).json();assert.equal(book.pages.length,1);assert.equal(book.pages[0].id,page);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM worksheets').get().n,0);
+ }finally{f.db.close();}
+});

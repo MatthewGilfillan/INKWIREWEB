@@ -29,3 +29,13 @@
 .folio-canvas .ink-page-caret{padding:3px;min-height:1.45em;z-index:2}.folio-canvas .ink-page-caret:empty{pointer-events:auto}
 
 .ink-paragraph.ink-page-caret{display:block!important}.ink-paragraph-content{margin:0!important}.ink-paragraph:not(.folio-text-frame):not(.ink-page-caret)>button{display:none!important}.ink-paragraph.folio-text-frame:hover>.frame-handle,.ink-paragraph.folio-text-frame:hover>.frame-resize,.ink-paragraph.folio-text-frame:focus-within>.frame-handle,.ink-paragraph.folio-text-frame:focus-within>.frame-resize{opacity:1}
+
+/* Printouts and ink share the ordinary notebook canvas with text. */
+.ink-printout{position:absolute;z-index:0;background:white;box-shadow:0 1px 5px #1831491a;user-select:none;cursor:default}.ink-printout canvas{display:block;width:100%;height:100%;pointer-events:none}.printout-loading{position:absolute;inset:20px auto auto 20px;font-size:13px;color:#63778a}.printout-controls{position:absolute;left:0;top:0;display:flex;gap:4px;transform:translateY(-100%);padding:4px;background:#f4f7f9;border:1px solid #d8e2e8;border-radius:6px;opacity:0;transition:opacity .12s;z-index:5;white-space:nowrap}.ink-printout:hover .printout-controls,.ink-printout:focus-within .printout-controls{opacity:1}.printout-controls button{font-size:11px;padding:4px 7px;min-height:25px}.printout-controls button[aria-label="Move printout"],.printout-resize{touch-action:none;cursor:move}.printout-resize{cursor:nwse-resize!important}.printout-controls[hidden],.printout-controls button[hidden]{display:none}.folio-text-frame,.ink-page-caret{z-index:2}.ink-stroke{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:3}.ink-stroke polyline{pointer-events:stroke}.folio-canvas[data-tool="text"] .ink-stroke polyline{pointer-events:none}.folio-canvas[data-tool="eraser"] .ink-stroke polyline{cursor:crosshair}.folio-canvas[data-tool="pen"],.folio-canvas[data-tool="highlight"]{cursor:crosshair}.ink-stroke-preview{pointer-events:none!important}.note-editor{position:relative}.note-toolbar>input[type="color"]{width:28px;height:28px;padding:2px;border:1px solid #d8e2e8;border-radius:5px}
+
+.ink-printout>.printout-resize{position:absolute;right:-6px;bottom:-6px;width:16px;height:16px;padding:0;font-size:11px;border:1px solid #91b2c0;border-radius:50%;background:#fff;opacity:0;z-index:4}.ink-printout:hover>.printout-resize,.ink-printout:focus-within>.printout-resize{opacity:1}.ink-printout>.printout-resize[hidden]{display:none}
+.printout-controls{top:8px;left:8px;transform:none}
+
+.ink-printout.printout-background{cursor:inherit}
+
+.folio-canvas[contenteditable="false"] .printout-controls,.folio-canvas[contenteditable="false"]>.ink-printout>.printout-resize{display:none}

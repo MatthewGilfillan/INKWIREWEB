@@ -27,3 +27,15 @@ test('free-positioned text containers retain geometry, rich text and concurrent 
  const bytes=seedState(doc),result=mergeState(bytes,encodeState(bytes));assert.deepEqual(result.document.content[0].attrs,attrs);assert.equal(result.document.content[0].content[0].content[0].text,'Movable feedback');
  for(const bad of [{x:-1},{width:20},{height:Infinity},{onload:'bad'}])assert.throws(()=>cleanFrame(bad));
 });
+test('inline PDF geometry, background state and ink survive synchronized storage while unsafe payloads are rejected',async()=>{
+ const {printoutNodes,cleanPrintout}=await import('../src/printout-node.mjs'),{cleanStroke}=await import('../src/ink-stroke.mjs');
+ const {seedState,mergeState,encodeState}=await import('../src/notebook-sync.mjs');
+ const pages=printoutNodes('00000000-0000-4000-8000-000000000001',[{width:612,height:792},{width:595,height:842}]);
+ assert.equal(pages[1].attrs.y,840);assert.equal(pages[0].attrs.background,true);
+ pages[0].attrs.width=306;pages[0].attrs.height=396;pages[0].attrs.background=false;
+ const ink={type:'inkStroke',attrs:{points:[[100,200],[110,205]],size:2,color:'#123456',highlight:false}};
+ const document={type:'doc',content:[...pages,ink,{type:'paragraph',attrs:{inkFrame:{x:100,y:200,width:340,height:30}},content:[{type:'text',text:'Student answer'}]}]};
+ const state=seedState(document),merged=mergeState(state,encodeState(state));assert.deepEqual(merged.document,document);
+ for(const a of [{...pages[0].attrs,assetId:'https://evil.invalid/a.pdf'},{...pages[0].attrs,page:60},{...pages[0].attrs,width:-1},{...pages[0].attrs,src:'javascript:bad'}])assert.throws(()=>cleanPrintout(a));
+ for(const a of [{...ink.attrs,points:[[0,0],[Infinity,0]]},{...ink.attrs,color:'url(bad)'},{...ink.attrs,size:100}])assert.throws(()=>cleanStroke(a));
+});
