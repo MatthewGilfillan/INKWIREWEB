@@ -1,4 +1,4 @@
-import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261103-learner-evidence';
+import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261103-progress-estimates';
 import {createClassSetup} from './class-setup.js?v=20261103-standards';
 import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js?v=20261103-skin';

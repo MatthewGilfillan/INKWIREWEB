@@ -59,7 +59,7 @@ Restore checkpoint before Assessment: local `backup/lms-navigation-verified-2026
 
 `dist/educade-demo-data.mjs` preserves the complete original fictional fixture from `public/teacher-data.js` at development commit `1a49552d1d76d4d3d9f973369454331b0fe7ba7c`; only the global wrapper becomes an ES module. It contains nine fictional learners in Classes 5A (six) and 5B (three), with 540 responses per learner across four weeks. `dist/assessment-demo.mjs` adapts these into the existing assessment view without changing the original skill response accuracy.
 
-The fixture is lazy-loaded when a demo is selected from the Class dropdown, or through `/teacher?view=assessment&demo=1`. Class and learner IDs are namespaced `demo-educade-`. They do not enter enrollment, profile, notebook or feedback APIs and create no accounts, invitations or database records. Selecting a real class removes the demo query, and normal class selection remains the default. A demo banner identifies every sample view; individual profiles are labelled Fictional learner. Standards remain Not reviewed because sample practice accuracy is not a teacher attainment judgment.
+The fixture is lazy-loaded when a demo is selected from the Class dropdown, or through `/teacher?view=assessment&demo=1`. Class and learner IDs are namespaced `demo-educade-`. They do not enter enrollment, profile, notebook or feedback APIs and create no accounts, invitations or database records. Selecting a real class removes the demo query, and normal class selection remains the default. A demo banner identifies every sample view; individual profiles are labelled Fictional learner. Initially Standards progress remained Not reviewed; the later owner-requested provisional B–M+ display is described below.
 
 Progress bars use SVG width attributes instead of inline style attributes, preserving the live site's strict content security policy. Tests verify original roster membership, namespaced identities, source-equivalent domain percentages, known skill IDs and populated chart markup.
 
@@ -81,3 +81,8 @@ Student names in Assessment and the regular class roster open the full student p
 ## Inline class evidence
 
 The class table adapts EDUCADE's independent learner-row and subject-column expansion. Show learning evidence toggles summaries in that row without changing the route; student names and score buttons retain full profile navigation. Expanded areas show actual correct/attempt counts, hint and support counts, encountered skills and nested, scrollable response histories. Unassessed areas remain No evidence yet. Native details retain their open state across class-table rerenders. Class changes reset expansion, and row toggles preserve focus and the table scroll position.
+
+
+## Provisional B–M+ percentage estimates
+
+At the owner's request, Standards progress now displays a provisional conversion of recorded practice accuracy in both class and student views: B 0–39%, B+ 40–54%, D 55–69%, D+ 70–79%, M 80–89%, M+ 90–100%. The shared conversion uses the same rounded percentage as the progress bars. Missing evidence remains ungraded. Labels and a visible band key identify these as estimates; this display conversion does not write curriculum judgments, overwrite course standards or assign an understanding grade. Thresholds live in `dist/assessment-progress-scale.mjs` for later refinement.
