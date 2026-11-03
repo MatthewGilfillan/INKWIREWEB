@@ -1,0 +1,48 @@
+/* One control row, followed by a continuous stream of months. */
+[data-calendar-active=true] .teacher-main{padding-top:24px}
+[data-calendar-active=true] .teacher-heading{display:none}
+.calendar-workspace .calendar-toolbar{display:flex;align-items:center;gap:24px;flex-wrap:nowrap;margin:0;padding:0;justify-content:initial}
+.calendar-month-navigation{display:flex;align-items:center;gap:12px;min-width:290px;flex:none}
+.calendar-workspace .calendar-arrow{display:grid;place-items:center;flex:none;width:37px;height:37px;border:1px solid var(--theme-line,#dce5eb);border-radius:9px;background:var(--theme-panel,#fff);color:var(--theme-text,#24465c);font:22px/1 Poppins,Arial,sans-serif;cursor:pointer}
+.calendar-workspace .calendar-arrow:hover:not(:disabled){background:var(--theme-raised,#edf4f3)}
+.calendar-month-heading{position:relative;display:flex!important;gap:9px!important;flex-direction:row;align-items:baseline;justify-content:center;min-width:200px!important;margin:0!important;cursor:pointer}
+.calendar-month-heading strong{font-size:29px;line-height:1.3;letter-spacing:-.8px;font-weight:600;color:var(--theme-text,#102640)}
+.calendar-month-heading>span{font-size:14px;font-weight:500;color:var(--theme-muted,#748797)}
+.calendar-month-heading input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.calendar-month-heading:focus-within{outline:2px solid var(--theme-accent,#28796e);outline-offset:5px;border-radius:5px}
+.calendar-view-switch{display:flex;margin-left:auto;padding:4px;gap:3px;border:1px solid var(--theme-line,#dce5eb);border-radius:10px;background:var(--theme-raised,#edf2f5);flex:none}
+.calendar-workspace .calendar-view-switch button{padding:8px 16px;min-height:35px;border:0;border-radius:7px;background:transparent;color:var(--theme-muted,#637b8e);font:500 12px Poppins,Arial,sans-serif;cursor:pointer}
+.calendar-workspace .calendar-view-switch button[aria-pressed=true]{background:var(--theme-panel,#fff);color:var(--theme-text,#173b52);box-shadow:0 1px 5px #10264014}
+.calendar-workspace .calendar-class-filter{display:flex;align-items:center;gap:10px;min-width:0;margin:0;font:500 12px Poppins,Arial,sans-serif;color:var(--theme-muted,#637b8e)}
+.calendar-workspace .calendar-class-filter select{min-height:43px;width:240px;max-width:100%;margin:0;padding:9px 13px;border:1px solid var(--theme-line,#d9e4eb);border-radius:9px;background:var(--theme-panel,#fff);color:var(--theme-text,#24465c);font:12px Poppins,Arial,sans-serif}
+.calendar-meta{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 0 18px;color:var(--theme-muted,#718498)}
+#teacher-calendar .calendar-meta [data-cal=status],.calendar-workspace .calendar-meta [data-cal=status]{margin:0;font:11px/1.7 Poppins,Arial,sans-serif;min-height:0;color:inherit}
+.calendar-zone-link{font:10px/1.6 Poppins,Arial,sans-serif;text-decoration:none;color:var(--theme-muted,#718498);white-space:nowrap}
+.calendar-zone-link:hover{text-decoration:underline}
+.calendar-month-section{margin:0 0 30px;scroll-margin-top:100px;min-width:0}
+.calendar-section-heading{display:flex;align-items:center;gap:16px;justify-content:space-between;margin:25px 0 12px}
+#teacher-calendar .calendar-section-heading h2,#class-panel-calendar .calendar-section-heading h2{margin:0;font:600 25px/1.3 Poppins,Arial,sans-serif;color:var(--theme-text,#173552);letter-spacing:-.6px}
+.calendar-section-heading>span{font-size:11px;color:var(--theme-muted,#718498)}
+.calendar-first-heading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);margin:0}
+.calendar-workspace .calendar-weekdays{margin-top:0;padding:10px 0;font:500 11px Poppins,Arial,sans-serif;background:var(--theme-raised,#eef3f6);border-color:var(--theme-line,#dce5eb);color:var(--theme-muted,#637b8e)}
+.calendar-workspace .calendar-month{border-color:var(--theme-line,#dce5eb);background:var(--theme-panel,#fff)}
+.calendar-workspace .calendar-day{min-height:115px;padding:8px;border-color:var(--theme-line,#e0e7ec)}
+.calendar-workspace .calendar-day h3{font:500 11px Poppins,Arial,sans-serif;color:var(--theme-muted,#728699);margin:0 0 8px}
+.calendar-workspace .outside-month{background:var(--theme-inset,#f6f8fa)}
+.calendar-workspace .outside-month h3{opacity:.4}
+.calendar-workspace .calendar-event{font:10px/1.5 Poppins,Arial,sans-serif;padding:7px;border-radius:6px}
+.calendar-workspace .calendar-event :is(time,strong,span){font-size:10px;line-height:1.5}
+.calendar-workspace .calendar-agenda{gap:12px}.calendar-workspace .calendar-agenda>section{padding:18px}
+.calendar-workspace .calendar-agenda .calendar-event{display:grid;grid-template-columns:135px 1fr 1.5fr;gap:16px;align-items:center;padding:12px}
+.calendar-workspace .calendar-agenda .calendar-event :is(time,strong,span){font-size:12px}
+.calendar-more{display:flex;justify-content:center;padding:0 0 20px}.calendar-more button{font-size:12px}
+@media(max-width:1000px){.calendar-workspace .calendar-toolbar{flex-wrap:wrap;gap:14px 20px}.calendar-workspace .calendar-class-filter{flex:1;justify-content:flex-start}.calendar-workspace .calendar-class-filter select{width:190px}}
+@media(max-width:650px){
+ [data-calendar-active=true] .teacher-main{padding-top:18px}
+ .calendar-workspace .calendar-toolbar{display:flex;gap:14px}.calendar-month-navigation{width:100%;justify-content:space-between;min-width:0}.calendar-month-heading strong{font-size:27px}
+ .calendar-workspace .calendar-view-switch button{padding:7px 13px}.calendar-workspace .calendar-class-filter{display:block;font-size:0}.calendar-workspace .calendar-class-filter select{width:100%;font-size:11px}
+ .calendar-meta{align-items:start;margin:12px 0 16px;gap:10px}.calendar-zone-link{white-space:normal;text-align:right;font-size:9px}
+ .calendar-workspace .calendar-day{padding:4px;min-height:82px}.calendar-workspace .calendar-event{padding:4px 2px}.calendar-workspace .calendar-month .calendar-event time{font-size:8px}.calendar-workspace .calendar-month .calendar-event strong{font-size:8px}
+ .calendar-workspace .calendar-agenda .calendar-event{grid-template-columns:1fr;gap:4px}.calendar-workspace .calendar-agenda .calendar-event :is(time,strong,span){font-size:11px}
+ #teacher-calendar .calendar-section-heading h2,#class-panel-calendar .calendar-section-heading h2{font-size:22px}
+}

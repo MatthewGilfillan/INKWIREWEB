@@ -24,6 +24,7 @@
    tools.append(button);if(account)tools.append(account);
   });
   apply(theme);
+  import('./workspace-notifications.js?v=20261103-header-bell').then(module=>document.querySelectorAll('.workspace-header-tools').forEach(module.mountNotifications)).catch(()=>{});
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
  window.addEventListener('storage',event=>{if(event.key===key||event.key===null)apply(event.newValue);});

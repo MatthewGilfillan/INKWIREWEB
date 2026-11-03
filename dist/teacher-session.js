@@ -4,12 +4,13 @@ import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js?v=20261103-skin';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js?v=20261103-standards';
-import {createTeacherCalendar} from './teacher-calendar.js';
-import {createTeacherToday} from './teacher-today.js';
+import {createTeacherCalendar} from './teacher-calendar.js?v=20261103-scroll-calendar';
+import {createTeacherToday} from './teacher-today.js?v=20261103-local-time';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
 const rosters=new Map();
+let notificationEntryHandled=false;
 let currentView='today',deletingClass='',activeClassId='',activeTab='students';
 const classTabs=new Map();
 function problem(error) {status.textContent=error.message;if(error.status===401){list.replaceChildren();location.replace('/account');}}
@@ -92,8 +93,8 @@ function showView(view){
   if(view!=='assessment')document.title='Teacher dashboard | Ink Wire Education';
   $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':view==='assessment'?'Assessment':'My classes';
   $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':view==='assessment'?'Learning evidence, skills and curriculum standards.':'Restore classes and their course plans.';
-  $('#teacher-today').hidden=view!=='today';$('#teacher-assessment').hidden=view!=='assessment';$('.lms-heading-tools').hidden=view==='assessment';
-  document.body.dataset.assessmentActive=String(view==='assessment');
+  $('#teacher-today').hidden=view!=='today';$('#teacher-assessment').hidden=view!=='assessment';$('.lms-heading-tools').hidden=view==='assessment'||view==='calendar';$('.teacher-heading').hidden=view==='calendar';
+  document.body.dataset.assessmentActive=String(view==='assessment');document.body.dataset.calendarActive=String(view==='calendar');
   currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
   document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
   const utility=$('.teacher-trash-utility'),inTrash=view==='trash';
@@ -136,7 +137,7 @@ async function loadRoster(classId){
 }
 async function loadClasses(force=false){
   if(loading||(!force && coursePlanner.hasUnsavedChanges()))return;loading=true;retry.hidden=true;status.textContent='Loading your classes…';
-  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();today.refresh();if(currentView==='trash')await loadTrash();if(currentView==='assessment')assessmentWorkspace.refresh();status.textContent='';}
+  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();today.refresh();const query=new URLSearchParams(location.search),notificationClass=query.get('notificationClass');if(!notificationEntryHandled&&notificationClass){notificationEntryHandled=true;if(classrooms.some(c=>c.id===notificationClass)){const index=query.get('notificationLesson');await openCourseTab(notificationClass,null,index!==null&&/^\d+$/.test(index)?Number(index):undefined);}const url=new URL(location.href);url.searchParams.delete('notificationClass');url.searchParams.delete('notificationLesson');history.replaceState(null,'',url);}if(currentView==='trash')await loadTrash();if(currentView==='assessment')assessmentWorkspace.refresh();status.textContent='';}
   catch(error){problem(error);retry.hidden=false;}finally{loading=false;}
 }
 for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes/join']]){

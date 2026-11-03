@@ -91,3 +91,31 @@ At the owner's request, Standards progress now displays a provisional conversion
 ## LMS appearance
 
 `lms-theme.js` applies an explicit browser preference before first paint and mounts the same accessible Dark mode switch next to the account menu in teacher, student, parent and notebook headers. Light is the default. The choice is saved only on a toggle, survives navigation/reload, synchronizes through storage events and degrades to page-only state when storage is unavailable. No profile or classroom data is written. `lms-theme.css` supplies the navy screen palette, dark glass header, assessment/chart/grade surfaces, forms and notebook chrome. Notebook paper and print colours remain unchanged. Header labels use Dashboard in both teacher and notebook navigation.
+
+
+## Calendar and header updates
+
+The calendar uses a single Month/Agenda toggle and a month/year title between
+previous/next arrows. It renders successive months, fetching each month's grid
+separately within the existing 62-day API limit. Scrolling preloads another month;
+a Show next month button remains available to keyboard users and browsers without
+IntersectionObserver. Class filtering applies across loaded months. The class selector sits next to the
+month navigation; the view toggle is on the right. The calendar hides the redundant
+page heading and Create class action.
+
+`display-time-zone.mjs` uses the device's IANA timezone by default. A verified
+account may save a personal override under My account. Preferences are private
+objects in the existing R2 binding, addressed exclusively by the session user ID.
+This requires no schema migration. Lesson source timezones and wall-clock schedule
+values are unchanged: a lesson at 18:00 Beijing displays at 17:00 Bangkok.
+User-facing labels lead with the current GMT offset, for example GMT+7 · Bangkok
+and GMT+8 · Beijing; the stored value remains an IANA identifier.
+
+The shared header places the fixed sun/moon switch before an accessible notification
+bell and the avatar. The bell lists actual submitted quizzes from current class
+rosters plus current cancelled lessons for authorized teachers. It does not create
+fictional submission alerts or expose teacher plans to families. Notification read
+IDs are account-owned R2 preferences; opening a notification links to the relevant
+course lesson. Cancellation dates in the feed identify the schedule's latest update,
+and read status is keyed to the cancelled lesson. Homework tracking and persistent
+notification event history remain future producers.

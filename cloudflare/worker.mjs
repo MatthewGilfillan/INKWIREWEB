@@ -1,5 +1,7 @@
 import {handleClassFiles} from './class-files.mjs';
 import {handleProfile} from './profiles.mjs';
+import {handleAccountPreferences} from './account-preferences.mjs';
+import {handleNotifications} from './notifications.mjs';
 import {handleNotebooks} from './notebooks.mjs';
 import {handleWorksheets} from './worksheets.mjs';
 import {handleCourseResources} from './course-resources.mjs';
@@ -190,6 +192,14 @@ export default {
       if (url.pathname === '/api/teacher/transcript-summary') {
         const session = await auth.api.getSession({headers:request.headers});
         return await handleTranscriptSummary(request,env,session?.user,{json,fail,readJSON});
+      }
+      if (url.pathname === '/api/notifications') {
+        const session=await auth.api.getSession({headers:request.headers});
+        return await handleNotifications(request,env,session?.user,{json,fail,readJSON});
+      }
+      if (url.pathname === '/api/account/preferences') {
+        const session=await auth.api.getSession({headers:request.headers});
+        return await handleAccountPreferences(request,env,session?.user,{json,fail,readJSON});
       }
       if (url.pathname === '/api/account' && request.method === 'GET') {
         const session = await auth.api.getSession({ headers: request.headers });

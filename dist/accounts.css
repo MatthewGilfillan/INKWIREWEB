@@ -37,3 +37,5 @@
 .account-home{display:block;text-align:center;margin:24px 0 0}.account-shell noscript{display:block;padding:16px;background:#fff0ee}
 #signin-dialog{max-height:calc(100dvh - 40px);overflow:auto}#signin-dialog [data-account-root]{margin-top:22px}
 @media(max-width:560px){.account-shell{margin:24px 16px;padding:25px 22px;border-radius:14px}.account-header{padding:23px 16px}.account-header img{width:180px}#signin-dialog{padding:30px 22px}}
+
+.account-time-zone{margin:26px 0;padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.account-time-zone label{display:block;font-size:13px;font-weight:600;margin:12px 0 7px}.account-time-zone select{box-sizing:border-box;display:block;width:100%;padding:12px;border:1px solid #c9d6e2;border-radius:8px;font:inherit;background:#fff;color:#173552;margin:0 0 12px}.account-time-zone .account-submit{width:auto;padding:10px 16px;cursor:pointer;border:0;border-radius:8px}.account-time-zone [data-time-zone-status]{font-size:12px}

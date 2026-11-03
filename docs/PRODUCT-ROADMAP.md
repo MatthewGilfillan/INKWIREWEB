@@ -14,3 +14,11 @@ using the existing course planner.
 
 This is a roadmap item only; meeting capture and automatic plan updates are
 not part of the current appearance release.
+
+
+## Notification producers
+
+The teacher bell now projects submitted quizzes and current lesson cancellations.
+Connect homework-submission alerts when homework submission tracking is added.
+A school-wide timezone default belongs with future school administrator settings;
+current accounts support automatic local display and a personal manual override.
