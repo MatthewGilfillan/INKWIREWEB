@@ -104,3 +104,8 @@ body.folio-app{--folio-ink:#172b49;--folio-muted:#6d7889;--folio-line:#dfe4e9;--
 .folio-app #page-heading:has(#page-status:empty):not(:has(.page-actions>label:not([hidden]))):not(:has(.page-actions>button:not([hidden]))){display:none}
 .worksheet-app .ws-document-heading #feedback-tools{border:0;padding:0;margin-left:auto}.worksheet-app .ws-document-heading #feedback-tools label{display:flex;gap:6px;align-items:center;font-size:10px}.worksheet-app .ws-document-heading #feedback-tools select{padding:4px 7px;font-size:11px}
 .note-toolbar .note-type-group{gap:8px}.note-toolbar .note-font-row,.note-toolbar .note-character-row{gap:10px}.note-toolbar .note-type-group input,.note-toolbar .note-paragraph-group button,.note-toolbar .note-drawing-group button{font-size:13px}.note-toolbar .note-emphasis-group button{font-size:15px;min-width:35px}
+
+/* Keep the LMS navigation above the compact notebook controls. */
+body.folio-app{display:flex;flex-direction:column}
+.folio-app>.notebook-site-header{flex:0 0 auto}
+.folio-app>main{flex:1;min-height:0;height:auto!important}

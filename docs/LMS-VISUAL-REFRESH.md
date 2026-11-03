@@ -1,7 +1,8 @@
 # LMS visual refresh · 3 November 2026
 
 The signed-in teacher, student and parent workspaces use `dist/lms-skin.css`.
-The public website and Ink Note editor keep their existing layouts. The palette
+The public website keeps its existing layout. Ink Note shares the application
+header while retaining its editing toolbar and canvas layout. The palette
 uses navy type, mint primary actions, pale paper surfaces and restrained lavender.
 
 Students open a course in their dashboard, choose a lesson and see preparation,
@@ -41,3 +42,18 @@ Validation: 146 tests pass; production build succeeds. Browser checks cover
 Essentials/Extended persistence, teacher preparation and compact overview, student
 lesson switching, the existing quiz dialog, published feedback and notebook URLs,
 parent reading controls, and phone/laptop layouts using fictional local data.
+
+## Navigation refinement
+
+Dashboards and notebooks share `workspace-header.css`: the same logo, role-aware
+navigation and account menu, pinned above scrolling content with a restrained
+translucent background and 16 px backdrop blur. Reduced-transparency preferences
+and browsers without backdrop filters receive an opaque header. Notebooks keep
+the focus toggle and compact notebook controls directly below the global header.
+
+Teacher links support `?view=classes` and `?view=calendar`. In Deleted classes,
+the corner utility becomes Home and returns to Today; elsewhere it opens Trash.
+Notebook header navigation checks for pending saves before leaving the editor.
+
+`backup/lms-before-navigation-20261103` and its sibling source archive preserve
+the version before this navigation refinement.

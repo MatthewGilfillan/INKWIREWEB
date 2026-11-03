@@ -1,0 +1,29 @@
+/* The same application header on dashboards and notebooks. */
+.workspace-header.teacher-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;flex:none;gap:48px;min-height:80px;height:auto;margin:0;padding:16px max(28px,calc((100vw - 1376px)/2));background:#ffffffef;border:0;border-bottom:1px solid #e0e7ec;color:#102640;font:14px/1.6 Poppins,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.workspace-header .today-brand{display:block;flex:none;text-decoration:none}
+.workspace-header .today-brand img{display:block;width:150px;height:auto;max-width:100%}
+.workspace-header .today-nav{display:flex;gap:30px;align-self:stretch;align-items:stretch;margin:0 auto 0 0;padding:0;overflow:visible}
+.workspace-header .today-nav :is(a,button){box-sizing:border-box;position:relative;display:flex;align-items:center;min-height:44px;padding:0 4px;margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#617185;font:500 13px/1.6 Poppins,Arial,sans-serif;text-decoration:none;white-space:nowrap;cursor:pointer}
+.workspace-header .today-nav :is(a,button):hover{background:transparent;color:#24776a}
+.workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]){color:#102640;font-weight:600}
+.workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]):after{content:'';position:absolute;bottom:-16px;left:0;right:0;height:3px;border-radius:3px 3px 0 0;background:#68dcc1}
+.workspace-header .today-account{position:relative;flex:none;font:inherit}
+.workspace-header .today-account>summary{box-sizing:border-box;display:grid;place-items:center;width:40px;height:40px;list-style:none;border:1px solid #e1e3ed;border-radius:50%;background:#ecebf6;cursor:pointer}
+.workspace-header .today-account>summary::-webkit-details-marker{display:none}
+.workspace-header .today-account>summary .profile-face{display:block;width:34px!important;height:34px!important;object-fit:cover;border-radius:50%;background:#ecebf6;border:1px solid #dbe4e8}
+.workspace-header .today-account-menu{position:absolute;right:0;top:50px;z-index:80;display:grid;min-width:205px;padding:8px;border:1px solid #e0e7ec;border-radius:12px;background:#fff;box-shadow:0 12px 40px #10264012}
+.workspace-header .today-account-menu :is(a,button){margin:0;padding:11px 13px;min-height:40px;border:0;border-radius:7px;background:transparent;box-shadow:none;text-align:left;text-decoration:none;color:#173552;font:400 12px/1.6 Poppins,Arial,sans-serif;white-space:nowrap;cursor:pointer}
+.workspace-header .today-account-menu :is(a,button):hover:not(:disabled){background:#f5f4fa}
+.workspace-header .today-account-menu button:disabled{opacity:.45;cursor:default}
+.workspace-header :is(a,button,summary):focus-visible{outline:2px solid #267c70;outline-offset:4px}
+.workspace-header [hidden]{display:none!important}
+@media(max-width:900px){.workspace-header.teacher-header{gap:28px}.workspace-header .today-nav{gap:24px}}
+@media(max-width:700px){.workspace-header.teacher-header{padding:14px 20px;min-height:70px;gap:20px;flex-wrap:wrap}.workspace-header .today-brand img{width:132px}.workspace-header .today-account{margin-left:auto}.workspace-header .today-nav{order:3;width:100%;gap:23px;margin:0;overflow-x:auto;overflow-y:hidden;padding-bottom:3px;scrollbar-width:none}.workspace-header .today-nav::-webkit-scrollbar{display:none}.workspace-header .today-nav :is(a,button){min-height:36px;font-size:12px}.workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]):after{bottom:-2px}}
+@media print{.workspace-header{display:none!important}}
+
+/* Pinned glass: content can pass underneath without competing with navigation. */
+.workspace-header.teacher-header{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.78);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);border-bottom-color:rgba(205,217,226,.72);box-shadow:0 1px 8px #10264004}
+.teacher-main :is(h1,h2,h3,[data-overview-lesson]),.learning-report{scroll-margin-top:100px}
+@media(max-width:700px){.teacher-main :is(h1,h2,h3,[data-overview-lesson]),.learning-report{scroll-margin-top:150px}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.workspace-header.teacher-header{background:#fff}}
+@media(prefers-reduced-transparency:reduce){.workspace-header.teacher-header{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}}

@@ -92,6 +92,10 @@ function showView(view){
   $('#teacher-today').hidden=view!=='today';
   currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
   document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
+  const utility=$('.teacher-trash-utility'),inTrash=view==='trash';
+  utility.dataset.teacherView=inTrash?'today':'trash';utility.setAttribute('aria-label',inTrash?'Home':'Trash');utility.title=inTrash?'Home':'Trash';utility.removeAttribute('aria-pressed');
+  utility.querySelector('path').setAttribute('d',inTrash?'m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z':'M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6');
+  const url=new URL(location.href);if(view==='today')url.searchParams.delete('view');else url.searchParams.set('view',view);history.replaceState(null,'',url);
   if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();
 }
 document.querySelectorAll('[data-teacher-view]').forEach(b=>b.onclick=()=>showView(b.dataset.teacherView));
@@ -212,3 +216,8 @@ $('#invite-email-form').addEventListener('submit',async event=>{
   }catch(error){if(sharing===context)output.textContent=error.message;}
   finally{if(sharing===context)button.disabled=false;}
 });
+
+// Notebook navigation returns to the same named dashboard view.
+const entryQuery=new URLSearchParams(location.search),entryView=entryQuery.get('view');
+showView(['classes','calendar','trash'].includes(entryView)?entryView:'today');
+if(entryQuery.get('join')==='1'){document.querySelector('[data-open="join-class"]').click();const url=new URL(location.href);url.searchParams.delete('join');history.replaceState(null,'',url);}

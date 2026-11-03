@@ -1,7 +1,7 @@
 import {mountWorksheet} from './worksheets.js';
 import './notebook-editor.js';
 import * as Y from 'yjs';
-import {escape,requestId} from '../dist/workspace-shared.js';
+import {escape,requestId,api} from '../dist/workspace-shared.js';
 import {encodeState,decodeState} from './notebook-sync.mjs';
 import {inspectPrintout,validatePrintout} from './pdf-printout.mjs';
 import {recoverDraft} from './notebook-recovery.mjs';
@@ -109,6 +109,15 @@ function titleEditing(){const allowed=library?.role==='teacher'&&selection?.page
 titleField.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();titleField.blur();}if(event.key==='Escape'){titleField.textContent=selection?.pages.find(p=>p.id===selection.pageId)?.title||'Untitled page';titleField.blur();}};
 titleField.onblur=async()=>{const page=selection?.pages.find(p=>p.id===selection.pageId);if(!page||library.role!=='teacher'||page.kind!=='note')return;const name=titleField.textContent.trim()||'Untitled page';if(name===page.title){titleField.textContent=name;return;}try{await adapter.rename(book.id,page.id,name,page.title);page.title=name;renderLists();}catch(error){titleField.textContent=page.title;problem(error);}};
 $('#notebook-home').onclick=event=>{if(!mayNavigate())event.preventDefault();};
+$('.notebook-site-header').addEventListener('click',event=>{if(event.target.closest('a[href]') && !mayNavigate())event.preventDefault();});
+const accountMenu=$('.today-account');
+document.addEventListener('click',event=>{if(!accountMenu.contains(event.target))accountMenu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')accountMenu.open=false;});
+$('#notebook-signout').onclick=async()=>{
+  if(practice || !mayNavigate())return;const button=$('#notebook-signout');button.disabled=true;
+  try{await api('/api/accounts/signout',{});location.replace('/account');}catch(error){problem(error);button.disabled=false;}
+};
+
 $('#notebook-list').onclick=e=>{const b=e.target.closest('[data-id]');if(b)openBook(b.dataset.id);};
 $('#section-list').onclick=e=>{const b=e.target.closest('[data-id]');if(!b||!mayNavigate())return;closePage();selection.sectionId=b.dataset.id;selection.pageId=null;renderLists();pane('pages');const first=selection.pages.find(p=>p.sectionId===selection.sectionId);if(first)openPage(first.id);};
 $('#page-list').onclick=e=>{const b=e.target.closest('[data-id]');if(b&&b.dataset.id!==selection?.pageId)openPage(b.dataset.id);};
@@ -143,7 +152,15 @@ async function poll(){if(refreshing||!book||!selection||document.hidden)return;r
   finally{refreshing=false;}}
 async function initialize(){
   try{if(practice){adapter=await(await import('./notebook-preview.mjs')).previewAdapter(query.get('role')||'teacher');$('#practice-banner').hidden=false;}
-    library=await adapter.list();if(!library.classes.length)library.classes=[...new Map(library.notebooks.map(b=>[b.classId,{id:b.classId,name:b.className}])).values()];$('#view-label').textContent=library.role==='parent'?'Parent · read only':library.role==='student'?'Student notebook':'Teacher workspace';$('#dashboard-link').textContent=library.role==='teacher'?'Teacher dashboard':library.role==='parent'?'Parent dashboard':'Student dashboard';$('#dashboard-link').href=practice?'studio.html?role='+library.role:'/'+library.role;$('#notebook-home').href=$('#dashboard-link').href;
+    library=await adapter.list();if(!library.classes.length)library.classes=[...new Map(library.notebooks.map(b=>[b.classId,{id:b.classId,name:b.className}])).values()];$('#view-label').textContent=library.role==='parent'?'Parent · read only':library.role==='student'?'Student notebook':'Teacher workspace';const teacher=library.role==='teacher',home=practice?'studio.html?role='+library.role:'/'+library.role;
+    $('#notebook-today').hidden=!teacher;$('#notebook-calendar').hidden=!teacher;
+    $('#notebook-today').href=home;$('#notebook-calendar').href=home+(practice?'&':'?')+'view=calendar';
+    $('#dashboard-link').hidden=false;$('#dashboard-link').textContent=teacher?'Classes':library.role==='parent'?'My children':'My classes';$('#dashboard-link').href=home+(teacher?(practice?'&':'?')+'view=classes':'');$('#notebook-home').href=home;
+    $('#notebook-site-nav').setAttribute('aria-label',teacher?'Teacher workspace':library.role==='parent'?'Parent workspace':'Student workspace');
+    $('.today-account>summary').setAttribute('aria-label',teacher?'Teacher account':library.role==='parent'?'Parent account':'Student account');
+    $('#notebook-join').href=teacher?home+(practice?'&':'?')+'join=1':'/join#'+(library.role==='parent'?'family':'class')+'=';
+    $('#notebook-join').textContent=teacher?'Join with an invite code':library.role==='parent'?'Connect to my child':'Join a class';
+    $('#notebook-signout').disabled=practice;
     $('#class-filter').innerHTML='<option value="">All classes</option>'+library.classes.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');$('#class-filter').value=library.classes.some(c=>c.id===query.get('classId'))?query.get('classId'):'';
     renderLists();const visible=library.notebooks.filter(b=>!$('#class-filter').value||b.classId===$('#class-filter').value),first=visible.find(b=>b.id===query.get('notebookId'))||visible[0];if(first)await openBook(first.id,{initial:true});else{$('#connection').textContent='No notebooks yet';$('#page-meta').textContent='Add students to a class to see their notebooks here.';}
   }catch(e){problem(e);$('#connection').textContent='Could not load notebooks';if(e.status===401){const a=document.createElement('a');a.href='/account';a.textContent='Sign in to your website account →';$('#page-empty').append(a);}}}
