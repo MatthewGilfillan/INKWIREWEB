@@ -10,7 +10,7 @@ Imported with Matthew Gilfillan's authorization from `MatthewGilfillan/EDUCADE`:
 - `public/teacher-curriculum.js` at feature/adaptive-reading-curriculum-dashboard commit `9bf1dd2f8caf791ca2ea63e1486bd3fccec20c02`: framework metadata and candidate links, materialized against those same skill IDs in `dist/assessment-curricula.mjs`. CCSS has 17 links, England 18, Australia 27 and Cambridge Primary 27. These describe partial or thematic connections, not a complete standards database.
 - `public/teacher-standards.js` at the development commit above: Beginning, Approaching, Meeting and Exceeding descriptions, retained in `dist/assessment-model.mjs` as reference descriptors. No demo achievement levels were imported or inferred from scores.
 
-Fictional students, scores, practice responses, reading levels and browser-local teacher judgments were excluded. England is labelled National Curriculum for England, rather than a universal British curriculum. Cambridge Primary English (0058) is not IGCSE. The new standards registry adds separately researched reference packs; these are distinct from the older prototype mappings.
+Fictional fixtures are now available only through the explicitly labelled EDUCADE demo class choices. No sample teacher attainment judgments or reading levels are inferred. England is labelled National Curriculum for England, rather than a universal British curriculum. Cambridge Primary English (0058) is not IGCSE. The new standards registry adds separately researched reference packs; these are distinct from the older prototype mappings.
 
 The class comparison layout and chart helpers in `dist/educade-assessment-view.js` adapt the actual EDUCADE `public/teacher.js` and profile axes from `public/teacher-data.js` at the development commit above. The default view uses one bold Class label and adjacent selector, truthful evidence counts, subject tabs, search/sort/portrait controls, progress bars, heatmap and standards views. Learner dialogs retain the existing quiz and lesson assessment details. No duplicate dashboard title, repeated class name or hamburger menu is included.
 
@@ -54,3 +54,11 @@ This release contains the catalogue and validator, not a public game ingestion e
 The assessment tests cover learner isolation, absence/missing evidence, first-attempt weighting, unique preserved IDs, partial curriculum provenance, and invalid game events. Browser verification uses a local read-only fixture with fictional learners, then the live signed-in website without editing student work.
 
 Restore checkpoint before Assessment: local `backup/lms-navigation-verified-20261103`, source commit `855dc33`, published commit `791f4b213201cbfea2616c45269eefd3cce13d54`. Archives are outside the release checkout in `work/lms-restore-points`.
+
+## Fictional EDUCADE classes
+
+`dist/educade-demo-data.mjs` preserves the complete original fictional fixture from `public/teacher-data.js` at development commit `1a49552d1d76d4d3d9f973369454331b0fe7ba7c`; only the global wrapper becomes an ES module. It contains nine fictional learners in Classes 5A (six) and 5B (three), with 540 responses per learner across four weeks. `dist/assessment-demo.mjs` adapts these into the existing assessment view without changing the original skill response accuracy.
+
+The fixture is lazy-loaded when a demo is selected from the Class dropdown, or through `/teacher?view=assessment&demo=1`. Class and learner IDs are namespaced `demo-educade-`. They do not enter enrollment, profile, notebook or feedback APIs and create no accounts, invitations or database records. Selecting a real class removes the demo query, and normal class selection remains the default. A demo banner identifies every sample view; individual profiles are labelled Fictional learner. Standards remain Not reviewed because sample practice accuracy is not a teacher attainment judgment.
+
+Progress bars use SVG width attributes instead of inline style attributes, preserving the live site's strict content security policy. Tests verify original roster membership, namespaced identities, source-equivalent domain percentages, known skill IDs and populated chart markup.
