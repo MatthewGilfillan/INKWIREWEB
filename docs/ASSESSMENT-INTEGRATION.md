@@ -119,3 +119,8 @@ IDs are account-owned R2 preferences; opening a notification links to the releva
 course lesson. Cancellation dates in the feed identify the schedule's latest update,
 and read status is keyed to the cancelled lesson. Homework tracking and persistent
 notification event history remain future producers.
+
+Course overview is the first class workspace tab and the default when entering
+Classes from the header or Dashboard. Explicit lesson, timeline and student
+links keep their own destinations. The shared header gutter matches the inner
+1376px page container and responsive page padding.

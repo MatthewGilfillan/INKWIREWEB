@@ -1,3 +1,4 @@
+import {displayTimeZoneLabel} from './display-time-zone.mjs';
 import {escape} from './workspace-shared.js';
 import {courseSummary} from './course-model.mjs';
 import {lessonKey} from './lesson-feedback-model.mjs';
@@ -22,7 +23,7 @@ const activity = (icon,label,text) => text ? `<li class="overview-activity">${co
 export function courseOverviewHTML(course,{draft=false}={}) {
   if (!course) return `<div class="overview-empty">${courseIcon('book')}<h3>Your course starts here.</h3><p>Create a unit plan from a teaching format, your own resources, or an existing outline. Your lessons will appear here once you save it.</p></div>`;
   const billing=billingSchedule(course);
-  return `<header class="overview-intro">${draft?'<span class="class-badge">Unsaved draft · preview</span>':''}<h3>${escape(course.title)}</h3><p class="overview-course-meta">${escape(courseSummary(course))} · ${escape(course.timeZone)}</p>${course.description?`<p class="overview-description">${escape(course.description)}</p>`:''}</header>
+  return `<header class="overview-intro">${draft?'<span class="class-badge">Unsaved draft · preview</span>':''}<h3>${escape(course.title)}</h3><p class="overview-course-meta">${escape(courseSummary(course))} · ${escape(displayTimeZoneLabel(course.timeZone))}</p>${course.description?`<p class="overview-description">${escape(course.description)}</p>`:''}</header>
   <ol class="course-overview-lessons">${course.lessons.map((lesson,i)=>{
     const id=lessonKey(lesson,i),timing=lessonTiming(course,lesson),cancelled=lesson.status==='cancelled';
     const date=timing.date ? new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(timing.date+'T12:00:00Z')) : 'Date to be set';

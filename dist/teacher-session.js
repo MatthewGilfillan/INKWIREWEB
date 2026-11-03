@@ -11,7 +11,7 @@ const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classe
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;
 const rosters=new Map();
 let notificationEntryHandled=false;
-let currentView='today',deletingClass='',activeClassId='',activeTab='students';
+let currentView='today',deletingClass='',activeClassId='',activeTab='overview';
 const classTabs=new Map();
 function problem(error) {status.textContent=error.message;if(error.status===401){list.replaceChildren();location.replace('/account');}}
 function openDialog(id,button){returnFocus=button;document.getElementById(id).showModal();}
@@ -22,11 +22,11 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
 });
-const tabs=[['students','Students'],['overview','Course overview'],['calendar','Calendar'],['timeline','Timeline'],['files','Class files'],['notebooks','Notebooks']];
+const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['files','Class files'],['notebooks','Notebooks']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
   <div class="class-workspace-heading"><div><label for="selected-class">Class</label><select id="selected-class"></select><p id="selected-class-detail"></p></div><span class="class-badge" id="class-membership"></span></div>
-  <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='students'}" tabindex="${id==='students'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
-  ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='students'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Homework completion will appear when submission tracking is connected.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
+  <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='overview'}" tabindex="${id==='overview'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
+  ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='overview'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Homework completion will appear when submission tracking is connected.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
 const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onSaved:()=>{calendar.refresh();classCalendar.refresh();today.refresh();}});
@@ -36,7 +36,7 @@ const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-time
 const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
-const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('students',button);$('.teacher-heading h1').focus();},problem});
+const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('overview',button);$('.teacher-heading h1').focus();},problem});
 const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,onDemoInstalled:()=>loadClasses(true),openStandards:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editStandards();},openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
 function renderClasses(){
   $('#selected-class').innerHTML=classrooms.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
@@ -60,7 +60,7 @@ async function selectClass(id){
   if(!coursePlanner.canLeave()){$('#selected-class').value=activeClassId;return false;}
   coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();
   activeClassId=id;$('#student-search').value='';$('#selected-roster').textContent='Loading students…';$('#roster-count').textContent='';renderClassHeading();
-  await showClassTab(classTabs.get(id)||'students');if(activeClassId!==id)return false;if(activeTab!=='students')loadRoster(id);return true;
+  await showClassTab(classTabs.get(id)||'overview');if(activeClassId!==id)return false;if(activeTab!=='students')loadRoster(id);return true;
 }
 async function showClassTab(tab,button,lessonIndex){
   if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}if(tab==='notebooks'){if(!coursePlanner.canLeave())return;coursePlanner.reset();location.assign('/notebooks?'+new URLSearchParams({classId:activeClassId}));return;}activeTab=tab;classTabs.set(activeClassId,tab);
@@ -103,7 +103,7 @@ function showView(view){
   const url=new URL(location.href);if(view==='today')url.searchParams.delete('view');else url.searchParams.set('view',view);history.replaceState(null,'',url);
   if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();if(view==='assessment')assessmentWorkspace.refresh();
 }
-document.querySelectorAll('[data-teacher-view]').forEach(b=>b.onclick=()=>showView(b.dataset.teacherView));
+document.querySelectorAll('[data-teacher-view]').forEach(b=>b.onclick=()=>{showView(b.dataset.teacherView);if(b.dataset.teacherView==='classes'&&activeClassId&&activeTab!=='overview')showClassTab('overview',b);});
 $('#retry-trash').onclick=loadTrash;
 $('#class-trash').addEventListener('click',async event=>{
   const button=event.target.closest('[data-restore-class]');if(!button||button.disabled)return;button.disabled=true;

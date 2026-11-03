@@ -17,7 +17,7 @@ test('class tabs preserve drafts, isolate students and calendar, and expose hone
   return route.fulfill({status:404,json:{}});
  });
  try{
-  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('rowheader',{name:'Alice Example'}).waitFor();
+  await page.goto('http://127.0.0.1:8788/teacher.html?view=classes');await page.getByRole('tab',{name:'Course overview',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await page.getByRole('tab').first().innerText(),'Course overview');await page.getByRole('tab',{name:'Students',exact:true}).click();await page.getByRole('rowheader',{name:'Alice Example'}).waitFor();
   assert.match(await page.locator('.student-table').innerText(),/75%/);assert.match(await page.locator('.student-table').innerText(),/3 \/ 4 recorded lessons/);
   assert.match(await page.locator('[data-student-row="b"]').innerText(),/Not recorded yet/);assert.match(await page.locator('[data-student-row="b"]').innerText(),/Not linked/);
   assert.match(await page.locator('[data-student-row="a"]').innerText(),/Not tracked yet/);
@@ -29,7 +29,7 @@ test('class tabs preserve drafts, isolate students and calendar, and expose hone
   await page.screenshot({path:'/tmp/inkwire-timeline-tab.png',fullPage:true});
   await page.getByRole('tab',{name:'Course overview',exact:true}).click();assert.equal(await page.locator('#course-title').inputValue(),'My unsaved course draft');
   page.once('dialog',d=>d.dismiss());await page.locator('#selected-class').selectOption(second);assert.equal(await page.locator('#selected-class').inputValue(),first);
-  page.once('dialog',d=>d.accept());await page.locator('#selected-class').selectOption(second);await page.getByText('No students yet.',{exact:false}).waitFor();
+  page.once('dialog',d=>d.accept());await page.locator('#selected-class').selectOption(second);await page.getByRole('tab',{name:'Students',exact:true}).click();await page.getByText('No students yet.',{exact:false}).waitFor();
   assert.equal(await page.locator('#selected-class-settings').isVisible(),false);
   await page.locator('#selected-class').selectOption(first);await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});assert.equal(await page.locator('#course-title').inputValue(),'Literature & essays');
   await page.getByRole('tab',{name:'Calendar',exact:true}).click();await page.locator('#class-panel-calendar [data-cal=month]').fill('2026-11');
@@ -40,7 +40,7 @@ test('class tabs preserve drafts, isolate students and calendar, and expose hone
   await page.locator('#selected-roster[aria-busy=false]').waitFor();
   await page.waitForFunction(()=>{const el=document.querySelector('.student-table-scroll');return el && el.clientWidth>0 && el.scrollWidth>el.clientWidth;});
   await page.screenshot({path:'/tmp/inkwire-students-tab-mobile.png',fullPage:true});
-  await page.getByRole('tab',{name:'Students',exact:true}).focus();await page.keyboard.press('ArrowRight');assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');
+  await page.getByRole('tab',{name:'Students',exact:true}).focus();await page.keyboard.press('ArrowLeft');assert.equal(await page.getByRole('tab',{name:'Course overview',exact:true}).getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('dialog[open]').count(),0);assert.deepEqual(await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(el=>el.id);return ids.filter((id,i)=>ids.indexOf(id)!==i);}),[]);assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

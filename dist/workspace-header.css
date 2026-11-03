@@ -29,3 +29,9 @@
 @media(prefers-reduced-transparency:reduce){.workspace-header.teacher-header{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}}
 @media(max-width:700px){.workspace-header .today-nav{gap:0;justify-content:space-between}.workspace-header .today-nav :is(a,button){font-size:11px;padding-inline:0}}
 @media(max-width:700px){.workspace-header.teacher-header{padding-inline:16px}.workspace-header .today-nav :is(a,button){font-size:10.5px}}
+
+/* Align the logo and account tools with the page's inner content edges. */
+:root{--workspace-content-width:1376px;--workspace-page-padding:28px}
+.workspace-header.teacher-header{padding-inline:max(var(--workspace-page-padding),calc((100% - var(--workspace-content-width))/2 + var(--workspace-page-padding)))}
+@media(max-width:700px){:root{--workspace-page-padding:20px}}
+@media(max-width:480px){:root{--workspace-page-padding:16px}}
