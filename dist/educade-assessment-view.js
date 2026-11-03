@@ -16,7 +16,7 @@ export function classAxes(catalogue,scope){
  return catalogue.profileAxes[tab.domain];
 }
 export function axisStats(catalogue,records,axis){
- if(axis.domain){const ids=new Set(catalogue.groups.filter(g=>g.domain===axis.domain).flatMap(g=>g.skills.map(s=>s.id)));return summarizePractice(records.filter(r=>ids.has(r.skillId)));}
+ if(axis.domain){const ids=new Set(catalogue.groups.filter(g=>g.domain===axis.domain&&(!axis.section||g.section===axis.section)).flatMap(g=>g.skills.map(s=>s.id)));return summarizePractice(records.filter(r=>ids.has(r.skillId)));}
  return summarizePractice(records.filter(r=>r.skillId===axis.id));
 }
 export const progressBar=(score,label)=>score===null?'<span class="educade-no-evidence">No evidence yet</span>':`<span class="educade-hp" role="img" aria-label="${escape(label)}: ${score} percent"><svg class="educade-hp-track" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><rect class="educade-hp-background" width="100" height="12" rx="6"/><rect class="educade-hp-fill ${score<70?'needs-practice':''}" width="${score}" height="12" rx="6"/></svg><strong>${score}%</strong></span>`;

@@ -12,7 +12,7 @@ Imported with Matthew Gilfillan's authorization from `MatthewGilfillan/EDUCADE`:
 
 Fictional fixtures are now available only through the explicitly labelled EDUCADE demo class choices. No sample teacher attainment judgments or reading levels are inferred. England is labelled National Curriculum for England, rather than a universal British curriculum. Cambridge Primary English (0058) is not IGCSE. The new standards registry adds separately researched reference packs; these are distinct from the older prototype mappings.
 
-The class comparison layout and chart helpers in `dist/educade-assessment-view.js` adapt the actual EDUCADE `public/teacher.js` and profile axes from `public/teacher-data.js` at the development commit above. The default view uses one bold Class label and adjacent selector, truthful evidence counts, subject tabs, search/sort/portrait controls, progress bars, heatmap and standards views. Learner dialogs retain the existing quiz and lesson assessment details. No duplicate dashboard title, repeated class name or hamburger menu is included.
+The class comparison layout and chart helpers in `dist/educade-assessment-view.js` adapt the actual EDUCADE `public/teacher.js` and profile axes from `public/teacher-data.js` at the development commit above. The default view uses one bold Class label and adjacent selector, truthful evidence counts, subject tabs, search/sort/portrait controls, progress bars, heatmap and standards views. Full student pages retain the existing quiz and lesson assessment details. No duplicate dashboard title, repeated class name or hamburger menu is included.
 
 ## Course standards and reference packs
 
@@ -62,3 +62,17 @@ Restore checkpoint before Assessment: local `backup/lms-navigation-verified-2026
 The fixture is lazy-loaded when a demo is selected from the Class dropdown, or through `/teacher?view=assessment&demo=1`. Class and learner IDs are namespaced `demo-educade-`. They do not enter enrollment, profile, notebook or feedback APIs and create no accounts, invitations or database records. Selecting a real class removes the demo query, and normal class selection remains the default. A demo banner identifies every sample view; individual profiles are labelled Fictional learner. Standards remain Not reviewed because sample practice accuracy is not a teacher attainment judgment.
 
 Progress bars use SVG width attributes instead of inline style attributes, preserving the live site's strict content security policy. Tests verify original roster membership, namespaced identities, source-equivalent domain percentages, known skill IDs and populated chart markup.
+
+## Account-owned demo classes across the LMS
+
+The initial Assessment-only fixture is now an explicit preview, available through the demo URL rather than automatically listed for all teachers. Its Add demo classes to my workspace action calls authenticated POST `/api/classes/demo-educade` with `{version:1}`. Ownership comes exclusively from the verified session; callers cannot select another account. Merely viewing Classes, Assessment or Notebooks never installs data.
+
+The installer atomically creates two normal classes, nine disconnected fictional learner slots, two eight-lesson course plans and nine editable reading journal pages using the existing schema and Yjs state format. It creates no invitations, student logins or parent connections. Stable per-owner IDs and reserved class request IDs make retries safe. Reinstalling preserves edited plans and pages, removed roster members and Trash state. The owner’s regular Classes, Today, course overview, timeline, calendar and notebooks all use these same stored class IDs and normal access rules. Other teacher accounts receive no class membership.
+
+The class list supplies a demoKey for installed fixtures. After the normal teacher class-access check, the teacher timeline maps the original EDUCADE practice records to the stored learner IDs and filters against the current roster. Families never receive that class-wide fixture. Tests verify ownership, cross-account denial, idempotence, current roster filtering, calendar projection and readable starter notebook pages. No database migration is needed.
+
+## Student profile navigation
+
+Student names in Assessment and the regular class roster open the full student page under the existing teacher header. The URL identifies the class and learner: `/teacher?view=assessment&class=<class-id>&learner=<learner-id>`. Profiles support direct loading, refresh, browser Back/Forward, Back to class and switching learners. They do not create dialogs or overlays.
+
+`dist/educade-student-view.js` adapts EDUCADE's `renderProfile`, learning-area axes, cumulative four-week progress and Glows & Grows patterns from the same development source commit. Reading Foundations and Literacy retain separate evidence. The page includes chart choices, subject navigation, current support counts, inline responses, the skill catalogue, lesson feedback and a notebook link. Its relative strengths and next practice areas come from recorded accuracy; they do not assign standards attainment. No unsupported report-generation or grouping controls are included.

@@ -1,3 +1,4 @@
+import {installEducadeDemo,demoKey} from './educade-demo.mjs';
 import {validateCourse} from '../dist/course-model.mjs';
 import { digest } from './auth.mjs';
 import { createLearningInvite } from './enrollment.mjs';
@@ -22,6 +23,14 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (!user?.emailVerified) return fail('Please sign in.', 401, 'UNAUTHENTICATED');
   if (!isTeacher(user)) return fail('This workspace is for teacher accounts.', 403, 'FORBIDDEN');
   const path = new URL(request.url).pathname;
+  if(path==='/api/classes/demo-educade'){
+    if(request.method!=='POST')return fail('Use POST.',405);
+    if(request.headers.get('Origin')!==env.APP_ORIGIN || request.headers.get('Sec-Fetch-Site')==='cross-site')return fail('Invalid origin.',403,'INVALID_ORIGIN');
+    let input;try{input=await readJSON(request);}catch{return fail('Invalid request.',400,'INVALID_INPUT');}
+    if(input.version!==1 || Object.keys(input).some(key=>key!=='version'))return fail('Use the current demo installer.',400,'INVALID_INPUT');
+    if(!await limitClassAction(env,user.id,'install-educade-demo',3))return fail('Please wait before retrying the demo setup.',429,'RATE_LIMITED');
+    return json({classes:await installEducadeDemo(env,user)},201);
+  }
   const planningMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/planning-assistant$/);
   if (planningMatch) return handlePlanningAssistant(request, env, user, planningMatch[1], { json, fail, readJSON });
   if (path === '/api/classes/calendar') return handleCalendar(request, env, user, { json, fail });
@@ -33,11 +42,11 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (overviewMatch) return handleCourseOverview(request, env, user, overviewMatch[1], { json, fail, readJSON });
   if (path === '/api/classes' && request.method === 'GET') {
     const rows = await env.DB.prepare(`SELECT ${classFields}, o.revision AS overviewRevision,
-      json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
+      c.request_id AS demoRequestId, json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
       json_extract(o.content, '$.lessonMinutes') AS courseMinutes, json_extract(o.content, '$.pacing') AS coursePacing, json_extract(o.content, '$.lessonCount') AS courseLessonCount FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
       WHERE c.deleted_at IS NULL AND (c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers m WHERE m.class_id = c.id AND m.user_id = ?))
       ORDER BY c.created_at DESC, c.id`).bind(user.id, user.id, user.id).all();
-    return json({ classes: rows.results });
+    return json({ classes: rows.results.map(({demoRequestId,...row})=>({...row,...(demoKey(demoRequestId)?{demoKey:demoKey(demoRequestId)}:{})})) });
   }
   const inviteMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/invite$/);
   const lifecycleMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/(delete|restore)$/);

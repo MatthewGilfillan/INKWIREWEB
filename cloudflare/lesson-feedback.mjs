@@ -1,3 +1,4 @@
+import {educadeSkillEvidence} from './educade-demo.mjs';
 import {nextQuizLesson,quizContext,saveQuizDraft} from './quiz-assistant.mjs';
 import {quizTimeline} from './lesson-quizzes.mjs';
 import {lessonTiming,billingSchedule} from '../dist/schedule-model.mjs';
@@ -31,7 +32,8 @@ async function familyOverview(request,env,user,classId,{json,fail},teacherTimeli
   const roster=teacherTimeline?await getRoster(env,classId):[],names=new Map(roster.map(s=>[s.id,s.name]));
   const quizDrafts=teacherTimeline?(await env.DB.prepare('SELECT lesson_id FROM quiz_drafts WHERE class_id=?').bind(classId).all()).results:[];
   const quizzes=await quizTimeline(env,classId,teacherTimeline?{roster}:{learnerId:linked.id});
-  return json({demo,teacher:teacherTimeline,canTakeQuiz:user.requestedRole==='student',serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{...(teacherTimeline?{assessment:course.assessment,enduringUnderstandings:course.enduringUnderstandings}:{}),title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
+  const demoEvidence=teacherTimeline?await educadeSkillEvidence(env,classId,roster):null;
+  return json({...demoEvidence,demo,teacher:teacherTimeline,canTakeQuiz:user.requestedRole==='student',serverNow:Date.now(),className:linked.className,learnerName:linked.name,course:{...(teacherTimeline?{assessment:course.assessment,enduringUnderstandings:course.enduringUnderstandings}:{}),title:course.title,description:course.description,timeZone:course.timeZone,startTime:course.startTime,lessonMinutes:course.lessonMinutes,
     lessons:course.lessons.map((lesson,i)=>{
       const report=reports.get(lessonKey(lesson,i)), own=report?.students[linked.id];
       // Project fields on the server: never send roster, drafts, speaker labels,
