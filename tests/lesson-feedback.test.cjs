@@ -116,3 +116,14 @@ test('published lesson dates and attendance cannot be erased through reschedulin
   const unchanged=structuredClone(f.course);unchanged.lessons[0].startTime=unchanged.startTime;unchanged.lessons[0].lessonMinutes=unchanged.lessonMinutes;unchanged.billingMode='packs';assert.equal((await save(unchanged)).status,200);
  }finally{Date.now=clock;global.fetch=fetch;f.db.close();}
 });
+
+test('course assessment setup and private school rubric notes are projected only to teacher timelines',async()=>{
+ const f=await fixture();
+ try{
+  f.course.assessment={version:1,deferred:false,frameworks:[{id:'ib-pyp',scope:'school'}],judgmentScale:'b-m-plus',notes:'PRIVATE SCHOOL RUBRIC'};
+  f.course.enduringUnderstandings='PRIVATE PLANNING TARGET';
+  f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),classId);
+  const teacher=await(await f.request('timeline')).json();assert.deepEqual(teacher.course.assessment,f.course.assessment);assert.equal(teacher.course.enduringUnderstandings,'PRIVATE PLANNING TARGET');
+  for(const user of [teachers.student,teachers.parent]){const family=await(await f.request(user.requestedRole==='parent'?'overview?learnerId=a':'overview',undefined,user)).json();assert.equal('assessment' in family.course,false);assert.equal('enduringUnderstandings' in family.course,false);assert.ok(!JSON.stringify(family).includes('PRIVATE'));}
+ }finally{f.db.close();}
+});

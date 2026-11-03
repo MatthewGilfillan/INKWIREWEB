@@ -1,4 +1,4 @@
-import {defaults,validateCourse,addDays,validDate} from './course-model.mjs';
+import {defaults,validateCourse,addDays,validDate} from './course-model.mjs?v=20261103-standards';
 import {scheduleCandidates,slotKey,applySchedule} from './schedule-model.mjs';
 
 export const sessionName=(index,frequency)=>`Week ${Math.floor(index/frequency)+1}${frequency>1?` Lesson ${index%frequency+1}`:''}`;

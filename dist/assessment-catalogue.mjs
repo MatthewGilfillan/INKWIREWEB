@@ -1185,5 +1185,119 @@ export default {
       "source": "https://www.thecorestandards.org/ELA-Literacy/L/5/",
       "checked": "2026-10-09"
     }
+  },
+  "profileAxes": {
+    "reading": [
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.INFERENCE.01",
+        "label": "Inference"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.WORDMEANING.01",
+        "label": "Vocabulary in context"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.FIGURATIVE.01",
+        "label": "Figurative language"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.CHARACTER.01",
+        "label": "Character analysis"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.MAINIDEA.01",
+        "label": "Main idea"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.STRUCTURE.03",
+        "label": "Cause and effect"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.PURPOSE.02",
+        "label": "Comparing perspectives"
+      },
+      {
+        "id": "EDU.G5.READING.COMPREHENSION.INFERENCE.02",
+        "label": "Theme"
+      }
+    ],
+    "writing": [
+      {
+        "id": "EDU.G5.WRITING.ORGANIZATION.01",
+        "label": "Transitions"
+      },
+      {
+        "id": "EDU.G5.WRITING.ARGUMENT.01",
+        "label": "Supporting arguments"
+      },
+      {
+        "id": "EDU.G5.WRITING.DESCRIPTION.01",
+        "label": "Descriptive details"
+      },
+      {
+        "id": "EDU.G5.WRITING.REVISION.01",
+        "label": "Revision"
+      },
+      {
+        "id": "EDU.G5.WRITING.OPENING.01",
+        "label": "Topic sentences"
+      },
+      {
+        "id": "EDU.G5.WRITING.VARIETY.01",
+        "label": "Sentence variety"
+      }
+    ],
+    "grammar": [
+      {
+        "id": "EDU.G5.GRAMMAR.CONJUNCTIONS.01",
+        "label": "Conjunctions"
+      },
+      {
+        "id": "EDU.G5.GRAMMAR.TENSE.01",
+        "label": "Perfect tense"
+      },
+      {
+        "id": "EDU.G5.GRAMMAR.TENSE.02",
+        "label": "Consistent tense"
+      },
+      {
+        "id": "EDU.G5.GRAMMAR.COMMAS.01",
+        "label": "Commas"
+      },
+      {
+        "id": "EDU.G5.GRAMMAR.AGREEMENT.01",
+        "label": "Subject–verb agreement"
+      },
+      {
+        "id": "EDU.G5.GRAMMAR.MODIFIERS.01",
+        "label": "Adjectives and adverbs"
+      }
+    ],
+    "vocabulary": [
+      {
+        "id": "EDU.G5.VOCABULARY.CONTEXT.01",
+        "label": "Context clues"
+      },
+      {
+        "id": "EDU.G5.VOCABULARY.ROOTS.01",
+        "label": "Greek and Latin roots"
+      },
+      {
+        "id": "EDU.G5.VOCABULARY.RELATIONSHIPS.01",
+        "label": "Synonyms and antonyms"
+      },
+      {
+        "id": "EDU.G5.VOCABULARY.CONTEXT.02",
+        "label": "Words in use"
+      },
+      {
+        "id": "EDU.G5.VOCABULARY.AFFIXES.01",
+        "label": "Prefixes"
+      },
+      {
+        "id": "EDU.G5.VOCABULARY.IDIOMS.01",
+        "label": "Idioms"
+      }
+    ]
   }
 };

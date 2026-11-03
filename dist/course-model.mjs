@@ -1,3 +1,4 @@
+import {validateStandardsSelection} from './standards-registry.mjs';
 import {validateScheduleFields,validateLessonSchedule} from './schedule-model.mjs';
 // Shared by the teacher planner and its authenticated API.
 export const presets = [
@@ -105,6 +106,7 @@ export function validateCourse(value) {
     return input.trim();
   };
   const course = { version: 1, preset: value.preset, organization: text(value.organization, 120, 'school or organisation'), title: text(value.title, 160, 'course title', true), description: text(value.description, 4000, 'course description'), weeks: value.weeks, lessonsPerWeek: value.lessonsPerWeek, lessonMinutes: value.lessonMinutes };
+  if (value.assessment !== undefined) course.assessment = validateStandardsSelection(value.assessment);
   if (value.pacing !== undefined) { if (!['weekly', 'lessons'].includes(value.pacing)) throw Error('Choose a weekly timetable or individual lesson dates.'); course.pacing = value.pacing; }
   if (value.lessonCount !== undefined) {
     if (!Number.isInteger(value.lessonCount) || value.lessonCount < 1 || value.lessonCount > 156 || value.weeks !== Math.ceil(value.lessonCount / value.lessonsPerWeek)) throw Error('Check the total lessons and lesson frequency.');

@@ -1,9 +1,9 @@
-import {createAssessmentWorkspace} from './assessment-workspace.js';
-import {createClassSetup} from './class-setup.js';
+import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261103-class-view';
+import {createClassSetup} from './class-setup.js?v=20261103-standards';
 import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js?v=20261103-skin';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
-import {createCoursePlanner} from './course-planner.js';
+import {createCoursePlanner} from './course-planner.js?v=20261103-standards';
 import {createTeacherCalendar} from './teacher-calendar.js';
 import {createTeacherToday} from './teacher-today.js';
 const $=selector=>document.querySelector(selector);
@@ -36,7 +36,7 @@ const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
 const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('students',button);$('.teacher-heading h1').focus();},problem});
-const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
+const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,openStandards:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editStandards();},openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
 function renderClasses(){
   $('#selected-class').innerHTML=classrooms.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
   $('#class-empty').hidden=Boolean(classrooms.length);$('#class-workspace').hidden=!classrooms.length;
@@ -92,6 +92,7 @@ function showView(view){
   $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':view==='assessment'?'Assessment':'My classes';
   $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':view==='assessment'?'Learning evidence, skills and curriculum standards.':'Restore classes and their course plans.';
   $('#teacher-today').hidden=view!=='today';$('#teacher-assessment').hidden=view!=='assessment';$('.lms-heading-tools').hidden=view==='assessment';
+  document.body.dataset.assessmentActive=String(view==='assessment');
   currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
   document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
   const utility=$('.teacher-trash-utility'),inTrash=view==='trash';
