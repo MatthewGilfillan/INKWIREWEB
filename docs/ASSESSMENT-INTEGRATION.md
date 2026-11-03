@@ -86,3 +86,8 @@ The class table adapts EDUCADE's independent learner-row and subject-column expa
 ## Provisional B–M+ percentage estimates
 
 At the owner's request, Standards progress now displays a provisional conversion of recorded practice accuracy in both class and student views: B 0–39%, B+ 40–54%, D 55–69%, D+ 70–79%, M 80–89%, M+ 90–100%. The shared conversion uses the same rounded percentage as the progress bars. Missing evidence remains ungraded. Labels and a visible band key identify these as estimates; this display conversion does not write curriculum judgments, overwrite course standards or assign an understanding grade. Thresholds live in `dist/assessment-progress-scale.mjs` for later refinement.
+
+
+## LMS appearance
+
+`lms-theme.js` applies an explicit browser preference before first paint and mounts the same accessible Dark mode switch next to the account menu in teacher, student, parent and notebook headers. Light is the default. The choice is saved only on a toggle, survives navigation/reload, synchronizes through storage events and degrades to page-only state when storage is unavailable. No profile or classroom data is written. `lms-theme.css` supplies the navy screen palette, dark glass header, assessment/chart/grade surfaces, forms and notebook chrome. Notebook paper and print colours remain unchanged. Header labels use Dashboard in both teacher and notebook navigation.

@@ -1,0 +1,146 @@
+/* Shared appearance controls. Theme rules affect screen chrome, never saved ink. */
+.workspace-header .workspace-header-tools{display:flex;align-items:center;gap:18px;flex:none;margin-left:auto}
+.workspace-header .lms-theme-toggle{display:flex;align-items:center;justify-content:center;gap:9px;min-width:100px;min-height:40px;margin:0;padding:8px 10px;border:1px solid #dce5eb;border-radius:24px;background:#f4f7f9;color:#526b80;cursor:pointer}
+.lms-theme-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.lms-theme-toggle .theme-sun{display:block}
+.theme-switch-track{display:block;width:26px;height:15px;padding:2px;border-radius:20px;background:#c3d0dc}
+.theme-switch-track>span{display:block;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #10264030;transform:translateX(11px);transition:transform .15s}
+.lms-theme-toggle[aria-checked=true] .theme-switch-track{background:#69cdb4}
+.lms-theme-toggle[aria-checked=true] .theme-switch-track>span{transform:translateX(0)}
+.lms-theme-toggle .theme-moon,.lms-theme-toggle .theme-sun{display:block}
+@media(max-width:700px){.workspace-header .workspace-header-tools{gap:12px}.workspace-header .workspace-header-tools .today-account{margin:0}.workspace-header .lms-theme-toggle{min-width:88px;padding:7px 8px}}
+@media(prefers-reduced-motion:reduce){.theme-switch-track>span{transition:none}}
+@media print{.workspace-header-tools{display:none!important}:root{color-scheme:light}}
+
+@media screen {
+ html[data-lms-theme=dark]{color-scheme:dark;background:#080f1f}
+ html[data-lms-theme=dark] body{
+  --theme-bg:#080f1f;--theme-panel:#111d31;--theme-raised:#192941;--theme-inset:#0c1628;
+  --theme-text:#e5edf8;--theme-muted:#a3b3c9;--theme-line:#2b3d56;--theme-accent:#78dec4;
+  --brand-dark:var(--theme-text);--brand-navy:#d9e6f7;--brand-body:var(--theme-muted);
+  --brand-mint:#78dec4;--brand-mint-hover:#96e8d3;--brand-mint-soft:#16372f;--brand-green:#8be2cb;
+  --brand-lavender:#2b304c;--brand-lavender-hover:#363c59;--brand-lavender-soft:#1a2238;
+  --folio-ink:var(--theme-text);--folio-muted:var(--theme-muted);--folio-line:var(--theme-line);--folio-teal:var(--theme-accent);--folio-purple:var(--theme-accent);
+  --navy:var(--theme-text);--ink:var(--theme-text);--muted:var(--theme-muted);--paper:var(--theme-bg);--line:var(--theme-line);
+  background:var(--theme-bg);color:var(--theme-text);scrollbar-color:#41546e var(--theme-inset);
+ }
+ html[data-lms-theme=dark] :is(body[data-lms-skin],body.folio-app) :is(h1,h2,h3,h4,h5){color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(body[data-lms-skin],body.folio-app) :is(input,select,textarea){background-color:var(--theme-inset);color:var(--theme-text);border-color:var(--theme-line);accent-color:var(--theme-accent)}
+ html[data-lms-theme=dark] :is(input,textarea)::placeholder{color:#8c9eb7;opacity:1}
+ html[data-lms-theme=dark] :is(a,button,summary,input,select,textarea):focus-visible{outline-color:var(--theme-accent)}
+ html[data-lms-theme=dark] :is(body[data-lms-skin],body.folio-app) :is(dialog,.today-account-menu){background:var(--theme-panel);color:var(--theme-text);border-color:var(--theme-line);box-shadow:0 22px 75px #0006}
+ html[data-lms-theme=dark] dialog::backdrop{background:#020713b3}
+ html[data-lms-theme=dark] .workspace-header.teacher-header{background:rgba(8,15,31,.82);border-color:#293951;box-shadow:0 1px 12px #0002}
+ html[data-lms-theme=dark] .workspace-header .today-brand img{filter:brightness(0) invert(.94)}
+ html[data-lms-theme=dark] .workspace-header .today-nav :is(a,button){color:var(--theme-muted)}
+ html[data-lms-theme=dark] .workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]),html[data-lms-theme=dark] .workspace-header .today-nav :is(a,button):hover{color:#f0f6ff}
+ html[data-lms-theme=dark] .workspace-header :is(.today-account>summary,.lms-theme-toggle){background:var(--theme-raised);border-color:var(--theme-line);color:#d2e2f3}
+ html[data-lms-theme=dark] .workspace-header .today-account>summary .profile-face{border-color:#43526c;background:#263247}
+ html[data-lms-theme=dark] .workspace-header .today-account-menu :is(a,button){color:var(--theme-text)}
+ html[data-lms-theme=dark] .workspace-header .today-account-menu :is(a,button):hover{background:var(--theme-raised)}
+ html[data-lms-theme=dark] [data-lms-skin] .teacher-button{color:#0b302b;border-color:#78dec4;background:#78dec4}
+ html[data-lms-theme=dark] [data-lms-skin] .teacher-button:hover:not(:disabled){background:#96e8d3}
+ html[data-lms-theme=dark] [data-lms-skin] :is(.teacher-button.secondary,.teacher-trash-utility){background:var(--theme-raised);border-color:var(--theme-line);color:var(--theme-text)}
+ html[data-lms-theme=dark] [data-lms-skin] .teacher-button.danger{background:#78373f;border-color:#ad5763;color:#ffe6e7}
+ html[data-lms-theme=dark] :is(.text-button,.account-link,.overview-activity-link,.assessment-notebook-link,.learning-notebook-shortcut,.roster-student-profile){color:var(--theme-accent)}
+ html[data-lms-theme=dark] :is(.teacher-footer,.teacher-footer a,.teacher-heading p,.today-zone,.lms-kicker,.empty-classes p){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.class-card,.trash-class,.empty-classes,.member-class,.today-panel,.timeline-content,.calendar-month,.calendar-agenda>section,.calendar-empty,.calendar-unscheduled,.calendar-issues,.class-file,.setup-calendar-scroll,.student-table-scroll,.student-table tbody th,.plan-lesson,.planner-save,.schedule-editor,.join-panel,.lesson-feedback,.member-course,.lesson-quiz,.learning-activity,.quiz-edit-question,.forms-question-list,.quiz-source-cards button,.quiz-card-meta button,.quiz-mode-buttons button,.course-preparation){background:var(--theme-panel);border-color:var(--theme-line);color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.today-next,.today-master){background:linear-gradient(115deg,#153431,#111e32);border-color:#2c4d49;color:var(--theme-text)}
+ html[data-lms-theme=dark] .today-master{background:linear-gradient(115deg,#24283f,#141f33);border-color:#383c58}
+ html[data-lms-theme=dark] :is(.today-next h2,.today-next .today-topic,.today-master strong,.today-class-copy strong,.today-review-row strong){color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.today-meta,.today-eyebrow,.today-panel>p,.today-master small,.today-class-copy small,.today-class-time,.today-class-time small,.upcoming-row small,.unit-meter>div,.unit-meter strong,.member-class p,.learning-lesson-heading>p,.learning-activity-content p,.learning-course-intro p,.learning-course-intro .lms-kicker,.learning-step small){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.today-class-row,.today-review-row,.upcoming-row,.unit-overview-row,.overview-lesson,.class-tab-list,.student-table :is(th,td),.calendar-day,.calendar-weekdays,.learning-course-intro,.learning-rail,.learning-reading,.learning-resources,.preparation-lesson){border-color:var(--theme-line)}
+ html[data-lms-theme=dark] :is(.today-class-row,.upcoming-row,.class-tab-list button){color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.today-class-row:hover,.upcoming-row:hover,.class-tab-list button:hover,.learning-step:hover){background:#17283b}
+ html[data-lms-theme=dark] :is(.workspace-switch,.assessment-views,.educade-mode-switch,.calendar-weekdays,.student-table thead th,.course-assistant,.planner-intro,.quiz-ai-tools,.transcript-summary-output,.standards-setting-row,.files-upload,.setup-calendar-days,.learning-activity-label,.learning-step-number,.connection-pill,.course-tag,.class-badge,.practice-banner){background:var(--theme-raised);border-color:var(--theme-line);color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.workspace-switch button,.assessment-views button,.assessment-domains button,.educade-mode-switch button){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.workspace-switch button[aria-pressed=true],.assessment-views button[aria-pressed=true],.educade-mode-switch button[aria-pressed=true]){background:#30435c;border-color:#425b76;color:#f2f7ff;box-shadow:0 1px 5px #0003}
+ html[data-lms-theme=dark] :is(.class-tab-list button[aria-selected=true],.learning-step[aria-current=step]){background:#163c35;color:#94e6cf;border-color:#427f70}
+ html[data-lms-theme=dark] :is(.class-setup,.class-files,.assessment-settings,.course-planner,.schedule-picker,.schedule-wheel-panel){color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.class-setup p,.class-files p,.assessment-settings p,.setup-calendar-day,.plan-lesson p,.preparation-lesson small){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.schedule-picker,.schedule-wheel-panel,.feedback-student,.timeline-student-assessment,.student-slot,.quiz-choice,.quiz-review-options>div){background:var(--theme-inset);border-color:var(--theme-line);color:var(--theme-text)}
+ html[data-lms-theme=dark] .class-setup .schedule-value{color:var(--theme-text)}
+ html[data-lms-theme=dark] .schedule-wheel{background:linear-gradient(#101d30 0 40%,#264438 40% 60%,#101d30 60%)}
+ html[data-lms-theme=dark] :is(.outside-month,.calendar-event.is-cancelled,.feedback-absent){background:#0b1628;color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.calendar-event:not(.is-cancelled),.setup-count,.setup-calendar-day button,.connection-pill.linked,.feedback-metric,.quiz-result-panel,.learning-feedback-ready,.class-course,.billing-months>div,.standards-dimensions span,.slot-views section,.invite-email-form){background:#173a32;color:#a2ead4;border-color:#31564e}
+ html[data-lms-theme=dark] :is(.calendar-event time,.calendar-event small,.feedback-metric strong){color:#b2efdd}
+ html[data-lms-theme=dark] :is(.feedback-quote,.quiz-notice,.ai-review-notes,.calendar-issues){background:#392e20;color:#f2d49f;border-color:#625034}
+ html[data-lms-theme=dark] :is(.feedback-parent,.timeline-quiz,.student-quiz-score,.quiz-forms-panel,.slot-views section+section){background:#1c2c45;color:#bed2ef;border-color:var(--theme-line)}
+ html[data-lms-theme=dark] :is(.form-error,.hub-error){background:#3d2531;color:#ffbec4!important;border-color:#71404d}
+ html[data-lms-theme=dark] .quiz-choice:has(input:checked){background:#193f36;border-color:#72bfa9}
+ html[data-lms-theme=dark] :is(.tone-0,.today-master-icon,.member-class-icon,.educade-avatar,.assessment-initial){background:#2b2b46;color:#d0c7f0;border-color:#44415c}
+ html[data-lms-theme=dark] .tone-1{background:#193c34;color:#a5ebd8}html[data-lms-theme=dark] .tone-2{background:#20324d;color:#b6d4f4}
+ /* Assessment tables, inline evidence, charts, and grade estimates. */
+ html[data-lms-theme=dark] #teacher-assessment{color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.assessment-card,.assessment-reference-grid article,.assessment-linked-skill,.educade-class-table th:first-child,.educade-class-table tbody th,.educade-cell-evidence details){background:var(--theme-panel);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] #teacher-assessment [data-assessment-class]{background-color:var(--theme-inset);background-image:url('./icons/chevron-down-light.svg');color:var(--theme-text);border-color:#46617c}
+ html[data-lms-theme=dark] :is(.educade-class-toolbar,.assessment-controls) :is(input,select){background-color:var(--theme-inset);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] #teacher-assessment .educade-class-toolbar>label{color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.assessment-card p,.assessment-footnote,.assessment-card-heading>span,.educade-data-view>p,.educade-learner small,.educade-student-identity p,.educade-cell-evidence,.educade-cell-evidence summary>span,.educade-response-meta,.educade-estimated-level small,.educade-scale-key,.educade-support-totals span){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.educade-summary>div,.educade-class-table thead th,.educade-class-table thead th:first-child,.educade-scale-key){background:var(--theme-raised);border-color:var(--theme-line);color:var(--theme-text)}
+ html[data-lms-theme=dark] .educade-summary>div:nth-child(2){background:#122c29;border-color:#25473e}html[data-lms-theme=dark] .educade-summary>div:nth-child(3){background:#2d261f;border-color:#4b3b2a}
+ html[data-lms-theme=dark] .educade-summary-icon{background:#263d55;color:#9bcbea}html[data-lms-theme=dark] .educade-summary>div:nth-child(2) .educade-summary-icon{background:#22483c;color:#9addbf}html[data-lms-theme=dark] .educade-summary>div:nth-child(3) .educade-summary-icon{background:#4b3624;color:#e8bd7a}
+ html[data-lms-theme=dark] :is(.educade-class-table,.educade-class-table thead button,.educade-learner button,.educade-student-skill,.educade-estimated-level,.educade-scale-key strong){color:var(--theme-text)}
+ html[data-lms-theme=dark] :is(.educade-table-scroll,.educade-class-table :is(th,td),.educade-learning-tabs,.educade-cell-evidence,.educade-inline-history article,.educade-student-skill,.educade-student-summary,.educade-support-totals,.assessment-lesson,.educade-student-catalogue .assessment-skill-group){border-color:var(--theme-line)}
+ html[data-lms-theme=dark] :is(.educade-learning-tabs button,.educade-student-legend){color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.educade-learning-tabs button[aria-selected=true],.educade-class-table thead button>span,.educade-cell-evidence summary,.educade-support-totals strong){color:var(--theme-accent)}
+ html[data-lms-theme=dark] :is(.educade-learner .educade-evidence-link,.educade-evidence-link[aria-expanded=true],.assessment-demo-notice,.educade-growth,.assessment-understanding-targets,.educade-student-score-grid button){background:#16332f;border-color:#2d5148;color:#abebd8}
+ html[data-lms-theme=dark] .educade-growth.grow{background:#332b22;border-color:#52432d;color:#efcb93}
+ html[data-lms-theme=dark] .educade-student-score-grid button strong{color:#9fe3cb}
+ html[data-lms-theme=dark] .educade-estimated-level>strong{background:#28344b;color:#c3d1e5}
+ html[data-lms-theme=dark] .educade-estimated-level[data-level^="D"]>strong{background:#453a24;color:#f2cf89}
+ html[data-lms-theme=dark] .educade-estimated-level[data-level^="M"]>strong{background:#204537;color:#a4ead0}
+ html[data-lms-theme=dark] .educade-hp-background{fill:#293951}html[data-lms-theme=dark] .educade-hp-track{background:#293951}
+ html[data-lms-theme=dark] .educade-heat.has-evidence{background:#244a40;color:#ace9d3}html[data-lms-theme=dark] .educade-heat.needs-practice{background:#4a3b25;color:#f2ce93}html[data-lms-theme=dark] .educade-heat.empty{background:var(--theme-inset);color:var(--theme-muted)}
+ html[data-lms-theme=dark] :is(.educade-practice-radar text,.educade-student-progress text){fill:#b0c3d8}
+ html[data-lms-theme=dark] :is(.educade-radar-grid,.educade-radar-axis,.educade-student-progress line){stroke:#364c65}
+ html[data-lms-theme=dark] .educade-radar-area{stroke:#79d4ba;fill:#6ed5b933}
+ /* Notebook chrome follows the theme; paper / PDF colours remain document data. */
+ html[data-lms-theme=dark] .folio-app :is(.folio-heading,.folio-column,.folio-content,.folio-mobile-nav,.page-heading){background:var(--theme-panel);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] .folio-app :is(.section-column,.page-column){background:var(--theme-inset)}
+ html[data-lms-theme=dark] .folio-app :is(.folio-row,.notebook-home,.icon-button,.page-empty,.page-actions){color:var(--theme-text)}
+ html[data-lms-theme=dark] .folio-app .folio-row[aria-current=true]{background:#23443e;color:#c3f1e3;box-shadow:inset 0 0 0 1px #396358}
+ html[data-lms-theme=dark] .folio-app :is(.note-toolbar,.note-more-content,.ws-toolbar,#page-navigation,.printout-controls){background:var(--theme-raised);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] .folio-app button{background-color:var(--theme-raised);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] .folio-app button:hover:not(:disabled){background:#2b4057}
+ html[data-lms-theme=dark] .folio-app button[aria-pressed=true]{background:#28574b;color:#c6f3e3;border-color:#427e6d}
+ html[data-lms-theme=dark] .folio-app .folio-row{background:transparent;border-color:transparent}
+ html[data-lms-theme=dark] .folio-app .note-editor{background:white;color:#172b49;color-scheme:light}
+ html[data-lms-theme=dark] .folio-app .pdf-drop-overlay{background:#102638ed;border-color:#69bca9}
+ html[data-lms-theme=dark] .folio-app :is(.pdf-drop-overlay span,.printout-picker){background:var(--theme-raised);color:var(--theme-text)}
+ html[data-lms-theme=dark] .folio-app :is(#worksheet-embed,.page-scroll){background:var(--theme-bg)}
+ @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){html[data-lms-theme=dark] .workspace-header.teacher-header{background:#080f1f}}
+ @media(prefers-reduced-transparency:reduce){html[data-lms-theme=dark] .workspace-header.teacher-header{background:#080f1f}}
+}
+@media(min-width:701px) and (max-width:1000px){
+ .workspace-header.teacher-header{flex-wrap:wrap;gap:12px 28px}
+ .workspace-header .today-nav{order:3;width:100%;justify-content:space-between;margin:0;overflow-x:auto}
+ .teacher-main :is(h1,h2,h3,[data-overview-lesson]),.learning-report{scroll-margin-top:150px}
+}
+@media screen{
+ html[data-lms-theme=dark] #teacher-assessment .assessment-controls>label{color:var(--theme-text)}
+ html[data-lms-theme=dark] #teacher-assessment .educade-summary>div:nth-child(2){background:#122c29;border-color:#25473e}
+ html[data-lms-theme=dark] #teacher-assessment .educade-summary>div:nth-child(3){background:#2d261f;border-color:#4b3b2a}
+}
+@media screen{
+ html[data-lms-theme=dark] #teacher-assessment .assessment-controls>label strong{color:var(--theme-text)}
+ html[data-lms-theme=dark] .upcoming-icon{background:#20384a;color:#a4dfce}
+}
+@media(max-width:700px){
+ body[data-lms-skin] .workspace-header .today-nav{gap:0;justify-content:space-between}
+}
+@media(min-width:701px) and (max-width:1000px){
+ .workspace-header .today-nav{overflow-y:hidden;padding-bottom:4px;scrollbar-width:none}
+ .workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]):after{bottom:0}
+}
+@media screen{
+ html[data-lms-theme=dark] .folio-app .note-editor :is(h1,h2,h3,h4,h5){color:inherit}
+ html[data-lms-theme=dark] .folio-app .note-toolbar :is(.text-font-trigger,.text-size-trigger){background:var(--theme-raised);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] .folio-app .note-toolbar .format-control{color:var(--theme-muted)}
+}
+@media screen{
+ html[data-lms-theme=dark] .folio-app .note-toolbar :is(.text-font-trigger,.text-size-trigger){background:var(--theme-raised)!important;border-color:var(--theme-line)!important}
+ html[data-lms-theme=dark] .text-tools-popover{background:var(--theme-panel);color:var(--theme-text);border-color:var(--theme-line)}
+ html[data-lms-theme=dark] :is(.text-tools-popover>p,.text-font-status){color:var(--theme-muted)}
+ html[data-lms-theme=dark] .text-more-colours{color:var(--theme-text)!important}
+}
