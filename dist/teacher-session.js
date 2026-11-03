@@ -1,6 +1,6 @@
 import {createClassSetup} from './class-setup.js';
 import {createClassFiles} from './class-files.js';
-import {createMemberCourse} from './member-course.js';
+import {createMemberCourse} from './member-course.js?v=20261103-skin';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js';
 import {createTeacherCalendar} from './teacher-calendar.js';
