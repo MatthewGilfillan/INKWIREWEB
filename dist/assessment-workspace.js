@@ -1,6 +1,6 @@
-import {studentPageHTML} from './educade-student-view.js?v=20261103-student-page';
+import {studentPageHTML} from './educade-student-view.js?v=20261103-learner-evidence';
 import {assessmentDemoClasses,isAssessmentDemo,loadAssessmentDemo} from './assessment-demo.mjs';
-import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261103-student-page';
+import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261103-learner-evidence';
 import catalogue from './assessment-catalogue.mjs?v=20261103-class-view';
 import {standardsPacks,packById,schoolProgressScale} from './standards-registry.mjs';
 import curricula from './assessment-curricula.mjs';
@@ -9,8 +9,8 @@ import {api,escape} from './workspace-shared.js';
 
 export function createAssessmentWorkspace({root,getClasses,openTimeline,openStandards,onDemoInstalled}) {
   const entry=new URLSearchParams(location.search);
-  let classId=entry.get('class') || assessmentDemoClasses.find(c=>c.id===new URLSearchParams(location.search).get('demo'))?.id || (new URLSearchParams(location.search).get('demo')==='1'?assessmentDemoClasses[0].id:''),learnerId=entry.get('learner') || '',view='evidence',framework='ccss',domain='all',search='',students=[],lessons=[],courseAssessment=null,libraryPack='ccss-ela',librarySearch='',loading=false,error='',epoch=0,classScope='overall',expandedAxis='',classMode='bars',learnerSearch='',learnerSort='name',portrait='photos',skillRecords=[],enduringTargets='',profileScope=Object.hasOwn(learningTabs,entry.get('subject'))?entry.get('subject'):'overall',studentMode='radar',selectedSkill='';
-  const $=selector=>root.querySelector(selector);
+  let classId=entry.get('class') || assessmentDemoClasses.find(c=>c.id===new URLSearchParams(location.search).get('demo'))?.id || (new URLSearchParams(location.search).get('demo')==='1'?assessmentDemoClasses[0].id:''),learnerId=entry.get('learner') || '',view='evidence',framework='ccss',domain='all',search='',students=[],lessons=[],courseAssessment=null,libraryPack='ccss-ela',librarySearch='',loading=false,error='',epoch=0,classScope='overall',expandedAxis='',expandedLearner='',classMode='bars',learnerSearch='',learnerSort='name',portrait='photos',skillRecords=[],enduringTargets='',profileScope=Object.hasOwn(learningTabs,entry.get('subject'))?entry.get('subject'):'overall',studentMode='radar',selectedSkill='';
+  const $=selector=>root.querySelector(selector),expandedDetails=new Set();
   root.innerHTML=`<div class="assessment-controls"><label><strong>Class</strong><select data-assessment-class aria-label="Class"></select></label><div class="assessment-views" role="group" aria-label="Assessment workspace"><button type="button" data-assessment-view="evidence" aria-pressed="true">Learning evidence</button><button type="button" data-assessment-view="standards" aria-pressed="false">Standards library</button><button type="button" data-assessment-view="catalogue" aria-pressed="false">Skill catalogue</button></div><button type="button" class="text-button" data-assessment-refresh>Refresh</button></div><p data-assessment-status role="status"></p><div data-assessment-body></div>`;
   const previewRequested=new URLSearchParams(location.search).has('demo');
   const currentDemo=()=>isAssessmentDemo(classId) || Boolean(getClasses().find(c=>c.id===classId)?.demoKey);
@@ -21,7 +21,11 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     $('[data-assessment-class]').innerHTML=(classId?'':'<option value="">Choose a class…</option>')+saved.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')+(preview.length?`<optgroup label="Fictional demo classes">${preview.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</optgroup>`:'');
     $('[data-assessment-class]').value=classId;$('[data-assessment-class]').disabled=!classes.length;
   }
+  function rememberClassDetails(){
+    root.querySelectorAll('[data-class-detail]').forEach(detail=>{if(detail.open)expandedDetails.add(detail.dataset.classDetail);else expandedDetails.delete(detail.dataset.classDetail);});
+  }
   function render(){
+    rememberClassDetails();
     root.querySelectorAll('[data-assessment-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.assessmentView===view)));
     if(!learnerId)document.title='Assessment | Ink Wire';
     $('[data-assessment-status]').textContent=loading?'Loading learning evidence…':error;
@@ -34,8 +38,8 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     const demo=currentDemo();
     $('[data-assessment-body]').innerHTML=(demo?`<div class="assessment-demo-notice"><span><strong>Demo class</strong> · Fictional students and sample responses from EDUCADE.</span>${isAssessmentDemo(classId)?'<button type="button" class="text-button" data-install-assessment-demo>Add demo classes to my workspace</button>':''}</div>`:'')+classOverviewHTML(classData())+courseStandardsHTML();
   }
-  function classData(){return {students,lessons,catalogue,scope:classScope,mode:classMode,search:learnerSearch,sort:learnerSort,portrait,records:skillRecords,expandedAxis};}
-  function refreshRows(){if($('[data-class-rows]'))$('[data-class-rows]').innerHTML=classRowsHTML(classData());}
+  function classData(){return {students,lessons,catalogue,scope:classScope,mode:classMode,search:learnerSearch,sort:learnerSort,portrait,records:skillRecords,expandedAxis,expandedLearner,expandedDetails};}
+  function refreshRows(){rememberClassDetails();if($('[data-class-rows]'))$('[data-class-rows]').innerHTML=classRowsHTML(classData());}
   function renderStudent(){
     const student=students.find(s=>s.id===learnerId),className=getClasses().find(c=>c.id===classId)?.name || assessmentDemoClasses.find(c=>c.id===classId)?.name || 'Class';
     $('[data-assessment-body]').innerHTML=studentPageHTML({classId,className,student,students,catalogue,lessons,records:skillRecords,scope:profileScope,mode:studentMode,selectedSkill,demo:currentDemo(),virtual:isAssessmentDemo(classId),enduringTargets});
@@ -103,11 +107,12 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     const button=event.target.closest('button');if(!button)return;
     if(button.dataset.assessmentView){view=button.dataset.assessmentView;learnerId='';writeRoute();render();}
     if(button.dataset.assessmentDomain){domain=button.dataset.assessmentDomain;renderCatalogue();}
+    if(button.dataset.expandLearner){const id=button.dataset.expandLearner;expandedLearner=expandedLearner===id?'':id;refreshRows();Array.from(root.querySelectorAll('[data-expand-learner]')).find(toggle=>toggle.dataset.expandLearner===id)?.focus({preventScroll:true});}
     if(button.dataset.assessmentLearner)openProfile(button.dataset.assessmentLearner,button);
     if(button.dataset.classLearner)openProfile(button.dataset.classLearner,button,button.dataset.classEvidence);
     if(button.dataset.classScope){classScope=button.dataset.classScope;render();$(`[data-class-scope="${classScope}"]`)?.focus({preventScroll:true});}
     if(button.dataset.classMode){classMode=button.dataset.classMode;render();}
-    if(button.dataset.classAxis){expandedAxis=expandedAxis===button.dataset.classAxis?'':button.dataset.classAxis;render();}
+    if(button.dataset.classAxis){const id=button.dataset.classAxis;expandedAxis=expandedAxis===id?'':id;refreshRows();root.querySelectorAll('[data-class-axis]').forEach(toggle=>{const open=expandedAxis===toggle.dataset.classAxis;toggle.setAttribute('aria-expanded',String(open));toggle.querySelector('span').textContent=open?'− Hide evidence':'+ Show evidence';});}
     if(button.matches('[data-assessment-refresh],[data-assessment-retry]'))load();
     if(button.matches('[data-assessment-standards]')&&!isAssessmentDemo(classId))openStandards?.(classId,button);
     if(button.matches('[data-install-assessment-demo]'))installDemo(button);
@@ -117,7 +122,7 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     if(button.dataset.studentMode){studentMode=button.dataset.studentMode;renderStudent();}
     if(button.dataset.profileEvidence){selectedSkill=button.dataset.profileEvidence;renderStudent();$('#student-response-evidence')?.focus();}
   });
-  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
+  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
     if(event.target.matches('[data-assessment-framework]')){framework=event.target.value;renderCatalogue();$('[data-assessment-framework]').focus({preventScroll:true});}});
   root.addEventListener('input',event=>{if(event.target.matches('[data-class-search]')){learnerSearch=event.target.value;refreshRows();}if(event.target.matches('[data-library-search]')){librarySearch=event.target.value;renderStandardsCriteria();}if(event.target.matches('[data-assessment-search]')){search=event.target.value;renderSkills();}});
   for(const type of ['inkwire:quiz-changed','inkwire:feedback-published'])document.addEventListener(type,event=>{if(event.detail?.classId===classId&&!root.hidden)load();});

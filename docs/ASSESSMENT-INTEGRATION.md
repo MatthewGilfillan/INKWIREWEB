@@ -76,3 +76,8 @@ The class list supplies a demoKey for installed fixtures. After the normal teach
 Student names in Assessment and the regular class roster open the full student page under the existing teacher header. The URL identifies the class and learner: `/teacher?view=assessment&class=<class-id>&learner=<learner-id>`. Profiles support direct loading, refresh, browser Back/Forward, Back to class and switching learners. They do not create dialogs or overlays.
 
 `dist/educade-student-view.js` adapts EDUCADE's `renderProfile`, learning-area axes, cumulative four-week progress and Glows & Grows patterns from the same development source commit. Reading Foundations and Literacy retain separate evidence. The page includes chart choices, subject navigation, current support counts, inline responses, the skill catalogue, lesson feedback and a notebook link. Its relative strengths and next practice areas come from recorded accuracy; they do not assign standards attainment. No unsupported report-generation or grouping controls are included.
+
+
+## Inline class evidence
+
+The class table adapts EDUCADE's independent learner-row and subject-column expansion. Show learning evidence toggles summaries in that row without changing the route; student names and score buttons retain full profile navigation. Expanded areas show actual correct/attempt counts, hint and support counts, encountered skills and nested, scrollable response histories. Unassessed areas remain No evidence yet. Native details retain their open state across class-table rerenders. Class changes reset expansion, and row toggles preserve focus and the table scroll position.

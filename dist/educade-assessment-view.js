@@ -15,10 +15,28 @@ export function classAxes(catalogue,scope){
  if(scope==='foundations')return catalogue.groups.filter(g=>g.section==='foundations').flatMap(g=>g.skills.map(s=>({id:s.id,label:s.name})));
  return catalogue.profileAxes[tab.domain];
 }
-export function axisStats(catalogue,records,axis){
- if(axis.domain){const ids=new Set(catalogue.groups.filter(g=>g.domain===axis.domain&&(!axis.section||g.section===axis.section)).flatMap(g=>g.skills.map(s=>s.id)));return summarizePractice(records.filter(r=>ids.has(r.skillId)));}
- return summarizePractice(records.filter(r=>r.skillId===axis.id));
+function axisRecords(catalogue,records,axis){
+ if(axis.domain){const ids=new Set(catalogue.groups.filter(g=>g.domain===axis.domain&&(!axis.section||g.section===axis.section)).flatMap(g=>g.skills.map(s=>s.id)));return records.filter(r=>ids.has(r.skillId));}
+ return records.filter(r=>r.skillId===axis.id);
 }
+export function axisStats(catalogue,records,axis){return summarizePractice(axisRecords(catalogue,records,axis));}
+// EDUCADE's compactDomain / subjectEvidence pattern: expand within the table;
+// keep profile navigation on the learner name and score buttons.
+function compactClassEvidence(catalogue,records,student,axis,expandedDetails){
+ const stats=summarizePractice(records);
+ if(!stats.attempts)return '<p class="educade-no-evidence">No evidence yet for this area.</p>';
+ const groups=catalogue.groups.map(group=>({...group,skills:group.skills.filter(skill=>records.some(r=>r.skillId===skill.id))})).filter(group=>group.skills.length);
+ const key=kind=>'class-evidence-'+encodeURIComponent(student.id)+'-'+encodeURIComponent(axis.id)+'-'+encodeURIComponent(kind);
+ const counts=`<p><strong>${stats.correct}/${stats.attempts}</strong> correct · ${stats.hints} hints</p><p>${stats.independent} independent · ${stats.supported} supported</p>`;
+ const skills=groups.flatMap(group=>group.skills);
+ const history=skill=>{
+  const attempts=records.filter(r=>r.skillId===skill.id).slice().sort((a,b)=>(b.week||0)-(a.week||0)||(b.day||0)-(a.day||0)),summary=summarizePractice(attempts),detailKey=key(skill.id);
+  return `<details class="educade-inline-skill" data-class-detail="${detailKey}" ${expandedDetails?.has(detailKey)?'open':''}><summary><strong>${escape(skill.name)}</strong><span>${summary.correct}/${summary.attempts} correct · ${summary.hints} hints</span></summary><p>${summary.independent} independent · ${summary.supported} supported</p><div class="educade-inline-history" role="region" aria-label="${escape(student.name)} · ${escape(skill.name)} responses" tabindex="0">${attempts.map((record,index)=>`<article><h5>${record.week?'Week '+escape(record.week)+(record.day?' · Day '+escape(record.day):''):'Response '+(attempts.length-index)}</h5><p class="educade-response-meta">${record.correct?'Correct':'Try again'} · ${record.supported?'Supported':'Independent'} · ${record.hint?'Hint used':'No hint used'}</p><p>${record.response?escape(record.response):'Response text not available.'}</p></article>`).join('')}</div></details>`;
+ };
+ const details=groups.map(group=>`<section class="educade-inline-group"><h4>${escape(group.name)}</h4>${group.skills.map(history).join('')}</section>`).join('');
+ return counts+(axis.domain?`<h4>Skills encountered</h4><ul>${skills.map(skill=>`<li>${escape(skill.name)}</li>`).join('')}</ul><details class="educade-inline-subject" data-class-detail="${key('subject')}" ${expandedDetails?.has(key('subject'))?'open':''}><summary>Explore ${escape(axis.label.toLowerCase())} skills</summary>${details}</details>`:details);
+}
+
 export const progressBar=(score,label)=>score===null?'<span class="educade-no-evidence">No evidence yet</span>':`<span class="educade-hp" role="img" aria-label="${escape(label)}: ${score} percent"><svg class="educade-hp-track" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><rect class="educade-hp-background" width="100" height="12" rx="6"/><rect class="educade-hp-fill ${score<70?'needs-practice':''}" width="${score}" height="12" rx="6"/></svg><strong>${score}%</strong></span>`;
 const avatar=(student,portrait)=>`<span class="educade-avatar" aria-hidden="true">${escape(student.initials || student.name.slice(0,1))}${portrait==='photos'&&!student.demo?`<img src="/api/profiles/learners/${encodeURIComponent(student.id)}/image" alt="" loading="lazy">`:''}</span>`;
 export function classOverviewHTML(data){
@@ -29,7 +47,14 @@ export function classOverviewHTML(data){
 export function classRowsHTML(data){
  const {students,lessons,catalogue,scope,mode,search,sort,portrait,records=[]}=data,axes=classAxes(catalogue,scope);
  const filtered=students.filter(s=>s.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).slice().sort((a,b)=>(sort==='evidence'?learnerEvidence(lessons,a.id).length-learnerEvidence(lessons,b.id).length:0)||a.name.localeCompare(b.name));
- return filtered.map(student=>`<tr><th scope="row"><div class="educade-learner">${avatar(student,portrait)}<div><button type="button" data-assessment-learner="${escape(student.id)}" class="educade-profile-link">${escape(student.name)}</button><button type="button" data-assessment-learner="${escape(student.id)}" class="educade-evidence-link">+ Show learning evidence</button><small>${student.demo?records.filter(r=>r.learnerId===student.id).length+' sample responses':learnerEvidence(lessons,student.id).length+' lesson'+(learnerEvidence(lessons,student.id).length===1?'':'s')+' with evidence'}</small></div></div></th>${axes.map(axis=>{const stats=axisStats(catalogue,records.filter(r=>r.learnerId===student.id),axis);return `<td><button type="button" class="educade-score-cell ${mode==='heatmap'?'educade-heat-cell':''}" data-class-evidence="${escape(axis.id)}" data-class-learner="${escape(student.id)}">${mode==='standards'?'<span class="educade-no-evidence">Not reviewed</span>':mode==='heatmap'?`<span class="educade-heat ${stats.score===null?'empty':stats.score<70?'needs-practice':'has-evidence'}">${stats.score===null?'No evidence yet':stats.score+'%'}</span>`:progressBar(stats.score,axis.label)}</button>${data.expandedAxis===axis.id?`<div class="educade-cell-evidence"><strong>${stats.attempts} linked responses</strong><small>${stats.independent} independent · ${stats.supported} supported</small></div>`:''}</td>`;}).join('')}</tr>`).join('')||`<tr><td colspan="${axes.length+1}"><p class="assessment-empty">${students.length?'No learners match your search.':'Add learners from Classes to begin.'}</p></td></tr>`;
+ return filtered.map(student=>{
+  const open=data.expandedLearner===student.id,studentRecords=records.filter(r=>r.learnerId===student.id);
+  const evidenceId=axis=>'class-evidence-'+encodeURIComponent(student.id)+'-'+encodeURIComponent(axis.id);
+  return `<tr class="${open?'educade-expanded-learner':''}"><th scope="row"><div class="educade-learner">${avatar(student,portrait)}<div><button type="button" data-assessment-learner="${escape(student.id)}" class="educade-profile-link">${escape(student.name)}</button><button type="button" data-expand-learner="${escape(student.id)}" class="educade-evidence-link" aria-expanded="${open}" aria-controls="${axes.map(evidenceId).join(' ')}" aria-label="${open?'Hide':'Show'} learning evidence for ${escape(student.name)}">${open?'− Hide':'+ Show'} learning evidence</button><small>${student.demo?studentRecords.length+' sample responses':learnerEvidence(lessons,student.id).length+' lesson'+(learnerEvidence(lessons,student.id).length===1?'':'s')+' with evidence'}</small></div></div></th>${axes.map(axis=>{
+   const relevant=axisRecords(catalogue,studentRecords,axis),stats=summarizePractice(relevant),show=open||data.expandedAxis===axis.id;
+   return `<td><button type="button" class="educade-score-cell ${mode==='heatmap'?'educade-heat-cell':''}" data-class-evidence="${escape(axis.id)}" data-class-learner="${escape(student.id)}">${mode==='standards'?'<span class="educade-no-evidence">Not reviewed</span>':mode==='heatmap'?`<span class="educade-heat ${stats.score===null?'empty':stats.score<70?'needs-practice':'has-evidence'}">${stats.score===null?'No evidence yet':stats.score+'%'}</span>`:progressBar(stats.score,axis.label)}</button><div class="educade-cell-evidence" id="${evidenceId(axis)}" role="region" aria-label="${escape(student.name)} · ${escape(axis.label)} evidence" ${show?'':'hidden'}>${show?compactClassEvidence(catalogue,relevant,student,axis,data.expandedDetails):''}</div></td>`;
+  }).join('')}</tr>`;
+ }).join('')||`<tr><td colspan="${axes.length+1}"><p class="assessment-empty">${students.length?'No learners match your search.':'Add learners from Classes to begin.'}</p></td></tr>`;
 }
 export function practiceRadarHTML(axes,scores){
  // Preserve EDUCADE's missing-evidence rule: no missing point is plotted at zero,
