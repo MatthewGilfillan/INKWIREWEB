@@ -153,7 +153,7 @@ async function poll(){if(refreshing||!book||!selection||document.hidden)return;r
 async function initialize(){
   try{if(practice){adapter=await(await import('./notebook-preview.mjs')).previewAdapter(query.get('role')||'teacher');$('#practice-banner').hidden=false;}
     library=await adapter.list();if(!library.classes.length)library.classes=[...new Map(library.notebooks.map(b=>[b.classId,{id:b.classId,name:b.className}])).values()];$('#view-label').textContent=library.role==='parent'?'Parent · read only':library.role==='student'?'Student notebook':'Teacher workspace';const teacher=library.role==='teacher',home=practice?'studio.html?role='+library.role:'/'+library.role;
-    $('#notebook-today').hidden=!teacher;$('#notebook-calendar').hidden=!teacher;
+    $('#notebook-today').hidden=!teacher;$('#notebook-calendar').hidden=!teacher;$('#notebook-assessment').hidden=!teacher;$('#notebook-assessment').href=home+(practice?'&':'?')+'view=assessment';
     $('#notebook-today').href=home;$('#notebook-calendar').href=home+(practice?'&':'?')+'view=calendar';
     $('#dashboard-link').hidden=false;$('#dashboard-link').textContent=teacher?'Classes':library.role==='parent'?'My children':'My classes';$('#dashboard-link').href=home+(teacher?(practice?'&':'?')+'view=classes':'');$('#notebook-home').href=home;
     $('#notebook-site-nav').setAttribute('aria-label',teacher?'Teacher workspace':library.role==='parent'?'Parent workspace':'Student workspace');

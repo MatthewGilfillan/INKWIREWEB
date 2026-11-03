@@ -1,3 +1,4 @@
+import {createAssessmentWorkspace} from './assessment-workspace.js';
 import {createClassSetup} from './class-setup.js';
 import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js?v=20261103-skin';
@@ -35,6 +36,7 @@ const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
 const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('students',button);$('.teacher-heading h1').focus();},problem});
+const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
 function renderClasses(){
   $('#selected-class').innerHTML=classrooms.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
   $('#class-empty').hidden=Boolean(classrooms.length);$('#class-workspace').hidden=!classrooms.length;
@@ -87,16 +89,16 @@ async function loadTrash(){
   }catch(error){$('#trash-list').textContent=error.message;$('#retry-trash').hidden=false;if(error.status===401)problem(error);}
 }
 function showView(view){
-  $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':'My classes';
-  $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':'Restore classes and their course plans.';
-  $('#teacher-today').hidden=view!=='today';
+  $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':view==='assessment'?'Assessment':'My classes';
+  $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':view==='assessment'?'Learning evidence, skills and curriculum standards.':'Restore classes and their course plans.';
+  $('#teacher-today').hidden=view!=='today';$('#teacher-assessment').hidden=view!=='assessment';$('.lms-heading-tools').hidden=view==='assessment';
   currentView=view;list.hidden=view!=='classes';$('#teacher-calendar').hidden=view!=='calendar';$('#class-trash').hidden=view!=='trash';
   document.querySelectorAll('[data-teacher-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.teacherView===view)));
   const utility=$('.teacher-trash-utility'),inTrash=view==='trash';
   utility.dataset.teacherView=inTrash?'today':'trash';utility.setAttribute('aria-label',inTrash?'Home':'Trash');utility.title=inTrash?'Home':'Trash';utility.removeAttribute('aria-pressed');
   utility.querySelector('path').setAttribute('d',inTrash?'m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z':'M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6');
   const url=new URL(location.href);if(view==='today')url.searchParams.delete('view');else url.searchParams.set('view',view);history.replaceState(null,'',url);
-  if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();
+  if(view==='calendar')calendar.refresh();if(view==='trash')loadTrash();if(view==='assessment')assessmentWorkspace.refresh();
 }
 document.querySelectorAll('[data-teacher-view]').forEach(b=>b.onclick=()=>showView(b.dataset.teacherView));
 $('#retry-trash').onclick=loadTrash;
@@ -132,7 +134,7 @@ async function loadRoster(classId){
 }
 async function loadClasses(force=false){
   if(loading||(!force && coursePlanner.hasUnsavedChanges()))return;loading=true;retry.hidden=true;status.textContent='Loading your classes…';
-  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();today.refresh();if(currentView==='trash')await loadTrash();status.textContent='';}
+  try{classrooms=(await api('/api/classes')).classes;renderClasses();calendar.refresh();today.refresh();if(currentView==='trash')await loadTrash();if(currentView==='assessment')assessmentWorkspace.refresh();status.textContent='';}
   catch(error){problem(error);retry.hidden=false;}finally{loading=false;}
 }
 for(const [id,route]of[['create-form','/api/classes'],['join-form','/api/classes/join']]){
@@ -202,7 +204,7 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{assessmentWorkspace.clear();today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();
 
@@ -219,5 +221,5 @@ $('#invite-email-form').addEventListener('submit',async event=>{
 
 // Notebook navigation returns to the same named dashboard view.
 const entryQuery=new URLSearchParams(location.search),entryView=entryQuery.get('view');
-showView(['classes','calendar','trash'].includes(entryView)?entryView:'today');
+showView(['classes','calendar','trash','assessment'].includes(entryView)?entryView:'today');
 if(entryQuery.get('join')==='1'){document.querySelector('[data-open="join-class"]').click();const url=new URL(location.href);url.searchParams.delete('join');history.replaceState(null,'',url);}

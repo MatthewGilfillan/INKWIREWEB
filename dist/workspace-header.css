@@ -27,3 +27,4 @@
 @media(max-width:700px){.teacher-main :is(h1,h2,h3,[data-overview-lesson]),.learning-report{scroll-margin-top:150px}}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.workspace-header.teacher-header{background:#fff}}
 @media(prefers-reduced-transparency:reduce){.workspace-header.teacher-header{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}}
+@media(max-width:700px){.workspace-header .today-nav{gap:0;justify-content:space-between}.workspace-header .today-nav :is(a,button){font-size:11px;padding-inline:0}}
