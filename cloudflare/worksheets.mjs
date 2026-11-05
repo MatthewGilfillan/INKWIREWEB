@@ -1,3 +1,4 @@
+import {notebookContext} from './notebook-organization.mjs';
 import {cleanAnnotationDocument,annotationPlainText} from '../src/annotation-text.mjs';
 import {fontName,textColor} from '../src/text-format.mjs';
 import {limitClassAction} from './classes.mjs';
@@ -72,7 +73,8 @@ export async function handleWorksheets(request,env,user) {
         ?await env.DB.prepare(`SELECT w.id,w.title,w.pages_json,p.published_at FROM worksheets w JOIN worksheet_publications p ON p.worksheet_id=w.id WHERE w.class_id=? AND p.learner_id=? ORDER BY w.created_at DESC`).bind(classId,scope.learnerId).all()
         :await env.DB.prepare('SELECT id,title,pages_json,created_at,display_mode FROM worksheets WHERE class_id=? ORDER BY created_at DESC').bind(classId).all();
       const students=scope.role==='teacher'?(await env.DB.prepare(`SELECT l.id,l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? ORDER BY l.display_name,l.id`).bind(classId).all()).results:[];
-      return json({userId:user.id,...scope,className:classroom.name,students,worksheets:rows.results.map(r=>({id:r.id,title:r.title,pageCount:JSON.parse(r.pages_json).length,displayMode:r.display_mode||'printout',publishedAt:r.published_at||null}))});
+      const allowed=scope.learnerId?new Set((await notebookContext(env,user,classId,scope.learnerId)).publicPages.map(page=>page.id)):null;
+      return json({userId:user.id,...scope,className:classroom.name,students,worksheets:rows.results.filter(row=>!allowed||allowed.has(row.id)).map(r=>({id:r.id,title:r.title,pageCount:JSON.parse(r.pages_json).length,displayMode:r.display_mode||'printout',publishedAt:r.published_at||null}))});
     }
     if(request.method!=='POST')return fail('Use GET or POST.',405);
     if(scope.role!=='teacher')return fail('Only a class teacher can upload worksheets.',403,'FORBIDDEN');
@@ -102,6 +104,7 @@ export async function handleWorksheets(request,env,user) {
   const worksheet=await env.DB.prepare('SELECT * FROM worksheets WHERE id=?').bind(id).first();
   if(!worksheet)return fail('Worksheet not found.',404,'NOT_FOUND');
   const scope=await access(env,user,worksheet.class_id,learnerId);if(!scope)return fail('Worksheet not found.',404,'NOT_FOUND');
+  if(scope.learnerId){try{(await notebookContext(env,user,worksheet.class_id,scope.learnerId)).pageUnlocked(id);}catch(e){return fail(e.message,e.status||400,e.code);}}
   const publication=scope.learnerId?await env.DB.prepare('SELECT snapshot_key,published_at FROM worksheet_publications WHERE worksheet_id=? AND learner_id=?').bind(id,scope.learnerId).first():null;
   const liveParent=scope.role==='parent'&&url.searchParams.get('notebook')==='1';
   if(scope.role==='parent'&&!publication&&!liveParent)return fail('This worksheet has not been shared with you yet.',404,'NOT_FOUND');

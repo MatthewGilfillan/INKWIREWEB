@@ -53,7 +53,7 @@ export function addDays(value, days) {
   return date.toISOString().slice(0, 10);
 }
 export function defaults(title = '') {
-  return { version: 1, preset: 'combined', organization: 'Rivendell', title: title || 'Literature & essay writing', description: presets[0].overview, weeks: 15, lessonsPerWeek: 1, lessonMinutes: 120, startDate: '', startTime: '16:00', timeZone: 'Asia/Shanghai', lessons: [] };
+  return { version: 1, preset: 'combined', organization: 'Rivendell', title: title || 'Literature & essay writing', description: presets[0].overview, weeks: 15, lessonsPerWeek: 1, lessonMinutes: 120, startDate: '', startTime: '16:00', timeZone: 'Asia/Shanghai', autoNotebookSections: true, lessons: [] };
 }
 export function courseSummary(course) {
   const count = course.lessonCount ?? course.weeks * course.lessonsPerWeek;
@@ -106,6 +106,8 @@ export function validateCourse(value) {
     return input.trim();
   };
   const course = { version: 1, preset: value.preset, organization: text(value.organization, 120, 'school or organisation'), title: text(value.title, 160, 'course title', true), description: text(value.description, 4000, 'course description'), weeks: value.weeks, lessonsPerWeek: value.lessonsPerWeek, lessonMinutes: value.lessonMinutes };
+  if(value.autoNotebookSections!==undefined&&typeof value.autoNotebookSections!=='boolean')throw Error('Check the notebook setup option.');
+  course.autoNotebookSections=value.autoNotebookSections!==false;
   if (value.assessment !== undefined) course.assessment = validateStandardsSelection(value.assessment);
   if (value.pacing !== undefined) { if (!['weekly', 'lessons'].includes(value.pacing)) throw Error('Choose a weekly timetable or individual lesson dates.'); course.pacing = value.pacing; }
   if (value.lessonCount !== undefined) {

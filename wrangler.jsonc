@@ -13,6 +13,7 @@
     "directory": "./dist",
     "run_worker_first": [
       "/api/*",
+      "/office-converter.html",
       "/account",
       "/account.html",
       "/teacher*",

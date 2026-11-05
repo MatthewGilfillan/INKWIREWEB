@@ -83,6 +83,16 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
+      if (url.pathname==='/office-converter.html') {
+        if(!await ready(env))return unavailable();
+        const session=await createAuth(env).api.getSession({headers:request.headers});
+        if(!session?.user?.emailVerified||session.user.requestedRole!=='teacher')return privateRedirect('/account');
+        const response=await env.ASSETS.fetch(request);
+        return new Response(response.body,{status:response.status,headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
+          'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp',
+          'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.zetaoffice.net; worker-src 'self' blob: data:; connect-src 'self' https://cdn.zetaoffice.net; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"}});
+      }
+
       if (['/profile','/profile/','/profile.html'].includes(url.pathname)) {
         if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/profile`);
         if(!await ready(env))return unavailable();
@@ -105,7 +115,7 @@ export default {
         if(url.pathname!=='/notebooks')return privateRedirect('/notebooks'+url.search);
         const response=await env.ASSETS.fetch(new Request(new URL('/notebooks',env.APP_ORIGIN)));
         return new Response(response.body,{headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
-          'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'none'"}});
+          'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'none'"}});
       }
       if (['/worksheets','/worksheets/','/worksheets.html'].includes(url.pathname)) {
         if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/worksheets${url.search}`);

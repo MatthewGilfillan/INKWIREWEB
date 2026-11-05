@@ -1,3 +1,4 @@
+import {mountNotebookRibbon} from './notebook-ribbon.mjs';
 import {Editor,generateHTML} from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import {TextFormat} from './text-format.mjs';
@@ -20,7 +21,7 @@ if(embedded)(root===document?document.body:root).classList.add('notebook-embed')
 const pdfOptions={cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/',isEvalSupported:false};
 const hints={select:'Drag the handle to move text. Click text to edit.',text:'Click anywhere to type. Drag the handle to move text. Esc finishes editing.',pen:'Draw with your mouse or stylus. Switch to Text to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
 let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='text',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
-let activeText=null;
+let activeText=null,worksheetRibbon=null;
 let pageNodes=[],rendering=new Map(),visible=new Set(),pdfTask,fileToUpload,uploadRequestId,queuedFeedback='',textBefore=null;
 const own=m=>meta&&meta.role!=='parent'&&m?.ownerId===meta.userId&&m.layer===meta.role;
 const editable=()=>!!meta?.learnerId&&meta.role!=='parent'&&!conflicts.has('access');
@@ -75,7 +76,7 @@ async function openWorksheet(id,learnerId){
     $('#learner-picker').hidden=meta.role!=='teacher';$('#learner-select').innerHTML=(library.students||[]).map(s=>`<option value="${escape(s.id)}">${escape(s.name)}</option>`).join('');$('#learner-select').value=meta.learnerId||'';
     for(const id of ['drawing-tools','style-tools'])$('#'+id).hidden=!editable();$('#feedback-tools').hidden=meta.role!=='teacher'||!editable();$('#publish-parent').hidden=meta.role!=='teacher'||notebookContext;$('#ink-color').value=meta.role==='teacher'?'#7461ad':'#243556';
     $('#read-only-message').hidden=editable();$('#read-only-message').textContent=meta.role==='parent'?(notebookContext?'Read-only: this is your child’s live notebook. New writing and feedback appear automatically.':'Read-only: this is the copy your child’s teacher shared. New edits appear when the teacher shares an updated copy.'):'Add a student to this class to open their worksheet copy. The original PDF is ready.';
-    publishedLabel(meta.publishedAt);setTool('text');buildPages();
+    publishedLabel(meta.publishedAt);if(worksheetRibbon){worksheetRibbon.select('text');$('.ws-toolbar').hidden=!editable();}else setTool('text');buildPages();
     const data=await adapter.pdf();if(token!==openToken)return;
     pdfTask=pdfjs.getDocument({...pdfOptions,data});pdf=await pdfTask.promise;if(token!==openToken)return;
     if(pdf.numPages!==meta.pages.length)throw Error('The PDF page count does not match this worksheet. Please upload it again.');
@@ -277,6 +278,15 @@ $('#upload-form').onsubmit=async event=>{
   catch(problem){$('#upload-error').textContent=problem.name==='PasswordException'?'This PDF is password-protected. Upload an unlocked copy.':problem.message;$('#upload-error').hidden=false;}
   finally{await task?.destroy();button.disabled=false;button.textContent='Add worksheet';}
 };
+if(embedded){
+ const toolbar=$('.ws-toolbar'),settings=$('#annotation-settings'),history=$('.annotation-history'),zoom=$('.zoom-tools'),oldTools=$('#drawing-tools');
+ const panels=['text','pen','highlight','eraser','insert'].map(id=>({id,label:({text:'Text',pen:'Pen',highlight:'Highlighter',eraser:'Eraser',insert:'Insert'})[id],content:[document.createElement('div')]}));
+ const eraser=panels[3].content[0];eraser.textContent='Click or drag over your own annotations to erase them. The PDF background stays locked.';eraser.append($('#delete-mark'));
+ const insert=panels[4].content[0],add=document.createElement('button');add.type='button';add.textContent='File or printout';add.onclick=()=>options.onPdfDrop?options.onPdfDrop():$('#upload-open').click();insert.append(add);
+ toolbar.classList.add('note-toolbar');history.classList.add('note-history-group');
+ worksheetRibbon=mountNotebookRibbon({toolbar,panels,history,onSelect:id=>{const panel=panels.find(p=>p.id===id).content[0];if(['text','pen','highlight'].includes(id))panel.append(settings);setTool(id==='eraser'?'erase':id==='insert'?'text':id);}});
+ const legacy=document.createElement('div');legacy.hidden=true;legacy.append(oldTools);toolbar.append(legacy);toolbar.querySelector('.notebook-ribbon-top').append(zoom);
+}
 await loadLibrary();
 return {destroy(){resetWorkspace();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
 }

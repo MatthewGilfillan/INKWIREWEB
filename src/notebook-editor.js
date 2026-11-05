@@ -1,3 +1,5 @@
+import {NotebookFile,cleanNotebookFile} from './notebook-file-node.mjs';
+import {mountNotebookRibbon} from './notebook-ribbon.mjs';
 import {PdfPrintout,printoutNodes} from './printout-node.mjs';
 import {InkStroke} from './ink-stroke.mjs';
 import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
@@ -29,7 +31,7 @@ function destroy() {
   activeProvider = undefined;
 }
 
-function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople, ydoc, loadPdf, readOnly = false }) {
+function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople, ydoc, loadPdf, loadAsset, onInsertPdf, readOnly = false }) {
   destroy();
   let connection;
   const sharedDocument = shared && demoDocument(shared.key);
@@ -62,7 +64,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [PdfPrintout.configure({loadPdf}),InkStroke,TextFrame.configure({canvas:!!ydoc,onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [NotebookFile.configure({loadAsset}),PdfPrintout.configure({loadPdf}),InkStroke,TextFrame.configure({canvas:!!ydoc,onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -128,13 +130,23 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
     (['Bold','Italic','Underline'].includes(item.label)?emphasis:['Undo','Redo'].includes(item.label)?history:advanced).append(button);
   }
   history.append(more);
+  let ribbonDrawing=null;
   if(ydoc&&!readOnly){
     const editor=activeEditor,root=editor.view.dom,ns='http://www.w3.org/2000/svg';let tool='text',color='#18395d';
     const drawing=window.document.createElement('div');drawing.className='note-drawing-group';drawing.setAttribute('role','group');drawing.setAttribute('aria-label','Writing and drawing tools');toolbar.append(drawing);
-    const modes=[];for(const [value,label] of [['text','Text'],['pen','Pen'],['highlight','Highlighter'],['eraser','Eraser']]){const b=window.document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('aria-pressed',String(value===tool));b.onmousedown=e=>e.preventDefault();b.onclick=()=>{tool=value;root.dataset.tool=value;editor.storage.inkStroke.tool=value;modes.forEach(([v,button])=>button.setAttribute('aria-pressed',String(v===value)));if(value==='text')ensureCanvasCaret(editor.view);else root.blur();};modes.push([value,b]);drawing.append(b);}
-    const ink=window.document.createElement('input');ink.type='color';ink.value=color;ink.setAttribute('aria-label','Ink color');ink.onchange=()=>{color=ink.value;};drawing.append(ink);
+    const options=window.document.createElement('div');options.className='note-ink-options';
+    const inkLabel=window.document.createElement('label');inkLabel.textContent='Colour';const ink=window.document.createElement('input');ink.type='color';ink.value=color;ink.setAttribute('aria-label','Ink colour');inkLabel.append(ink);options.append(inkLabel);
+    const widthLabel=window.document.createElement('label');widthLabel.textContent='Width';const width=window.document.createElement('select');width.setAttribute('aria-label','Ink width');widthLabel.append(width);options.append(widthLabel);
+    const memories={pen:{color:'#18395d',size:2},highlight:{color:'#ffe45c',size:16}};
+    const palette=addColorPalette(ink,{label:'Ink colour'});toolWidgets.push(palette);ink.onchange=()=>{if(memories[tool])memories[tool].color=ink.value;color=ink.value;};width.onchange=()=>{if(memories[tool])memories[tool].size=Number(width.value);};
+    const eraseOptions=window.document.createElement('div');eraseOptions.className='note-eraser-options';eraseOptions.textContent='Click an ink stroke to erase it.';
+    const eraseAll=window.document.createElement('button');eraseAll.type='button';eraseAll.textContent='Erase all ink';eraseAll.onclick=()=>{const positions=[];editor.state.doc.descendants((node,pos)=>{if(node.type.name==='inkStroke')positions.push([pos,node.nodeSize]);});let tr=editor.state.tr;for(const [pos,size]of positions.reverse())tr=tr.delete(pos,pos+size);if(positions.length)editor.view.dispatch(tr);};eraseOptions.append(eraseAll);
+    const penPanel=window.document.createElement('div'),highlightPanel=window.document.createElement('div');
+    ribbonDrawing={penPanel,highlightPanel,eraseOptions,select(value){tool=['pen','highlight','eraser'].includes(value)?value:'text';root.dataset.tool=tool;editor.storage.inkStroke.tool=tool;
+      if(memories[tool]){const choices=tool==='highlight'?[8,12,16,24,32]:[1,2,3,5,8];width.replaceChildren(...choices.map(size=>{const option=window.document.createElement('option');option.value=size;option.textContent=size+' px';return option;}));width.value=memories[tool].size;ink.value=color=memories[tool].color;(tool==='pen'?penPanel:highlightPanel).append(options);palette.sync?.();}
+      if(tool!=='text')root.blur();}};
     const draw=event=>{if(!editor.isEditable||!['pen','highlight'].includes(tool)||event.button!==0||event.target.closest('button'))return;event.preventDefault();event.stopPropagation();
-      const bounds=root.getBoundingClientRect(),point=e=>[Math.round(Math.max(0,Math.min(10000,e.clientX-bounds.left))*10)/10,Math.round(Math.max(0,Math.min(200000,e.clientY-bounds.top))*10)/10],points=[point(event)],svg=window.document.createElementNS(ns,'svg'),line=window.document.createElementNS(ns,'polyline'),size=tool==='highlight'?16:2,highlight=tool==='highlight',strokeColor=highlight&&color==='#18395d'?'#ffe45c':color;
+      const bounds=root.getBoundingClientRect(),point=e=>[Math.round(Math.max(0,Math.min(10000,e.clientX-bounds.left))*10)/10,Math.round(Math.max(0,Math.min(200000,e.clientY-bounds.top))*10)/10],points=[point(event)],svg=window.document.createElementNS(ns,'svg'),line=window.document.createElementNS(ns,'polyline'),size=memories[tool].size,highlight=tool==='highlight',strokeColor=color;
       svg.classList.add('ink-stroke','ink-stroke-preview');svg.append(line);line.setAttribute('stroke',strokeColor);line.setAttribute('stroke-width',size);line.setAttribute('fill','none');line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');line.setAttribute('opacity',highlight?'.32':'1');element.append(svg);const r=element.getBoundingClientRect();Object.assign(svg.style,{left:bounds.left-r.left+element.scrollLeft+'px',top:bounds.top-r.top+element.scrollTop+'px'});root.setPointerCapture(event.pointerId);
       const motion=e=>{if(points.length<1500)points.push(point(e));line.setAttribute('points',points.map(p=>p.join(',')).join(' '));};
       const finish=e=>{root.removeEventListener('pointermove',motion,true);root.removeEventListener('pointerup',finish,true);root.removeEventListener('pointercancel',cancel,true);svg.remove();if(root.hasPointerCapture(e.pointerId))root.releasePointerCapture(e.pointerId);if(points.length===1)points.push([points[0][0]+.1,points[0][1]]);if(!editor.isDestroyed)editor.view.dispatch(editor.state.tr.insert(editor.state.doc.content.size,editor.schema.nodes.inkStroke.create({points,color:strokeColor,size,highlight})));ensureCanvasCaret(editor.view);};
@@ -147,6 +159,12 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   for(const label of formatBody.querySelectorAll('.format-control'))(['fontFamily','fontSize'].includes(label.dataset.style)?fontRow:characterRow).append(label);
   characterRow.prepend(emphasis);characterRow.append(clear);const strike=advanced.querySelector('[data-format="strike"]');if(strike)emphasis.append(strike);fontRow.append(fonts);formatBody.remove();toolbar.prepend(typography);
   advanced.className='note-paragraph-group';advanced.setAttribute('role','group');advanced.setAttribute('aria-label','Paragraph formatting');toolbar.insertBefore(advanced,toolbar.querySelector('.note-drawing-group')||history);more.remove();
+  if(ribbonDrawing){
+    const insertPanel=window.document.createElement('div');insertPanel.className='note-insert-options';
+    const add=(label,run)=>{const button=window.document.createElement('button');button.type='button';button.textContent=label;button.onmousedown=e=>e.preventDefault();button.onclick=run;insertPanel.append(button);};
+    add('Text box',()=>showCaret());if(onInsertPdf)add('File or printout',onInsertPdf);add('Divider',()=>currentEditor().chain().focus().setHorizontalRule().run());add('Date',()=>currentEditor().chain().focus().insertContent(new Intl.DateTimeFormat(undefined,{dateStyle:'long'}).format(new Date())).run());
+    mountNotebookRibbon({toolbar,history,panels:[{id:'text',label:'Text',content:[typography,advanced]},{id:'pen',label:'Pen',content:[ribbonDrawing.penPanel]},{id:'highlight',label:'Highlighter',content:[ribbonDrawing.highlightPanel]},{id:'eraser',label:'Eraser',content:[ribbonDrawing.eraseOptions]},{id:'insert',label:'Insert',content:[insertPanel]}],onSelect:ribbonDrawing.select});
+  }
   updateToolbar(activeEditor);
   if(ydoc&&!readOnly)ensureCanvasCaret(activeEditor.view);
   activeEditor.focusPage=()=>showCaret();
@@ -171,9 +189,10 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
 
 function insertPrintout(assetId,pages,point){
  const editor=activeEditor;if(!editor?.isEditable)return false;
- let bottom=24;editor.state.doc.descendants(node=>{const a=node.type.name==='pdfPrintout'?node.attrs:node.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});
+ let bottom=24;editor.state.doc.descendants(node=>{const a=['pdfPrintout','notebookFile'].includes(node.type.name)?node.attrs:node.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});
  const nodes=printoutNodes(assetId,pages,point||{x:24,y:bottom});
  const pos=editor.state.doc.content.size;editor.view.dispatch(editor.state.tr.insert(pos,nodes.map(n=>editor.schema.nodeFromJSON(n))));ensureCanvasCaret(editor.view);return true;
 }
-window.InkWireEditor = { mount, insertPrintout, destroy, hasPendingChanges,
+function insertFile(attrs){const e=activeEditor;if(!e?.isEditable)return false;let bottom=24;e.state.doc.descendants(n=>{const a=['pdfPrintout','notebookFile'].includes(n.type.name)?n.attrs:n.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});const value=cleanNotebookFile({x:24,y:bottom,width:320,height:100,...attrs});e.view.dispatch(e.state.tr.insert(e.state.doc.content.size,e.schema.nodes.notebookFile.create(value)));ensureCanvasCaret(e.view);return true;}
+window.InkWireEditor = { mount, insertFile, insertPrintout, destroy, hasPendingChanges,
   focusPage:()=>activeEditor?.focusPage?.(), getText: () => activeEditor?.getText() || '', setEditable: value => activeEditor?.setEditable(value) };

@@ -1,3 +1,5 @@
+import {handleNotebookFile} from './notebook-files.mjs';
+import {notebookContext,notebookPrepare,handleNotebookOrganization,notebookVersion,notebookTemplate} from './notebook-organization.mjs';
 import {cleanDocument,emptyDocument,PRINT_SECTION,catalogPages,notebookKey} from '../src/notebook-model.mjs';
 import {seedState,mergeState,encodeState} from '../src/notebook-sync.mjs';
 import {limitClassAction} from './classes.mjs';
@@ -24,18 +26,24 @@ export async function handleNotebooks(request,env,user) {
       FROM classes c JOIN class_students s ON s.class_id=c.id JOIN learners l ON l.id=s.learner_id
       WHERE c.deleted_at IS NULL AND ${teacher?'(c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?))':parent?'EXISTS (SELECT 1 FROM learner_parents p WHERE p.learner_id=l.id AND p.parent_id=?)':'l.user_id=?'}
       ${classId?'AND c.id=?':''} ORDER BY c.name,l.display_name,l.id`).bind(...(teacher?[user.id,user.id]:[user.id]),...(classId?[classId]:[])).all();
-    return json({userId:user.id,role:user.requestedRole,notebooks:rows.results.map(r=>({...r,id:notebookKey(r.classId,r.learnerId),title:r.learnerName})),classes:teacher?(await env.DB.prepare(`SELECT c.id,c.name FROM classes c WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ORDER BY c.name`).bind(user.id,user.id).all()).results:[]});
+    const classes=teacher?(await env.DB.prepare(`SELECT c.id,c.name FROM classes c WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ${classId?'AND c.id=?':''} ORDER BY c.name`).bind(user.id,user.id,...(classId?[classId]:[])).all()).results:[];
+    const teacherBooks=classes.map(c=>({id:notebookKey(c.id,'teacher'),classId:c.id,className:c.name,learnerId:'teacher',learnerName:'Teacher notebook',title:'Teacher notebook',teacherBook:true,pinned:true}));
+    return json({userId:user.id,role:user.requestedRole,notebooks:[...teacherBooks,...rows.results.map(r=>({...r,id:notebookKey(r.classId,r.learnerId),title:r.learnerName}))],classes});
   }
   const [classId,learnerId,kind,id]=parts;
-  if(!ID.test(classId||'')||!(ID.test(learnerId||'')||/^[a-f0-9]{32}$/.test(learnerId||'')))return fail('Notebook not found.',404,'NOT_FOUND');
+  const teacherBook=learnerId==='teacher';
+  if(!ID.test(classId||'')||!(teacherBook&&teacher||ID.test(learnerId||'')||/^[a-f0-9]{32}$/.test(learnerId||'')))return fail('Notebook not found.',404,'NOT_FOUND');
   if(teacher&&!await canTeach(env,user,classId))return fail('Notebook not found.',404,'NOT_FOUND');
-  const learner=await env.DB.prepare(`SELECT l.id,l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? AND l.id=? ${student?'AND l.user_id=?':parent?'AND EXISTS (SELECT 1 FROM learner_parents p WHERE p.learner_id=l.id AND p.parent_id=?)':''}`).bind(classId,learnerId,...(!teacher?[user.id]:[])).first();
+  const learner=teacherBook?{id:'teacher',name:'Teacher notebook'}:await env.DB.prepare(`SELECT l.id,l.display_name AS name FROM learners l JOIN class_students s ON s.learner_id=l.id WHERE s.class_id=? AND l.id=? ${student?'AND l.user_id=?':parent?'AND EXISTS (SELECT 1 FROM learner_parents p WHERE p.learner_id=l.id AND p.parent_id=?)':''}`).bind(classId,learnerId,...(!teacher?[user.id]:[])).first();
   if(!learner)return fail('Notebook not found.',404,'NOT_FOUND');
   if(!await env.DB.prepare('SELECT id FROM classes WHERE id=? AND deleted_at IS NULL').bind(classId).first())return fail('Notebook not found.',404,'NOT_FOUND');
-  const scope=[classId,learnerId];
+  const scope=[classId,learnerId],prepare=notebookPrepare(env,learnerId);
+  let context;try{context=await notebookContext(env,user,classId,learnerId);if(kind==='pages'&&ID.test(id||''))context.pageUnlocked(id);}catch(e){return fail(e.message,e.status||400,e.code);}
+  const extra=await handleNotebookOrganization(context,request,kind,id);if(extra)return extra;
+  if(kind==='pages'&&ID.test(id||'')&&parts[4]==='assets'&&ID.test(parts[5]||'')&&parts.length===6)return handleNotebookFile(request,env,user,context,id,parts[5]);
   // PDF assets belong to a particular notebook page, never to a separate class library.
   if(kind==='pages'&&ID.test(id||'')&&parts[4]==='pdfs'&&ID.test(parts[5]||'')&&parts.length===6){
-    const page=await env.DB.prepare("SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=? AND kind='note'").bind(...scope,id).first();
+    const page=await prepare("SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=? AND kind='note'").bind(...scope,id).first();
     if(!page)return fail('Page not found.',404,'NOT_FOUND');
     if(!env.WORKSHEETS)return fail('PDF storage is unavailable. Try again shortly.',503);
     const key='notebook-pdfs/'+classId+'/'+learnerId+'/'+id+'/'+parts[5]+'.pdf';
@@ -56,60 +64,61 @@ export async function handleNotebooks(request,env,user) {
     if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')return fail('Choose a valid PDF.');
     await env.WORKSHEETS.put(key,bytes,{httpMetadata:{contentType:'application/pdf'}});return json({id:parts[5]},201);
   }
-  const sections=async()=>[{id:PRINT_SECTION,title:'Notes'},...(await env.DB.prepare('SELECT id,title FROM notebook_sections WHERE class_id=? AND learner_id=? ORDER BY created_at,id').bind(...scope).all()).results];
-  if(parts.length===2&&request.method==='GET') {
-    const worksheets=(await env.DB.prepare('SELECT id,title,display_mode AS displayMode,created_at AS createdAt FROM worksheets WHERE class_id=? ORDER BY created_at,id').bind(classId).all()).results;
-    const pages=(await env.DB.prepare('SELECT id,section_id AS sectionId,title,kind,version,updated_at AS updatedAt FROM notebook_pages WHERE class_id=? AND learner_id=? ORDER BY updated_at,id').bind(...scope).all()).results;
-    return json({userId:user.id,learnerName:learner.name,role:user.requestedRole,sections:await sections(),pages:catalogPages(worksheets,pages)});
-  }
+  const sections=async()=>(await notebookContext(env,user,classId,learnerId)).publicSections;
+  if(parts.length===2&&request.method==='GET')return json({userId:user.id,learnerName:learner.name,role:user.requestedRole,teacherBook,sections:context.publicSections,pages:context.publicPages});
   if(kind==='pages'&&ID.test(id||'')&&request.method==='GET'&&parts.length===4) {
-    const page=await env.DB.prepare('SELECT id,title,kind,section_id AS sectionId,document_json AS document,y_state AS state,version,updated_at AS updatedAt FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first();
+    const page=await prepare('SELECT id,title,kind,section_id AS sectionId,document_json AS document,y_state AS state,version,updated_at AS updatedAt FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first();
     if(!page)return fail('Page not found.',404,'NOT_FOUND');
     if(page.document)page.document=JSON.parse(page.document);if(page.state){page.syncState=encodeState(new Uint8Array(page.state));delete page.state;}return json({page,userId:user.id});
   }
-  if(parent)return fail('Parent notebooks are read-only.',403,'FORBIDDEN');
   if(request.method!=='POST')return fail('Not found.',404,'NOT_FOUND');
   if(request.headers.get('Origin')!==env.APP_ORIGIN||request.headers.get('Sec-Fetch-Site')==='cross-site')return fail('Invalid origin.',403,'INVALID_ORIGIN');
   if(!await limitClassAction(env,user.id,'notebooks',6000))return fail('Please wait a moment before trying again.',429,'RATE_LIMITED');
   let input;try{input=await readBody(request);}catch(e){return fail(e.message);}
   if(!input||typeof input!=='object'||Array.isArray(input))return fail('Invalid request.');
   if(input.expectedUserId&&input.expectedUserId!==user.id)return fail('Your signed-in account changed. Reload to open its notebooks.',401,'ACCOUNT_CHANGED');
+  const organized=await handleNotebookOrganization(context,request,kind,id,input);if(organized)return organized;
+  if(parent)return fail('Parent notebooks are read-only.',403,'FORBIDDEN');
   if(kind==='sections'&&parts.length===3&&teacher) {
     if(!ID.test(input.id||'')||!title(input.title))return fail('Enter a section name of up to 120 characters.');
-    await env.DB.prepare('INSERT OR IGNORE INTO notebook_sections SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM notebook_sections WHERE class_id=? AND learner_id=?)<50').bind(...scope,input.id,title(input.title),Date.now(),...scope).run();if(!(await sections()).some(s=>s.id===input.id))return fail('This notebook has reached its 50-section limit.',413,'NOTEBOOK_LIMIT');return json({sections:await sections()},201);
+    if(input.parentId){try{const group=context.sectionUnlocked(input.parentId);if(!group.group||group.depth>=2)return fail('Choose a section group with fewer than three levels.');}catch(e){return fail(e.message,e.status||400,e.code);}}
+    await prepare('INSERT OR IGNORE INTO notebook_sections SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM notebook_sections WHERE class_id=? AND learner_id=?)<50').bind(...scope,input.id,title(input.title),Date.now(),...scope).run();if(!(await sections()).some(s=>s.id===input.id))return fail('This notebook has reached its 50-section limit.',413,'NOTEBOOK_LIMIT');if(input.group||input.parentId){if(input.parentId&&!context.sections.some(row=>row.id===input.parentId&&row.group))return fail('Choose a section group.');await context.setMeta('section',input.id,{group:input.group===true,parentId:input.parentId||null});}return json({sections:await sections()},201);
   }
   if(kind==='pages'&&parts.length===3&&teacher) {
     if(!ID.test(input.id||'')||!title(input.title)||(input.kind&&input.kind!=='note'))return fail('Enter a page name of up to 120 characters.');
     if(!(await sections()).some(s=>s.id===input.sectionId))return fail('Section not found.',404,'NOT_FOUND');
-    await env.DB.prepare(`INSERT OR IGNORE INTO notebook_pages SELECT ?,?,?,?,?,'note',?,?,1,? WHERE (SELECT COUNT(*) FROM notebook_pages WHERE class_id=? AND learner_id=?)<500`).bind(...scope,input.id,input.sectionId,title(input.title),JSON.stringify(emptyDocument()),seedState(emptyDocument()),Date.now(),...scope).run();if(!await env.DB.prepare('SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,input.id).first())return fail('This notebook has reached its 500-page limit.',413,'NOTEBOOK_LIMIT');return json({id:input.id},201);
+    let initial;try{if(context.sectionUnlocked(input.sectionId).group)return fail('Choose a section, rather than a section group.');initial=await notebookTemplate(context,input.id,input.sectionId);}catch(e){return fail(e.message,e.status||400,e.code);}
+    const auto=context.sections.find(s=>s.id===input.sectionId);if(auto?.automatic&&!context.metadata.section[auto.id])await context.setMeta('section',auto.id,{automatic:true,archivedTitle:auto.title});
+    const state=seedState(initial);await prepare(`INSERT OR IGNORE INTO notebook_pages SELECT ?,?,?,?,?,'note',?,?,1,? WHERE (SELECT COUNT(*) FROM notebook_pages WHERE class_id=? AND learner_id=?)<500 AND (SELECT COALESCE(SUM(length(y_state)),0) FROM notebook_pages WHERE class_id=? AND learner_id=?)+?<=4000000`).bind(...scope,input.id,input.sectionId,title(input.title),JSON.stringify(initial),state,Date.now(),...scope,...scope,state.length).run();if(!await prepare('SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,input.id).first())return fail('This notebook has reached its page or storage limit.',413,'NOTEBOOK_LIMIT');if(!context.metadata.page[input.id])await context.setMeta('page',input.id,{position:Date.now()});return json({id:input.id},201);
   }
   if(kind==='pages'&&parts.length===4&&ID.test(id||'')) {
-    const current=await env.DB.prepare('SELECT * FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first();
+    const current=await prepare('SELECT * FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first();
     if(input.action==='rename'){
       if(!teacher)return fail('Only teachers can rename pages.',403,'FORBIDDEN');
       if(!current||current.kind!=='note')return fail('Page not found.',404,'NOT_FOUND');
       if(!title(input.title)||typeof input.expectedTitle!=='string')return fail('Enter a page name of up to 120 characters.');
-      const changed=await env.DB.prepare('UPDATE notebook_pages SET title=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=? AND title=?').bind(title(input.title),Date.now(),...scope,id,input.expectedTitle).run();
+      if(context.pages.find(page=>page.id===id)?.title!==input.expectedTitle)return fail('This page title changed. Reload before renaming it.',409,'CONFLICT');
+      const changed=await prepare('UPDATE notebook_pages SET title=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=? AND title=?').bind(title(input.title),Date.now(),...scope,id,current.title).run();
       if(!changed.meta.changes)return fail('This page title changed. Reload before renaming it.',409,'CONFLICT');
-      return json({title:title(input.title)});
+      if(context.metadata.page[id]?.title)await context.setMeta('page',id,{title:title(input.title)});return json({title:title(input.title)});
     }
     if(input.action==='move'&&teacher) {
-      if(!(await sections()).some(s=>s.id===input.sectionId))return fail('Section not found.',404,'NOT_FOUND');
-      if(current)await env.DB.prepare('UPDATE notebook_pages SET section_id=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=?').bind(input.sectionId,Date.now(),...scope,id).run();
+      try{if(context.sectionUnlocked(input.sectionId).group)return fail('Choose a section, rather than a section group.');}catch(e){return fail(e.message,e.status||400,e.code);}
+      if(current)await prepare('UPDATE notebook_pages SET section_id=?,updated_at=? WHERE class_id=? AND learner_id=? AND id=?').bind(input.sectionId,Date.now(),...scope,id).run();
       else {
-        if((await env.DB.prepare('SELECT COUNT(*) AS count FROM notebook_pages WHERE class_id=? AND learner_id=?').bind(...scope).first()).count>=500)return fail('This notebook has reached its page limit.',413,'NOTEBOOK_LIMIT');
-        const w=await env.DB.prepare('SELECT title FROM worksheets WHERE class_id=? AND id=?').bind(classId,id).first();if(!w)return fail('Page not found.',404,'NOT_FOUND');
-        await env.DB.prepare(`INSERT INTO notebook_pages VALUES(?,?,?,?,?,'worksheet',NULL,NULL,1,?) ON CONFLICT(class_id,learner_id,id) DO UPDATE SET section_id=excluded.section_id,updated_at=excluded.updated_at`).bind(...scope,id,input.sectionId,w.title,Date.now()).run();
+        if((await prepare('SELECT COUNT(*) AS count FROM notebook_pages WHERE class_id=? AND learner_id=?').bind(...scope).first()).count>=500)return fail('This notebook has reached its page limit.',413,'NOTEBOOK_LIMIT');
+        const w=await prepare('SELECT title FROM worksheets WHERE class_id=? AND id=?').bind(classId,id).first();if(!w)return fail('Page not found.',404,'NOT_FOUND');
+        await prepare(`INSERT INTO notebook_pages VALUES(?,?,?,?,?,'worksheet',NULL,NULL,1,?) ON CONFLICT(class_id,learner_id,id) DO UPDATE SET section_id=excluded.section_id,updated_at=excluded.updated_at`).bind(...scope,id,input.sectionId,w.title,Date.now()).run();
       }
       return json({ok:true});
     }
     if(!current||current.kind!=='note')return fail('Page not found.',404,'NOT_FOUND');
     for(let attempt=0;attempt<4;attempt++) {
-      const latest=attempt?await env.DB.prepare('SELECT * FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first():current;
+      const latest=attempt?await prepare('SELECT * FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...scope,id).first():current;
       let merged;try{merged=mergeState(latest.y_state,input.update);}catch(e){return fail(e.message);}
-      const usage=await env.DB.prepare('SELECT COALESCE(SUM(length(y_state)),0) AS bytes FROM notebook_pages WHERE class_id=? AND learner_id=?').bind(...scope).first();if(usage.bytes-(latest.y_state?.byteLength||0)+merged.state.length>4000000)return fail('This notebook is full. Download your draft and start a new notebook.',413,'NOTEBOOK_LIMIT');
-      const updatedAt=Date.now();const changed=await env.DB.prepare('UPDATE notebook_pages SET document_json=?,y_state=?,version=version+1,updated_at=? WHERE class_id=? AND learner_id=? AND id=? AND version=? AND (SELECT COALESCE(SUM(length(y_state)),0) FROM notebook_pages WHERE class_id=? AND learner_id=?)-COALESCE(length(y_state),0)+?<=4000000').bind(JSON.stringify(merged.document),merged.state,updatedAt,...scope,id,latest.version,...scope,merged.state.length).run();
-      if(changed.meta.changes)return json({version:latest.version+1,updatedAt,syncState:encodeState(merged.state)});
+      const usage=await prepare('SELECT COALESCE(SUM(length(y_state)),0) AS bytes FROM notebook_pages WHERE class_id=? AND learner_id=?').bind(...scope).first();if(usage.bytes-(latest.y_state?.byteLength||0)+merged.state.length>4000000)return fail('This notebook is full. Download your draft and start a new notebook.',413,'NOTEBOOK_LIMIT');
+      const updatedAt=Date.now();const changed=await prepare('UPDATE notebook_pages SET document_json=?,y_state=?,version=version+1,updated_at=? WHERE class_id=? AND learner_id=? AND id=? AND version=? AND (SELECT COALESCE(SUM(length(y_state)),0) FROM notebook_pages WHERE class_id=? AND learner_id=?)-COALESCE(length(y_state),0)+?<=4000000').bind(JSON.stringify(merged.document),merged.state,updatedAt,...scope,id,latest.version,...scope,merged.state.length).run();
+      if(changed.meta.changes){await notebookVersion(context,latest);return json({version:latest.version+1,updatedAt,syncState:encodeState(merged.state)});}
     }
     return fail('Another edit is saving. Your changes remain on this device; retrying will merge them.',409,'RETRY');
   }

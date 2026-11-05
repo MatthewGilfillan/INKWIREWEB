@@ -16,8 +16,8 @@ test('demo installation is authenticated, account-scoped and idempotent across n
    const o=await(await f.api('/api/classes/'+c.id+'/overview')).json();assert.equal(o.course.lessons.length,8);assert.equal(o.course.billingMode,'none');assert.ok(o.course.lessons.every(l=>l.date&&!l.rescheduledFrom));
   }
   const {handleNotebooks}=await import('../cloudflare/notebooks.mjs');
-  const notebooks=await(await handleNotebooks(new Request(origin+'/api/notebooks'),f.env,users.t)).json();assert.equal(notebooks.notebooks.filter(n=>classes.some(c=>c.id===n.classId)).length,9);
-  const notebook=notebooks.notebooks.find(n=>n.classId===classes[0].id),path='/api/notebooks/'+notebook.classId+'/'+notebook.learnerId;
+  const notebooks=await(await handleNotebooks(new Request(origin+'/api/notebooks'),f.env,users.t)).json();assert.equal(notebooks.notebooks.filter(n=>!n.teacherBook&&classes.some(c=>c.id===n.classId)).length,9);
+  const notebook=notebooks.notebooks.find(n=>!n.teacherBook&&n.classId===classes[0].id),path='/api/notebooks/'+notebook.classId+'/'+notebook.learnerId;
   const info=await(await handleNotebooks(new Request(origin+path),f.env,users.t)).json();assert.equal(info.pages.length,1);assert.equal(info.pages[0].title,'Reading journal');
   const page=await(await handleNotebooks(new Request(origin+path+'/pages/'+info.pages[0].id),f.env,users.t)).json();assert.ok(page.page.syncState);assert.match(JSON.stringify(page.page.document),/Fictional EDUCADE learner/);
   assert.equal((await handleNotebooks(new Request(origin+path),f.env,users.u)).status,404);

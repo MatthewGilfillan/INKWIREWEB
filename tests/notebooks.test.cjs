@@ -20,7 +20,7 @@ async function fixture(){
 }
 test('master and class notebooks share stable identity; account, family and current class membership limit access',async()=>{
   const f=await fixture();try{
-    const all=await(await f.call('teacher')).json(),filtered=await(await f.call('teacher','?classId='+f.classId)).json();assert.equal(all.notebooks.length,2);assert.deepEqual(filtered.notebooks,all.notebooks);
+    const all=await(await f.call('teacher')).json(),filtered=await(await f.call('teacher','?classId='+f.classId)).json();assert.equal(all.notebooks.length,3);assert.equal(all.notebooks[0].teacherBook,true);assert.deepEqual(filtered.notebooks,all.notebooks);
     assert.equal((await(await f.call('student')).json()).notebooks.length,1);assert.equal((await(await f.call('parent')).json()).notebooks.length,1);assert.equal((await(await f.call('otherParent')).json()).notebooks.length,0);
     for(const who of ['otherTeacher','otherStudent','otherParent'])assert.equal((await f.call(who,f.base)).status,404);
     assert.equal((await f.call('invitedTeacher',f.base)).status,200);

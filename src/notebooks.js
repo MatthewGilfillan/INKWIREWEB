@@ -1,3 +1,6 @@
+import {notebookFileType} from './notebook-file-node.mjs';
+import {officeJob,cleanOfficeJobs} from '../dist/office-jobs.mjs';
+import {mountNotebookMenus} from './notebook-menus.mjs';
 import {mountWorksheet} from './worksheets.js';
 import './notebook-editor.js';
 import * as Y from 'yjs';
@@ -7,25 +10,27 @@ import {inspectPrintout,validatePrintout} from './pdf-printout.mjs';
 import {recoverDraft} from './notebook-recovery.mjs';
 const $=s=>document.querySelector(s),query=new URLSearchParams(location.search);
 const practice=query.get('preview')==='1'&&!['inkwire-education.com','www.inkwire-education.com'].includes(location.hostname);
-let renameTarget;
+let renameTarget,newSectionOptions={},fileBusy=false;
 let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null,worksheetMount=null,worksheetLoading=false;
 const colors=['#9d89be','#67a7a3','#ccaa70','#7c9fc1','#b38ba4'];
 async function request(path,body) {
-  const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(20000)});
+  const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(body?.action==='translate'?120000:60000)});
   const value=await response.json().catch(()=>({}));if(!response.ok)throw Object.assign(Error(value.message||'Could not open this notebook. Please try again.'),{status:response.status});if(library?.userId&&value.userId&&value.userId!==library.userId)throw Object.assign(Error('Your signed-in account changed. Reload to open its notebooks.'),{status:401});return value;
 }
 const path=id=>'/api/notebooks/'+id.split('.').map(encodeURIComponent).join('/');
 let adapter={
   list:()=>request('/api/notebooks'),book:id=>request(path(id)),page:(id,page)=>request(path(id)+'/pages/'+page),
+  organize:(id,input)=>request(path(id)+'/organize',input),versions:(id,page)=>request(path(id)+'/versions/'+page),trash:id=>request(path(id)+'/trash'),
   section:(id,input)=>request(path(id)+'/sections',input),create:(id,input)=>request(path(id)+'/pages',input),
   rename:(id,page,title,expectedTitle)=>request(path(id)+'/pages/'+page,{action:'rename',title,expectedTitle}),
   save:(id,page,update)=>request(path(id)+'/pages/'+page,{update}),move:(id,page,sectionId)=>request(path(id)+'/pages/'+page,{action:'move',sectionId}),
 };
 function problem(error){$('#hub-error').textContent=error?.message||String(error);$('#hub-error').hidden=false;}
 function clearProblem(){$('#hub-error').hidden=true;}
-function pending(){return worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
+function pending(){return fileBusy||worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
 function mayNavigate(){if(!pending())return true;problem(Error('Your changes are still saving. Keep this page open, or download your draft before leaving.'));return false;}
-function row(value,current,icon,subtitle='',extra='') {return `<button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>`;}
+function row(value,current,icon,subtitle='',extra='') {const menu=(value.sectionId||selection?.sections?.some(s=>s.id===value.id))?`<button type="button" class="folio-row-menu" data-item-menu data-id="${escape(value.id)}" aria-label="Options for ${escape(value.title)}" aria-haspopup="menu" title="More options">⋯</button>`:'';return `<div class="folio-nav-item" style="--item-depth:${value.depth||0}"><button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>${menu}</div>`;}
+
 function updateLinks(){
   const url=new URL(location.href);for(const k of ['notebookId','sectionId','pageId'])url.searchParams.delete(k);
   if(book)url.searchParams.set('notebookId',book.id);if(selection?.sectionId)url.searchParams.set('sectionId',selection.sectionId);if(selection?.pageId)url.searchParams.set('pageId',selection.pageId);
@@ -38,25 +43,25 @@ function renderBooks(){
   const classId=$('#class-filter').value,search=$('#notebook-search').value.trim().toLowerCase();
   const visible=library.notebooks.filter(b=>(!classId||b.classId===classId)&&(!search||(b.learnerName+' '+b.className).toLowerCase().includes(search)));
   $('#notebook-count').textContent=String(visible.length);
-  $('#notebook-list').innerHTML=visible.length?visible.map(b=>row(b,b.id===book?.id,`<span class="book-icon" style="--book-color:${colors[library.notebooks.indexOf(b)%colors.length]}" aria-hidden="true"></span>`,b.className)).join(''):'<p class="nav-empty">No notebooks match this view.</p>';
+  $('#notebook-list').innerHTML=visible.length?visible.map(b=>row(b,b.id===book?.id,b.teacherBook?'<span class="teacher-book-pin" aria-hidden="true">⌖</span>':`<span class="book-icon" style="--book-color:${colors[library.notebooks.indexOf(b)%colors.length]}" aria-hidden="true"></span>`,b.className+(b.teacherBook?' · Private':''))).join(''):'<p class="nav-empty">No notebooks match this view.</p>';
   const scoped=library.classes.find(c=>c.id===classId);$('#hub-title').textContent=scoped?scoped.name+' notebooks':library.role==='teacher'?'Master notebooks':library.role==='parent'?'My child’s notebooks':'My notebooks';
   $('#scope-label').textContent=scoped?'CLASS NOTEBOOKS':library.role==='teacher'?'YOUR TEACHING WORKSPACE':'YOUR LEARNING WORKSPACE';
   $('#scope-description').textContent='';
 }
 function renderLists(){
   renderBooks();$('#selected-book').textContent=book?book.learnerName+' · '+book.className:'Choose a notebook';
-  $('#section-list').innerHTML=(selection?.sections||[]).map((s,i)=>row(s,s.id===selection.sectionId,`<span class="section-icon" style="--book-color:${colors[i%colors.length]}" aria-hidden="true"></span>`)).join('');
+  $('#section-list').innerHTML=(selection?.sections||[]).map((s,i)=>row(s,s.id===selection.sectionId,`<span class="section-icon ${s.group?'section-group-icon':''}" style="--book-color:${s.color||colors[i%colors.length]}" aria-hidden="true">${s.group?'▤':s.locked?'⌑':''}</span>`)).join('');
   const section=selection?.sections.find(s=>s.id===selection.sectionId);$('#selected-section').textContent=section?.title||'Choose a section';$('#page-breadcrumb').textContent=book?book.learnerName+' / '+(section?.title||'Sections'):'A LITTLE SPACE FOR BIG IDEAS';
   const pages=(selection?.pages||[]).filter(p=>p.sectionId===selection.sectionId);
   $('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':'☷'}</span>`,'')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
-  for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';
+  for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';$('#add-page').disabled ||= !!section?.group||!!section?.locked;$('#notebook-deleted-items').hidden=library.role!=='teacher';$('#distribute-page').hidden=library.role!=='teacher'||!selection?.pageId;
   $('#add-printout').hidden=!book||library.role!=='teacher';
   $('#printout-hint').hidden=!book||library.role!=='teacher';
   $('#move-page').innerHTML=(selection?.sections||[]).map(s=>`<option value="${escape(s.id)}">${escape(s.title)}</option>`).join('');$('#move-page').value=selection?.sectionId||'';$('#move-label').hidden=library.role!=='teacher'||(selection?.sections.length||0)<2;updateLinks();
 }
 function closePage(){
   openEpoch++;if(active){clearTimeout(active.timer);active.pdfHandles?.forEach(task=>task.destroy());active.doc.destroy();active=null;}window.InkWireEditor?.destroy();embeddedDirty=false;
-  $('#pdf-attachment').hidden=true;worksheetMount?.destroy();worksheetMount=null;const frame=$('#worksheet-embed');frame.hidden=true;frame.replaceChildren();$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
+  $('#pdf-attachment').hidden=true;worksheetMount?.destroy();worksheetMount=null;const frame=$('#worksheet-embed');frame.hidden=true;frame.replaceChildren();$('#note-editor').hidden=true;$('#note-editor').replaceChildren();$('#note-toolbar').hidden=true;$('#note-toolbar').replaceChildren();$('#page-empty').hidden=false;$('#move-label').hidden=true;$('#download-page').hidden=true;$('#page-status').textContent='';$('#distribute-page').hidden=true;$('#page-title').textContent='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
 }
 async function openBook(id,{initial=false}={}) {
   if(!initial&&!mayNavigate())return;const next=library.notebooks.find(b=>b.id===id);if(!next)return;
@@ -74,7 +79,7 @@ async function flush(c){
 }
 async function openPage(id){
   if(!mayNavigate())return;const page=selection?.pages.find(p=>p.id===id);if(!page)return;closePage();const epoch=openEpoch;selection.pageId=id;renderLists();pane('content');
-  $('#page-title').contentEditable='false';$('#page-title').textContent=page.title;$('#page-breadcrumb').textContent=book.learnerName+' / '+selection.sections.find(s=>s.id===page.sectionId)?.title;$('#page-meta').textContent=book.className+(library.role==='parent'?' · Parent view · read only':' · Shared student notebook');$('#move-label').hidden=library.role!=='teacher'||selection.sections.length<2;$('#move-page').value=page.sectionId;$('#page-empty').hidden=true;
+  $('#page-title').contentEditable='false';$('#page-title').textContent=page.title;$('#page-breadcrumb').textContent=book.learnerName+' / '+selection.sections.find(s=>s.id===page.sectionId)?.title;$('#page-meta').textContent=book.className+(book.teacherBook?' · Private teacher notebook':library.role==='parent'?' · Parent view · read only':' · Shared student notebook');$('#move-label').hidden=library.role!=='teacher'||selection.sections.length<2;$('#move-page').value=page.sectionId;$('#page-empty').hidden=true;
   if(page.kind==='worksheet'&&page.displayMode==='attachment'){
     $('#pdf-attachment').hidden=false;$('#attachment-title').textContent=page.title;$('#page-status').textContent='Downloadable PDF file';const link=$('#download-pdf');link.download=page.title+'.pdf';
     if(practice){link.href='#';link.onclick=async e=>{e.preventDefault();const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter(library.role,{classId:book.classId,learnerId:book.learnerId,liveParent:true});await ws.metadata(page.id);const url=URL.createObjectURL(new Blob([await ws.pdf()],{type:'application/pdf'}));const a=document.createElement('a');a.href=url;a.download=page.title+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
@@ -83,7 +88,7 @@ async function openPage(id){
   if(page.kind==='worksheet'){
     const root=$('#worksheet-embed');root.innerHTML=__WORKSHEET_MARKUP__;root.hidden=false;worksheetLoading=true;$('#page-status').textContent='Opening PDF printout…';
     const params=new URLSearchParams({class:book.classId,learner:book.learnerId,worksheet:page.id,notebook:'1',embed:'1'});if(practice){params.set('preview','1');params.set('role',library.role);}
-    try{worksheetMount=await mountWorksheet(root,{query:params,onDirty:dirty=>{embeddedDirty=dirty;},onPdfDrop:offerPrintout});$('#page-status').textContent='';}catch(error){problem(error);}finally{worksheetLoading=false;}return;
+    try{worksheetMount=await mountWorksheet(root,{query:params,onDirty:dirty=>{embeddedDirty=dirty;},onPdfDrop:offerFiles});$('#page-status').textContent='';}catch(error){problem(error);}finally{worksheetLoading=false;}return;
   }
 
   $('#page-status').textContent='Loading page…';
@@ -101,7 +106,8 @@ async function openPage(id){
       else{const response=await fetch(path(c.bookId)+'/pages/'+c.pageId+'/pdfs/'+assetId,{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error('PDF unavailable.');bytes=new Uint8Array(await response.arrayBuffer());}
       const task=pdfjs.getDocument({data:bytes,isEvalSupported:false,cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/'});c.pdfHandles||=[];c.pdfHandles.push(task);return task.promise;
     })());return pdfTasks.get(assetId);};
-    titleEditing();window.InkWireEditor.mount({loadPdf,element:$('#note-editor'),toolbar:$('#note-toolbar'),label:page.title,ydoc:doc,readOnly:c.readOnly,onChange:()=>{},onRecovery:()=>problem(Error('Some page formatting could not be displayed.'))});saveStatus(c);if(c.dirty)flush(c);
+    const loadAsset=async assetId=>{if(practice){const {previewPdf}=await import('./notebook-pdf-preview.mjs');const file=await previewPdf(c.bookId+':'+c.pageId+':file:'+assetId);if(!file)throw Error('File unavailable.');return file;}const response=await fetch(path(c.bookId)+'/pages/'+c.pageId+'/assets/'+assetId,{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error('File unavailable.');return response.blob();};
+    titleEditing();window.InkWireEditor.mount({loadAsset,loadPdf,onInsertPdf:library.role==='teacher'?()=>offerFiles():null,element:$('#note-editor'),toolbar:$('#note-toolbar'),label:page.title,ydoc:doc,readOnly:c.readOnly,onChange:()=>{},onRecovery:()=>problem(Error('Some page formatting could not be displayed.'))});saveStatus(c);if(c.dirty)flush(c);
   }catch(e){problem(e);$('#page-status').textContent='Could not open page';}
 }
 const titleField=$('#page-title');
@@ -119,7 +125,7 @@ $('#notebook-signout').onclick=async()=>{
 };
 
 $('#notebook-list').onclick=e=>{const b=e.target.closest('[data-id]');if(b)openBook(b.dataset.id);};
-$('#section-list').onclick=e=>{const b=e.target.closest('[data-id]');if(!b||!mayNavigate())return;closePage();selection.sectionId=b.dataset.id;selection.pageId=null;renderLists();pane('pages');const first=selection.pages.find(p=>p.sectionId===selection.sectionId);if(first)openPage(first.id);};
+$('#section-list').onclick=e=>{const b=e.target.closest('[data-id]');if(!b||!mayNavigate())return;const section=selection.sections.find(s=>s.id===b.dataset.id);if(section?.locked){notebookMenus.unlock(section);return;}closePage();selection.sectionId=b.dataset.id;selection.pageId=null;renderLists();pane('pages');const first=selection.pages.find(p=>p.sectionId===selection.sectionId);if(first)openPage(first.id);};
 $('#page-list').onclick=e=>{const b=e.target.closest('[data-id]');if(b&&b.dataset.id!==selection?.pageId)openPage(b.dataset.id);};
 $('#page-list').ondblclick=e=>{const b=e.target.closest('[data-id]'),page=selection?.pages.find(p=>p.id===b?.dataset.id);if(!page||page.kind!=='note'||library.role!=='teacher'||!mayNavigate())return;renameTarget={id:page.id,title:page.title};naming='rename';$('#name-heading').textContent='Rename page';$('#new-name').value=page.title;$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();$('#new-name').select();};
 $('#notebook-search').oninput=renderBooks;
@@ -128,8 +134,8 @@ function syncNavigationButton(){const focused=$('#folio-grid').classList.contain
 $('#toggle-navigation').onclick=()=>{const focused=!($('#folio-grid').classList.contains('focus-page')||document.documentElement.classList.contains('ink-note-focus'));$('#folio-grid').classList.toggle('focus-page',focused);document.documentElement.classList.remove('ink-note-focus');syncNavigationButton();if(focused)pane('content');};
 new MutationObserver(syncNavigationButton).observe(document.documentElement,{attributes:true,attributeFilter:['class']});syncNavigationButton();
 $('#mobile-pane').onchange=e=>pane(e.target.value);
-for(const nav of document.querySelectorAll('.folio-column nav'))nav.addEventListener('keydown',e=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key))return;const buttons=[...nav.querySelectorAll('button')],i=buttons.indexOf(document.activeElement);if(i<0)return;e.preventDefault();buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:Math.max(0,Math.min(buttons.length-1,i+(e.key==='ArrowDown'?1:-1)))]?.focus();});
-for(const [id,kind] of [['add-section','section']])$('#'+id).onclick=()=>{if(!mayNavigate()||!book||library.role!=='teacher')return;naming=kind;$('#name-heading').textContent=kind==='section'?'New section':'New page';$('#new-name').placeholder=kind==='section'?'e.g. Week 3 · Character study':'e.g. Class summary';$('#new-name').value='';$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();};
+for(const nav of document.querySelectorAll('.folio-column nav'))nav.addEventListener('keydown',e=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key))return;const buttons=[...nav.querySelectorAll('.folio-row')],i=buttons.indexOf(document.activeElement);if(i<0)return;e.preventDefault();buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:Math.max(0,Math.min(buttons.length-1,i+(e.key==='ArrowDown'?1:-1)))]?.focus();});
+for(const [id,kind] of [['add-section','section']])$('#'+id).onclick=()=>{if(!mayNavigate()||!book||library.role!=='teacher')return;newSectionOptions={};naming=kind;$('#name-heading').textContent=kind==='section'?'New section':'New page';$('#new-name').placeholder=kind==='section'?'e.g. Week 3 · Character study':'e.g. Class summary';$('#new-name').value='';$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();};
 $('#add-page').onclick=async()=>{
  if(!mayNavigate()||!book||library.role!=='teacher'||!selection?.sectionId)return;
  const button=$('#add-page');button.disabled=true;const id=requestId();
@@ -138,7 +144,7 @@ $('#add-page').onclick=async()=>{
 };
 $('#name-cancel').onclick=()=>$('#name-dialog').close();
 $('#name-form').onsubmit=async e=>{e.preventDefault();const title=$('#new-name').value.trim();if(!title)return;const submit=e.target.querySelector('[type=submit]'),id=requestId();submit.disabled=true;
-  try{if(naming==='rename'){await adapter.rename(book.id,renameTarget.id,title,renameTarget.title);const page=selection.pages.find(p=>p.id===renameTarget.id);if(page)page.title=title;$('#page-title').textContent=title;$('#name-dialog').close();renderLists();return;}if(naming==='section')await adapter.section(book.id,{id,title});else await adapter.create(book.id,{id,title,sectionId:selection.sectionId});const data=await adapter.book(book.id);selection={...data,sectionId:naming==='section'?id:selection.sectionId};$('#name-dialog').close();renderLists();if(naming==='page')await openPage(id);else{closePage();pane('pages');}}
+  try{if(naming==='rename'){await adapter.rename(book.id,renameTarget.id,title,renameTarget.title);const page=selection.pages.find(p=>p.id===renameTarget.id);if(page)page.title=title;$('#page-title').textContent=title;$('#name-dialog').close();renderLists();return;}if(naming==='section')await adapter.section(book.id,{id,title,...newSectionOptions});else await adapter.create(book.id,{id,title,sectionId:selection.sectionId});const data=await adapter.book(book.id);selection={...data,sectionId:naming==='section'?id:selection.sectionId};$('#name-dialog').close();renderLists();if(naming==='page')await openPage(id);else{closePage();pane('pages');}}
   catch(e){$('#name-error').textContent=e.message;}finally{submit.disabled=false;}};
 $('#move-page').onchange=async e=>{const previous=selection.sectionId;if(!mayNavigate()){e.target.value=previous;return;}try{await adapter.move(book.id,selection.pageId,e.target.value);const id=selection.pageId,data=await adapter.book(book.id);selection={...data,sectionId:e.target.value,pageId:id};renderLists();clearProblem();}catch(error){e.target.value=previous;problem(error);}};
 $('#download-page').onclick=()=>{if(!active)return;const bytes=JSON.stringify({notebook:book.learnerName,page:$('#page-title').textContent,savedAt:new Date().toISOString(),syncState:encodeState(Y.encodeStateAsUpdate(active.doc)),text:window.InkWireEditor.getText()},null,2);const u=URL.createObjectURL(new Blob([bytes],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='folio-page-draft.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
@@ -147,7 +153,7 @@ window.addEventListener('beforeunload',e=>{if(pending()){e.preventDefault();e.re
 window.addEventListener('online',()=>{if(active)flush(active);poll();});
 async function poll(){if(refreshing||!book||!selection||document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;
   try{if(c){const {page}=await adapter.page(c.bookId,c.pageId);if(c===active&&page?.syncState){Y.applyUpdate(c.doc,decodeState(page.syncState),'remote');c.version=page.version;window.InkWireEditor?.setEditable(!c.readOnly);saveStatus(c);}}
-    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind,displayMode:p.displayMode}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};if(changed)renderLists();}
+    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind,displayMode:p.displayMode,parentId:p.parentId,position:p.position,depth:p.depth}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};if(changed)renderLists();}
   }catch(e){if(epoch===openEpoch){problem(e);$('#connection').textContent=e.status===401?'Sign-in expired':'Reconnecting…';if([401,403,404].includes(e.status))window.InkWireEditor?.setEditable(false);}}
   finally{refreshing=false;}}
 async function initialize(){
@@ -167,7 +173,7 @@ async function initialize(){
 async function offerPrintout(file,point){
   if(!file){$('#printout-file').click();return;}
   if(printoutImport?.busy)return;
-  if(!book||!selection||library.role!=='teacher'){problem(Error('Choose a student notebook in your teacher view before inserting a PDF.'));return;}
+  if(!book||!selection||library.role!=='teacher'){problem(Error('Choose a notebook in your teacher view before inserting a PDF.'));return;}
   try{validatePrintout(file);}catch(error){problem(error);return;}
   if(worksheetMount){problem(Error('Open a notebook page to insert this PDF alongside text. Existing imported pages remain available.'));return;}
   if(active?.localFailure){problem(Error('Download your draft before inserting a PDF.'));return;}
@@ -184,12 +190,69 @@ async function offerPrintout(file,point){
   }catch(error){problem(error);}
   finally{upload.busy=false;printoutImport=null;$('#add-printout').disabled=false;$('#printout-file').value='';if(active)saveStatus(active);}
 }
-$('#add-printout').onclick=()=>offerPrintout();
-$('#printout-file').onchange=e=>{if(e.target.files[0])offerPrintout(e.target.files[0]);};
+
+function chooseOfficeInsert(file){return new Promise(resolve=>{
+ const dialog=document.createElement('dialog');dialog.className='notebook-action-dialog';const heading=document.createElement('h2');heading.textContent='Insert '+file.name;
+ const description=document.createElement('p');description.textContent='Attach the original file, or show its pages/slides on the notebook canvas so you can write over them.';
+ const detail=document.createElement('p');detail.className='muted';detail.textContent='Printouts are converted on this device. First use downloads a large LibreOffice engine (several hundred MB). Your notebook will reopen automatically when the printout is ready.';
+ const actions=document.createElement('div');actions.className='notebook-dialog-actions';let chosen=false;
+ const finish=value=>{if(chosen)return;chosen=true;dialog.close();dialog.remove();resolve(value);};
+ for(const [label,value]of [['Cancel',null],['Attach file','attachment'],['Insert as printout','printout']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{finish(value);};actions.append(b);}
+ dialog.append(heading,description,detail,actions);dialog.oncancel=e=>{e.preventDefault();finish(null);};document.body.append(dialog);dialog.showModal();actions.children[1].focus();
+});}
+async function queueOfficePrintout(file,point){
+ const current=await ensureFilePage();await flush(current);if(current.dirty>current.saved)throw Error('Wait for your page to finish saving before preparing a printout.');
+ const id=requestId(),returnUrl=new URL(location.href);returnUrl.searchParams.set('printoutJob',id);
+ await cleanOfficeJobs();await officeJob('put',id,{state:'queued',file,fileName:file.name,userId:library.userId||'practice',bookId:book.id,pageId:current.pageId,point,returnUrl:returnUrl.href});
+ fileBusy=false;location.assign('/office-converter.html#'+id);
+}
+async function resumeOfficePrintout(){
+ const id=query.get('printoutJob');if(!id)return;const url=new URL(location.href);url.searchParams.delete('printoutJob');history.replaceState(null,'',url);
+ try{const job=await officeJob('get',id);if(!job)throw Error('This printout request is no longer available. Insert your file again.');if(job.userId!==(library.userId||'practice')||job.bookId!==book?.id||job.pageId!==selection?.pageId)throw Error('Open the original notebook page with the same account to insert this printout.');
+ if(job.state!=='complete'||!job.pdf)throw Error(job.error||'The printout is not ready. Insert the file again.');
+ await offerPrintout(new File([job.pdf],job.fileName.replace(/\.[^.]+$/,'.pdf'),{type:'application/pdf'}),job.point);
+ }catch(e){problem(e);}finally{await officeJob('delete',id);updateLinks();}
+}
+async function ensureFilePage(){
+ if(active)return active;if(worksheetMount)throw Error('Create a notebook page to insert files alongside text. Your existing PDF page is unchanged.');
+ const section=selection?.sections.find(s=>s.id===selection.sectionId);if(!section||section.group||section.locked)throw Error('Choose an unlocked section first.');
+ const id=requestId(),sectionId=section.id;await adapter.create(book.id,{id,title:'Untitled page',sectionId});const data=await adapter.book(book.id);selection={...data,sectionId};fileBusy=false;await openPage(id);fileBusy=true;if(!active)throw Error('The new page could not be opened.');return active;
+}
+async function offerFiles(files,point){
+ if(!files){$('#printout-file').click();return;}if(fileBusy||printoutImport?.busy)return;
+ if(!Array.isArray(files))files=[files];if(!book||library?.role!=='teacher'){problem(Error('Choose a notebook in your teacher view before inserting files.'));return;}
+ if(files.length>20){problem(Error('Insert up to 20 files at a time.'));return;}
+ fileBusy=true;$('#add-printout').disabled=true;
+ try{for(const file of files){
+  if(/\.pdf$/i.test(file.name)||file.type==='application/pdf'){fileBusy=false;await offerPrintout(file,point);fileBusy=true;point=null;continue;}
+  const type=notebookFileType(file);let choice=type.image?'attachment':await chooseOfficeInsert(file);if(!choice)continue;
+  if(choice==='printout'){if(files.length>1)throw Error('Insert Office printouts one at a time. Attachments and photos can be inserted together.');await queueOfficePrintout(file,point);return;}
+  const c=await ensureFilePage(),id=requestId();$('#page-status').textContent='Inserting '+file.name+'…';
+  let dimensions={width:320,height:110};if(type.image){const bitmap=await createImageBitmap(file);const scale=Math.min(1,680/bitmap.width,1200/bitmap.height);dimensions={width:Math.max(80,Math.round(bitmap.width*scale)),height:Math.max(60,Math.round(bitmap.height*scale))};bitmap.close();}
+  if(practice){const {previewPdf}=await import('./notebook-pdf-preview.mjs');await previewPdf(c.bookId+':'+c.pageId+':file:'+id,file);}
+  else{const response=await fetch(path(c.bookId)+'/pages/'+c.pageId+'/assets/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':type.mime,'X-File-Name':encodeURIComponent(file.name),'X-File-Size':String(file.size)},body:file,signal:AbortSignal.timeout(90000)});if(!response.ok){const data=await response.json().catch(()=>({}));throw Error(data.message||'The file could not be inserted. Try again.');}}
+  if(c!==active)throw Error('The page changed. Insert your file again.');window.InkWireEditor.insertFile({assetId:id,fileName:file.name,mime:type.mime,size:file.size,...dimensions,...(point||{})});clearProblem();await flush(c);point=null;
+ }}catch(e){problem(e);}finally{fileBusy=false;$('#add-printout').disabled=false;$('#printout-file').value='';if(active)saveStatus(active);}
+}
+
+$('#add-printout').onclick=()=>offerFiles();
+$('#printout-file').onchange=e=>{if(e.target.files.length)offerFiles([...e.target.files]);};
 let fileDragDepth=0;
 const fileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
 document.addEventListener('dragenter',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth++;if(library?.role==='teacher'&&book)$('#pdf-drop-overlay').hidden=false;});
 document.addEventListener('dragover',e=>{if(fileDrag(e)){e.preventDefault();e.dataTransfer.dropEffect=library?.role==='teacher'?'copy':'none';}});
 document.addEventListener('dragleave',e=>{if(!fileDrag(e))return;if(--fileDragDepth<=0){fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;}});
-document.addEventListener('drop',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;if(e.dataTransfer.files.length!==1){problem(Error('Drop one PDF at a time.'));return;}const root=$('#note-editor .folio-canvas'),r=root?.getBoundingClientRect();const point=r&&e.target.closest('#note-editor')?{x:Math.round(Math.max(0,Math.min(5000,e.clientX-r.left))),y:Math.round(Math.max(0,Math.min(200000,e.clientY-r.top)))}:null;offerPrintout(e.dataTransfer.files[0],point);});
-await initialize();setInterval(poll,2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
+document.addEventListener('drop',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;const root=$('#note-editor .folio-canvas'),r=root?.getBoundingClientRect();const point=r&&e.target.closest('#note-editor')?{x:Math.round(Math.max(0,Math.min(5000,e.clientX-r.left))),y:Math.round(Math.max(0,Math.min(200000,e.clientY-r.top)))}:null;offerFiles([...e.dataTransfer.files],point);});
+async function refreshNotebook(){
+ if(!book)return;const previousSection=selection?.sectionId,previousPage=selection?.pageId,data=await adapter.book(book.id);
+ const page=data.pages.find(p=>p.id===previousPage);if(previousPage&&!page)closePage();
+ selection={...data,sectionId:data.sections.some(s=>s.id===previousSection)?previousSection:data.sections[0]?.id,pageId:page?.id};if(page)selection.sectionId=page.sectionId;renderLists();
+ if(page){$('#page-title').textContent=page.title;}else if(selection.sectionId){$('#page-empty').hidden=false;pane('pages');}
+}
+const notebookMenus=mountNotebookMenus({getState:()=>({library,book,selection}),adapter:()=>adapter,refresh:refreshNotebook,openBook,openPage,mayNavigate,problem,
+ createSection(options={}){if(!mayNavigate())return;newSectionOptions=options;naming='section';$('#name-heading').textContent=options.group?'New section group':'New section';$('#new-name').value='';$('#new-name').placeholder=options.group?'e.g. Reading resources':'e.g. Week 3 · Character study';$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();},
+ createPage(sectionId){if(!mayNavigate())return;selection.sectionId=sectionId;renderLists();$('#add-page').onclick();}
+});
+$('#notebook-deleted-items').onclick=()=>{if(mayNavigate())notebookMenus.trash().catch(problem);};
+$('#distribute-page').onclick=()=>{const page=selection?.pages.find(p=>p.id===selection.pageId);if(page&&mayNavigate())notebookMenus.distribute(page).catch(problem);};
+await initialize();await resumeOfficePrintout();setInterval(poll,2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
