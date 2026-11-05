@@ -8,7 +8,7 @@ const parsers={fontFamily:fontName,fontSize:textSize,color:textColor,backgroundC
 const css={fontFamily:'font-family',fontSize:'font-size',color:'color',backgroundColor:'background-color'};
 export const TextFormat=Mark.create({
  name:'textStyle',
- addAttributes(){return Object.fromEntries(Object.entries(parsers).map(([key,clean])=>[key,{default:null,parseHTML:element=>{try{return clean(element.style[key]);}catch{return null;}},renderHTML:attrs=>{try{const v=clean(attrs[key]);return v?{style:css[key]+': '+v+(key==='fontFamily'?', Arial, sans-serif':'')}:{};}catch{return {};}}}]));},
+ addAttributes(){return Object.fromEntries(Object.entries(parsers).map(([key,clean])=>[key,{default:null,parseHTML:element=>{try{return clean(key==='color'?element.getAttribute('data-text-color')||element.style[key]:element.style[key]);}catch{return null;}},renderHTML:attrs=>{try{const v=clean(attrs[key]);if(!v)return {};const automatic=key==='color'&&!attrs.backgroundColor&&['#243556','#000000'].includes(v);return {style:css[key]+': '+(automatic?'var(--notebook-auto-ink, '+v+')':v)+(key==='fontFamily'?', Arial, sans-serif':'')+(key==='backgroundColor'&&!attrs.color?'; color: #172b49':''),...(key==='color'?{'data-text-color':v}:{})};}catch{return {};}}}]));},
  parseHTML(){return [{tag:'span[style]'}];},
  renderHTML({HTMLAttributes}){return ['span',HTMLAttributes,0];},
 });

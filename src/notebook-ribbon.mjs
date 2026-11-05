@@ -6,5 +6,8 @@ export function mountNotebookRibbon({toolbar,panels,history,onSelect=()=>{}}){
  function select(id){for(const record of records){const selected=record.id===id;record.button.setAttribute('aria-selected',String(selected));record.button.tabIndex=selected?0:-1;record.panel.hidden=!selected;}toolbar.dataset.ribbonTab=id;onSelect(id);}
  for(const record of records)record.button.onclick=()=>select(record.id);
  tabs.onkeydown=event=>{const i=records.findIndex(record=>record.button===event.target);if(i<0||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const index=event.key==='Home'?0:event.key==='End'?records.length-1:(i+(event.key==='ArrowRight'?1:-1)+records.length)%records.length;select(records[index].id);records[index].button.focus();};
- top.append(tabs);if(history)top.append(history);toolbar.replaceChildren(top,strip);select('text');return {select};
+ const fold=doc.createElement('button');fold.type='button';fold.className='notebook-ribbon-fold';fold.setAttribute('aria-expanded','true');
+ function collapse(value){strip.hidden=value;fold.setAttribute('aria-expanded',String(!value));fold.setAttribute('aria-label',value?'Show formatting options':'Hide formatting options');fold.title=value?'Show formatting options':'Hide formatting options';fold.innerHTML='<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="'+(value?'m5 7 5 5 5-5':'m5 12 5-5 5 5')+'"/></svg>';}
+ fold.onmousedown=e=>e.preventDefault();fold.onclick=()=>collapse(!strip.hidden);tabs.addEventListener('click',()=>collapse(false));tabs.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key))collapse(false);});
+ top.append(tabs);if(history)top.append(history);top.append(fold);toolbar.replaceChildren(top,strip);select('text');collapse(false);return {select};
 }

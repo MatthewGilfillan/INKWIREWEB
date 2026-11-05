@@ -1,5 +1,5 @@
 import {escape,requestId} from '../dist/workspace-shared.js';
-export function mountNotebookMenus({getState,adapter,refresh,openBook,openPage,createSection,createPage,problem,mayNavigate}){
+export function mountNotebookMenus({getState,adapter,refresh,openBook,openPage,createSection,createPage,problem,mayNavigate,rename}){
  const doc=document,menu=doc.createElement('div'),dialog=doc.createElement('dialog');menu.className='notebook-context-menu';menu.setAttribute('role','menu');menu.hidden=true;dialog.className='notebook-action-dialog';doc.body.append(menu,dialog);let origin,clipboard=null;
  const get=()=>getState(),api=(book,input)=>{if(typeof adapter().organize!=='function')throw Error('Use a signed-in notebook to organize pages. This practice view supports editing sample notes.');return adapter().organize(book,input);};
  function closeMenu(){menu.hidden=true;menu.replaceChildren();}
@@ -9,7 +9,6 @@ export function mountNotebookMenus({getState,adapter,refresh,openBook,openPage,c
  async function perform(kind,item,action,extra={}){
   if(!mayNavigate())return;const {book}=get();const result=await api(book.id,{action,kind,id:item.id,revision:item.metaRevision,requestId:requestId(),...extra});await refresh();return result;
  }
- function rename(kind,item){modal('Rename '+kind,`<label>Name<input name="title" maxlength="120" value="${escape(item.title)}" required autocomplete="off"></label>`,'Rename',async data=>perform(kind,item,'rename',{title:data.get('title')}));}
  function link(kind,item){const {book}=get(),url=new URL(location.href);url.searchParams.set('notebookId',book.id);url.searchParams.set('sectionId',kind==='section'?item.id:item.sectionId);if(kind==='page')url.searchParams.set('pageId',item.id);else url.searchParams.delete('pageId');return url.href;}
  async function copyLink(kind,item){const url=link(kind,item);try{await navigator.clipboard.writeText(url);}catch{modal('Link to '+kind,`<label>Copy this link<input readonly value="${escape(url)}"></label>`);dialog.querySelector('input').select();}}
  function newWindow(kind,item){const anchor=doc.createElement('a');anchor.href=link(kind,item);anchor.target='_blank';anchor.rel='noopener';anchor.click();}

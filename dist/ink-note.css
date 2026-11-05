@@ -147,3 +147,17 @@ html[data-lms-theme=dark] .note-toolbar.notebook-ribbon{--ribbon-bg:#1b353d;--ri
 /* Put page actions directly above the ribbon; the navigation supplies the title. */
 .folio-app #page-heading{display:flex!important;min-height:40px;padding:4px 12px;flex:none;align-items:center}.folio-app .page-actions{width:100%;flex-wrap:nowrap;gap:8px}.page-view-tools{display:flex;align-items:center;gap:8px;margin-left:auto}.page-view-tools #toggle-navigation{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:11px;padding:6px 9px;min-height:34px}.page-view-tools #toggle-navigation svg{width:16px;height:16px;flex:none}.page-actions #distribute-page{font-size:11px;padding:6px 9px}.folio-app .folio-grid{border-top:0}.folio-app #hub-title.sr-only{margin:0!important}
 @media(max-width:500px){.folio-app #page-heading{padding:4px 8px}.page-view-tools{gap:5px}.page-view-tools #toggle-navigation{font-size:10px;padding:6px}.page-actions #distribute-page{font-size:10px;padding:6px}}
+
+/* Names are edited where they appear, without interrupting the notebook. */
+.folio-app .folio-naming-row{cursor:text;padding-right:7px;overflow:visible}.folio-app .folio-name-input{width:100%;min-width:0;flex:1;font:inherit;font-weight:600;color:var(--folio-ink);background:var(--theme-inset,#fff);border:1px solid var(--theme-accent,#4b9797);border-radius:4px;padding:5px 6px;line-height:1.4;box-sizing:border-box;outline:2px solid transparent}.folio-name-input::selection{background:#b9d9ef;color:#172b49}.folio-name-input[aria-invalid=true]{border-color:#bb5252}.folio-naming-row[aria-busy=true]{opacity:.7}
+.note-toolbar .notebook-ribbon-top .notebook-ribbon-fold,.ws-toolbar .notebook-ribbon-fold{display:grid;place-items:center;align-self:center;min-width:28px;min-height:28px;padding:4px;margin:0 6px 7px 0;background:transparent;border:1px solid transparent;border-radius:5px}.notebook-ribbon-fold svg{width:18px;height:18px}.notebook-ribbon-options[hidden]{display:none!important}
+
+/* Theme changes affect the editable paper's display, never the saved colours. */
+@media screen{
+ .folio-app .note-editor{--notebook-auto-ink:#161b24;background:#fff;color:var(--notebook-auto-ink);color-scheme:light}
+ .folio-app .note-editor :is(.folio-canvas,.inkwire-editor,.ink-caret-editor,.frame-content){color:var(--notebook-auto-ink)}
+ .folio-app .note-editor :is(h1,h2,h3,h4,h5,h6){color:inherit}
+ .folio-app .note-editor .ink-typing-caret{color:var(--notebook-auto-ink)}
+ html[data-lms-theme=dark] .folio-app .note-editor{--notebook-auto-ink:#e9eff8;background:#080f1d;color:var(--notebook-auto-ink);color-scheme:dark}
+ html[data-lms-theme=dark] .folio-app .note-editor :is(.folio-canvas,.inkwire-editor,.ink-caret-editor,.frame-content){color:var(--notebook-auto-ink)}
+}

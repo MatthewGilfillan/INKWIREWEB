@@ -105,7 +105,7 @@
  html[data-lms-theme=dark] .folio-app button:hover:not(:disabled){background:#2b4057}
  html[data-lms-theme=dark] .folio-app button[aria-pressed=true]{background:#28574b;color:#c6f3e3;border-color:#427e6d}
  html[data-lms-theme=dark] .folio-app .folio-row{background:transparent;border-color:transparent}
- html[data-lms-theme=dark] .folio-app .note-editor{background:white;color:#172b49;color-scheme:light}
+ html[data-lms-theme=dark] .folio-app .note-editor{background:#080f1d;color:#e9eff8;color-scheme:dark}
  html[data-lms-theme=dark] .folio-app .pdf-drop-overlay{background:#102638ed;border-color:#69bca9}
  html[data-lms-theme=dark] .folio-app :is(.pdf-drop-overlay span,.printout-picker){background:var(--theme-raised);color:var(--theme-text)}
  html[data-lms-theme=dark] .folio-app :is(#worksheet-embed,.page-scroll){background:var(--theme-bg)}
