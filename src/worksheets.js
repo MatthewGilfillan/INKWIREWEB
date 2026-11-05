@@ -14,7 +14,8 @@ export async function mountWorksheet(root=document,options={}){
 const toolWidgets=[];
 const controller=new AbortController();const listen=(target,type,handler)=>target.addEventListener(type,handler,{signal:controller.signal});
 pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
-const $=selector=>root.querySelector(selector);
+const externalFeedback=options.feedbackHost?root.querySelector('#feedback-tools'):null;
+const $=selector=>root.querySelector(selector)||(externalFeedback?.matches(selector)?externalFeedback:externalFeedback?.querySelector(selector));
 const query=options.query||new URLSearchParams(location.search);
 const demo=query.get('preview')==='1'&&location.hostname!=='inkwire-education.com'&&location.hostname!=='www.inkwire-education.com';
 const classId=query.get('class')||'',requestedLearner=query.get('learner')||'';
@@ -251,7 +252,7 @@ toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),a
 const fontRow=document.createElement('div');fontRow.className='pdf-font-row';const characterRow=document.createElement('div');characterRow.className='pdf-character-row';
 fontRow.append($('#text-font').closest('label'),$('#text-size').closest('label'));
 characterRow.append($('#text-bold'),$('#text-italic'),$('#text-underline'),$('#ink-color').closest('label'),$('#text-highlight').closest('label'),$('#text-highlight-toggle'));
-$('#style-tools').prepend(fontRow,characterRow);$('#print-worksheet').before($('#feedback-tools'));
+$('#style-tools').prepend(fontRow,characterRow);if(embedded&&options.feedbackHost)options.feedbackHost.append($('#feedback-tools'));else $('#print-worksheet').before($('#feedback-tools'));
 $('#text-highlight-toggle').textContent='Apply';$('#text-highlight-toggle').setAttribute('aria-label','Apply text highlight');
 $('#ink-color').addEventListener('clear-text-color',()=>{$('#ink-color').value='#243556';toolWidgets.forEach(w=>w.sync?.());styleSelection('ink-color');});
 $('#text-highlight').addEventListener('clear-text-color',()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','false');styleSelection('text-highlight-toggle');});
@@ -302,6 +303,6 @@ if(embedded){
  const legacy=document.createElement('div');legacy.hidden=true;legacy.append(oldTools);toolbar.append(legacy);toolbar.querySelector('.notebook-ribbon-top').append(zoom);
 }
 await loadLibrary();
-return {locallySaved,async sync(){if(editing)stopText();await flush();if(pending.size||conflicts.size)throw Error('Some worksheet changes could not be saved. Review the worksheet message and retry.');clearTimeout(pollTimer);await poll();},destroy(){resetWorkspace();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
+return {locallySaved,async sync(){if(editing)stopText();await flush();if(pending.size||conflicts.size)throw Error('Some worksheet changes could not be saved. Review the worksheet message and retry.');clearTimeout(pollTimer);await poll();},destroy(){resetWorkspace();externalFeedback?.remove();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
 }
 if(document.body.classList.contains('worksheet-app'))await mountWorksheet();

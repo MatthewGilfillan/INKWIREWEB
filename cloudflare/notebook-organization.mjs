@@ -146,7 +146,7 @@ async function clonePage(source,target,page,pageId,sectionId,{document,title,ver
  }
  const insert=target.prepare(`INSERT OR IGNORE INTO notebook_pages SELECT ?,?,?,?,?,'note',?,?,1,? WHERE (SELECT COUNT(*) FROM notebook_pages WHERE class_id=? AND learner_id=?)<500 AND (SELECT COALESCE(SUM(length(y_state)),0) FROM notebook_pages WHERE class_id=? AND learner_id=?)+?<=4000000`).bind(...target.scope,pageId,sectionId,(title||page.title).slice(0,120),JSON.stringify(clean),state,Date.now(),...target.scope,...target.scope,state.length);
  await insert.run();if(!await target.prepare('SELECT id FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...target.scope,pageId).first())throw error('The destination notebook is full.',413,'NOTEBOOK_LIMIT');
- if(!target.metadata.page[pageId])await target.setMeta('page',pageId,{position:Date.now()});
+ if(!target.metadata.page[pageId])await target.setMeta('page',pageId,{position:Date.now(),createdAt:Date.now()});
  const section=target.sections.find(s=>s.id===sectionId);if(section?.automatic&&!target.metadata.section[sectionId])await target.setMeta('section',sectionId,{automatic:true,archivedTitle:section.title});return {id:pageId,version:original.version};
 }
 export async function notebookTemplate(ctx,pageId,sectionId){

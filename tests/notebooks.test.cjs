@@ -78,11 +78,14 @@ test('a blank page can be named later, and a concurrent rename cannot overwrite 
   await f.call('teacher',f.base+'/sections',{id:section,title:'Lessons'});
   assert.equal((await f.call('teacher',f.base+'/pages',{id,sectionId:section,title:'Untitled page'})).status,201);
   const path=f.base+'/pages/'+id;
+  const created=(await(await f.call('teacher',path)).json()).page.createdAt;
+  assert.ok(created>0);assert.equal((await(await f.call('teacher',f.base)).json()).pages.find(p=>p.id===id).createdAt,created);
   assert.equal((await f.call('parent',path,{action:'rename',title:'Private',expectedTitle:'Untitled page'})).status,403);
   assert.equal((await f.call('student',path,{action:'rename',title:'Private',expectedTitle:'Untitled page'})).status,403);
   assert.equal((await f.call('teacher',path,{action:'rename',title:'Lesson notes',expectedTitle:'Untitled page'})).status,200);
   assert.equal((await f.call('invitedTeacher',path,{action:'rename',title:'Old edit',expectedTitle:'Untitled page'})).status,409);
   assert.equal((await(await f.call('parent',path)).json()).page.title,'Lesson notes');
+  assert.equal((await(await f.call('parent',path)).json()).page.createdAt,created);
  }finally{f.db.close();}
 });
 test('PDF printout assets stay inside the selected notebook page and respect family and teacher permissions',async()=>{

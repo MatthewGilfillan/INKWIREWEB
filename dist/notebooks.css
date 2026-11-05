@@ -11,16 +11,14 @@
 
 .note-toolbar{flex-wrap:wrap}.format-control{display:flex;align-items:center;gap:5px;font-size:10px;color:#65738a}.format-control input{border:1px solid #d5dbe5;border-radius:5px;padding:5px;max-width:140px;color:#344562;background:white}.format-control input[type=number]{width:57px}.format-control input[type=color]{width:30px;height:29px;padding:2px}.inkwire-editor{font-family:Calibri,Arial,sans-serif;font-size:16pt}
 
-.note-editor:has(.folio-canvas){padding:12px 20px;max-width:none;overflow:auto;flex:1;cursor:text}.folio-canvas{position:relative;min-height:1200px;min-width:100%;padding:12px;outline:none}.folio-text-frame{position:absolute;min-width:140px;min-height:60px;border:1px solid transparent;border-radius:4px;background:transparent;padding:10px}.folio-text-frame:hover,.folio-text-frame:focus-within,.folio-text-frame.frame-dragging{border-color:#c5b6dc}.frame-content{height:100%;overflow:auto;outline:none}.frame-content>:first-child{margin-top:0}.frame-handle,.frame-resize{position:absolute;z-index:2;opacity:0;transition:opacity .12s}.frame-handle{top:-23px;left:0;font-size:10px;padding:2px 7px;border:1px solid #bfaed5;border-radius:4px;background:#f1eaf7;color:#4d3e6b;cursor:move;touch-action:none}.frame-resize{right:-5px;bottom:-5px;width:12px;height:12px;padding:0;border:1px solid #8c76a8;background:white;cursor:nwse-resize;touch-action:none}.folio-text-frame:hover .frame-handle,.folio-text-frame:hover .frame-resize,.folio-text-frame:focus-within .frame-handle,.folio-text-frame:focus-within .frame-resize,.frame-dragging .frame-handle,.frame-dragging .frame-resize{opacity:1}.folio-canvas[contenteditable=false] .frame-handle,.folio-canvas[contenteditable=false] .frame-resize{display:none}
+.note-editor:has(.folio-canvas){padding:12px 20px;max-width:none;overflow:auto;flex:1;cursor:text}.folio-canvas{position:relative;min-height:1200px;min-width:100%;padding:12px;outline:none}
 
 #worksheet-embed{flex:1;min-height:520px;overflow:auto;background:#f5f7fb}#worksheet-embed .ws-document-heading .ws-title{display:none}#worksheet-embed .ws-content{height:calc(100dvh - 420px);min-height:400px}#worksheet-embed .ws-library{padding:20px}
 
 /* Ink Note: text lives on the page; selection reveals its controls. */
-.frame-handle{top:-17px;font-size:13px;padding:0 8px;background:#f1f4f6;color:#526a7e;border-color:#d1dae2}.frame-content ::selection{background:#bddde9;color:inherit}.folio-text-frame.frame-dragging .frame-content{cursor:move}.folio-text-frame[contenteditable=false]{border-color:transparent}
 
-.folio-text-frame:hover,.folio-text-frame:focus-within{border-color:transparent}.folio-text-frame.frame-selected,.folio-text-frame.frame-dragging{border-color:#9cbac6}.folio-text-frame.frame-selected .frame-handle,.folio-text-frame.frame-selected .frame-resize{opacity:1}
 /* Outline geometry follows the text; the temporary insertion caret is never saved. */
-.note-editor:has(.folio-canvas){position:relative}.folio-text-frame{min-height:20px;padding:3px;height:auto!important}.frame-content{height:auto;overflow:visible;min-height:1.45em}.frame-content p{margin:0;min-height:1.45em}.frame-content> :last-child{margin-bottom:0}.folio-text-frame .frame-resize{bottom:0;cursor:ew-resize}.folio-canvas>p:only-child:empty{pointer-events:none}
+.note-editor:has(.folio-canvas){position:relative}.frame-content{height:auto;overflow:visible;min-height:1.45em}.frame-content p{margin:0;min-height:1.45em}.frame-content> :last-child{margin-bottom:0}.folio-canvas>p:only-child:empty{pointer-events:none}
 .ink-typing-caret{position:absolute;z-index:5;pointer-events:auto;font:16px/1.45 Calibri,Arial,sans-serif;color:#243556;padding:3px;min-height:1.45em;background:transparent;border:0}.ink-caret-editor{min-height:1.45em;outline:none!important;padding:0!important;margin:0}.ink-caret-editor p{margin:0!important;min-height:1.45em}.ink-caret-editor:focus-visible{outline:none}.ink-typing-caret::selection{background:#bddde9}
 .folio-canvas:focus,.folio-canvas:focus-visible{outline:none!important;box-shadow:none!important}
 
@@ -28,7 +26,7 @@
 
 .folio-canvas .ink-page-caret{padding:3px;min-height:1.45em;z-index:2}.folio-canvas .ink-page-caret:empty{pointer-events:auto}
 
-.ink-paragraph.ink-page-caret{display:block!important}.ink-paragraph-content{margin:0!important}.ink-paragraph:not(.folio-text-frame):not(.ink-page-caret)>button{display:none!important}.ink-paragraph.folio-text-frame:hover>.frame-handle,.ink-paragraph.folio-text-frame:hover>.frame-resize,.ink-paragraph.folio-text-frame:focus-within>.frame-handle,.ink-paragraph.folio-text-frame:focus-within>.frame-resize{opacity:1}
+.ink-paragraph.ink-page-caret{display:block!important;position:absolute;left:var(--caret-x);top:var(--caret-y);width:var(--caret-width);margin:0}.ink-paragraph-content{margin:0!important}.ink-paragraph:not(.folio-text-frame):not(.ink-page-caret)>button{display:none!important}
 
 /* Printouts and ink share the ordinary notebook canvas with text. */
 .ink-printout{position:absolute;z-index:0;background:white;box-shadow:0 1px 5px #1831491a;user-select:none;cursor:default}.ink-printout canvas{display:block;width:100%;height:100%;pointer-events:none}.printout-loading{position:absolute;inset:20px auto auto 20px;font-size:13px;color:#63778a}.printout-controls{position:absolute;left:0;top:0;display:flex;gap:4px;transform:translateY(-100%);padding:4px;background:#f4f7f9;border:1px solid #d8e2e8;border-radius:6px;opacity:0;transition:opacity .12s;z-index:5;white-space:nowrap}.ink-printout:hover .printout-controls,.ink-printout:focus-within .printout-controls{opacity:1}.printout-controls button{font-size:11px;padding:4px 7px;min-height:25px}.printout-controls button[aria-label="Move printout"],.printout-resize{touch-action:none;cursor:move}.printout-resize{cursor:nwse-resize!important}.printout-controls[hidden],.printout-controls button[hidden]{display:none}.folio-text-frame,.ink-page-caret{z-index:2}.ink-stroke{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:3}.ink-stroke polyline{pointer-events:stroke}.folio-canvas[data-tool="text"] .ink-stroke polyline{pointer-events:none}.folio-canvas[data-tool="eraser"] .ink-stroke polyline{cursor:crosshair}.folio-canvas[data-tool="pen"],.folio-canvas[data-tool="highlight"]{cursor:crosshair}.ink-stroke-preview{pointer-events:none!important}.note-editor{position:relative}.note-toolbar>input[type="color"]{width:28px;height:28px;padding:2px;border:1px solid #d8e2e8;border-radius:5px}
@@ -39,3 +37,44 @@
 .ink-printout.printout-background{cursor:inherit}
 
 .folio-canvas[contenteditable="false"] .printout-controls,.folio-canvas[contenteditable="false"]>.ink-printout>.printout-resize{display:none}
+/* Compact outlines reveal their border and full-width grip without shifting text. */
+.folio-canvas{--frame-line:#859da8;--frame-grip:#e7eef1;--frame-grip-ink:#526b77}
+.folio-text-frame{position:absolute;min-width:140px;min-height:20px;height:auto!important;padding:3px;border:1px solid transparent;border-radius:2px;background:transparent;transition:border-color .16s ease,box-shadow .16s ease}
+.folio-text-frame:is(:hover,:focus-within,.frame-dragging,.frame-selected),.folio-canvas:focus-within .folio-text-frame.frame-active{border-color:var(--frame-line)}
+.folio-canvas .frame-handle,.folio-canvas .frame-resize{position:absolute;z-index:4;opacity:0;min-height:0;box-shadow:none;transition:opacity .16s ease,background-color .16s ease;touch-action:none;user-select:none;line-height:12px;border:1px solid var(--frame-line);background:var(--frame-grip);color:var(--frame-grip-ink)}
+.folio-canvas .frame-handle{top:-15px;left:-1px;width:calc(100% + 2px);height:15px;padding:0 22px;font:700 13px/10px Arial,sans-serif;letter-spacing:2px;border-radius:2px 2px 0 0;cursor:grab}
+.folio-canvas .frame-resize{top:-15px;right:-1px;width:23px;height:15px;padding:0;border-radius:0 2px 0 0;border-left:0;cursor:ew-resize}
+.folio-canvas .frame-resize:before{content:'↔';font:12px/12px Arial,sans-serif}
+.folio-text-frame:is(:hover,:focus-within,.frame-dragging,.frame-selected)>:is(.frame-handle,.frame-resize),.folio-canvas:focus-within .frame-active>:is(.frame-handle,.frame-resize){opacity:1}
+.folio-canvas .frame-handle:hover{background:#d6e3e9}.folio-canvas .frame-dragging,.folio-canvas .frame-dragging .frame-handle{cursor:grabbing}.frame-content ::selection{background:#bddde9;color:inherit}
+.folio-canvas[contenteditable=false] :is(.frame-handle,.frame-resize){display:none}.folio-canvas[contenteditable=false] .folio-text-frame{border-color:transparent;box-shadow:none}
+html[data-lms-theme=dark] .folio-canvas{--frame-line:#617584;--frame-grip:#263442;--frame-grip-ink:#b9c9d6}
+html[data-lms-theme=dark] .folio-app .folio-canvas :is(.frame-handle,.frame-resize){background:var(--frame-grip);border-color:var(--frame-line);color:var(--frame-grip-ink)}
+html[data-lms-theme=dark] .folio-app .folio-canvas :is(.frame-handle,.frame-resize):hover{background:#354858}
+@media(prefers-reduced-motion:reduce){.folio-text-frame,.folio-canvas .frame-handle,.folio-canvas .frame-resize{transition:none}}
+@media print{.folio-canvas .folio-text-frame{border-color:transparent}.folio-canvas :is(.frame-handle,.frame-resize){display:none}}
+
+/* A page title belongs to the paper and scrolls with its contents. */
+.notebook-paper-heading{margin:14px 24px 20px;max-width:640px}
+.folio-app .notebook-paper-heading #page-title{display:block;width:100%;padding:3px 0 8px;border:0;border-bottom:1px solid #b9c5cc;border-radius:0;outline:0;background:transparent;color:var(--notebook-auto-ink,#161b24);font:400 30px/1.3 Calibri,Arial,sans-serif;box-shadow:none;transition:border-color .16s}
+.folio-app .notebook-paper-heading #page-title:focus{border-color:#3c8786}.folio-app .notebook-paper-heading #page-title::placeholder{color:#8b96a3;opacity:.75}
+.notebook-page-created{min-height:18px;margin:5px 0 0;font:12px/1.5 Calibri,Arial,sans-serif;color:#71808e}.notebook-page-created:empty{display:none}
+html[data-lms-theme=dark] .notebook-paper-heading #page-title{border-color:#4b5e72}html[data-lms-theme=dark] .notebook-page-created{color:#91a2b6}
+@media(max-width:650px){.notebook-paper-heading{margin-inline:12px}.folio-app .notebook-paper-heading #page-title{font-size:26px}}
+
+/* PDF surfaces always pass writing input to the notebook canvas. */
+.folio-canvas .ink-printout{pointer-events:none}
+.folio-canvas .ink-printout :is(button,.printout-controls,.printout-document-controls){pointer-events:auto}
+.folio-canvas .printout-document-controls{position:absolute;z-index:6;display:flex;align-items:center;gap:5px;white-space:nowrap;padding:6px;background:#f4f7f9;border:1px solid #b9c9d4;border-radius:7px;box-shadow:0 2px 8px #13283c15;font:12px/1.3 Arial,sans-serif}
+.folio-canvas .printout-document-controls button{font-size:11px;padding:5px 8px;min-height:28px}.printout-scale{min-width:35px;text-align:center;color:#526b7b}
+.folio-canvas .printout-size-handle{position:absolute;z-index:5;width:12px;height:12px;min-height:0;padding:0;border:1px solid #2f747c;border-radius:2px;background:#fff;box-shadow:0 0 0 2px #ffffffa6}
+.printout-size-nw{left:-6px;top:-6px;cursor:nwse-resize}.printout-size-ne{right:-6px;top:-6px;cursor:nesw-resize}.printout-size-se{right:-6px;bottom:-6px;cursor:nwse-resize}.printout-size-sw{left:-6px;bottom:-6px;cursor:nesw-resize}.printout-size-n{left:calc(50% - 6px);top:-6px;cursor:ns-resize}.printout-size-s{left:calc(50% - 6px);bottom:-6px;cursor:ns-resize}.printout-size-e{right:-6px;top:calc(50% - 6px);cursor:ew-resize}.printout-size-w{left:-6px;top:calc(50% - 6px);cursor:ew-resize}
+.folio-canvas .ink-printout:not(.printout-background){outline:1px solid #88a9b6}.folio-canvas .ink-printout.printout-dragging{outline:2px solid #419c94}
+.folio-canvas .ink-printout:not(.printout-background) .printout-controls{opacity:1}
+html[data-lms-theme=dark] .printout-document-controls{background:#1b2c40;border-color:#4b657b}html[data-lms-theme=dark] .printout-scale{color:#c1d0dd}
+@media print{.folio-canvas .printout-document-controls,.folio-canvas .printout-controls,.folio-canvas .printout-size-handle{display:none}.folio-canvas .ink-printout{outline:none!important}}
+
+/* Imported worksheets use the notebook's single action row and cloud status. */
+.folio-app .notebook-embed .ws-document-heading{display:none!important}
+.notebook-feedback-host:empty{display:none}.notebook-feedback-host #feedback-tools{display:flex;align-items:center;padding:0;border:0;margin:0}.notebook-feedback-host #feedback-tools[hidden]{display:none}.notebook-feedback-host label{display:flex;gap:6px;align-items:center;white-space:nowrap;font-size:11px;color:#6a7d91}.notebook-feedback-host select{max-width:230px;margin:0;padding:5px 8px;font-size:11px}
+@media(max-width:650px){.notebook-feedback-host label{font-size:0}.notebook-feedback-host select{max-width:160px}}

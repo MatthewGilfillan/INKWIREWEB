@@ -26,25 +26,23 @@ export const TextFrame=Node.create({
   let current=node;
   const dom=document.createElement('div');dom.className='folio-text-frame';dom.dataset.folioTextFrame='';
   const contentDOM=document.createElement('div');contentDOM.className='frame-content';
-  const move=document.createElement('button');move.type='button';move.className='frame-handle';move.textContent='⠿';move.contentEditable='false';move.setAttribute('aria-label','Move text');move.title='Drag to move text';
+  const move=document.createElement('button');move.type='button';move.className='frame-handle';move.textContent='····';move.contentEditable='false';move.setAttribute('aria-label','Move text');move.title='Drag to move text';
   const resize=document.createElement('button');resize.type='button';resize.className='frame-resize';resize.contentEditable='false';resize.setAttribute('aria-label','Resize text');dom.append(move,contentDOM,resize);
   const paint=a=>{Object.assign(dom.style,{left:a.x+'px',top:a.y+'px',width:a.width+'px',height:a.height+'px'});const root=dom.closest('.folio-canvas');if(root)root.style.minHeight=Math.max(1200,parseFloat(root.style.minHeight)||0,a.y+a.height+100)+'px';};paint(current.attrs);
-  const selectAll=()=>{const pos=getPos();if(typeof pos!=='number')return;editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc,pos+2,pos+current.nodeSize-2)));editor.view.focus();};
   const drag=event=>{
    if(!editor.isEditable||event.button!==0)return;
-   const pos=getPos(),s=editor.state.selection,isResize=event.target===resize;
-   const inside=typeof pos==='number'&&s.from>pos&&s.to<pos+current.nodeSize;
+   const isResize=event.target===resize;
    if(event.currentTarget===dom&&event.target.closest('.frame-handle,.frame-resize'))return;
    if(event.currentTarget===dom&&event.target.closest('.frame-content'))return;
-   event.preventDefault();event.stopPropagation();selectAll();
+   event.preventDefault();event.stopPropagation();editor.view.focus();
    const before={...current.attrs},start={x:event.clientX,y:event.clientY},handle=event.currentTarget;let next=before;
    handle.setPointerCapture(event.pointerId);dom.classList.add('frame-dragging');
    const motion=e=>{const dx=e.clientX-start.x,dy=e.clientY-start.y;next=isResize?{...before,width:Math.max(140,Math.min(2000,before.width+dx)),height:Math.max(20,Math.min(6000,before.height+dy))}:{...before,x:Math.max(0,Math.min(5000,before.x+dx)),y:Math.max(0,Math.min(200000,before.y+dy))};paint(next);};
-   const finish=e=>{handle.removeEventListener('pointermove',motion);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',cancel);dom.classList.remove('frame-dragging');const pos=getPos();if(typeof pos==='number'&&!editor.isDestroyed){const live=editor.state.doc.nodeAt(pos);if(live?.type.name==='textFrame'&&JSON.stringify(before)!==JSON.stringify(next))editor.view.dispatch(editor.state.tr.setNodeMarkup(pos,undefined,{...live.attrs,...next}));}if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
+   const finish=e=>{handle.removeEventListener('pointermove',motion);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',cancel);dom.classList.remove('frame-dragging');const pos=getPos();if(typeof pos==='number'&&!editor.isDestroyed){const live=editor.state.doc.nodeAt(pos);if(live?.type.name==='textFrame'&&JSON.stringify(before)!==JSON.stringify(next))editor.view.dispatch(editor.state.tr.setNodeMarkup(pos,undefined,{...live.attrs,...next}).setStoredMarks(editor.state.storedMarks));}if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
    const cancel=e=>{next=before;finish(e);paint(before);};handle.addEventListener('pointermove',motion);handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',cancel);
   };
   let growthTask;
-  const grow=()=>{cancelAnimationFrame(growthTask);growthTask=requestAnimationFrame(()=>{if(editor.isDestroyed||!editor.isEditable)return;const pos=getPos();if(typeof pos!=='number')return;const live=editor.state.doc.nodeAt(pos);if(live?.type.name!=='textFrame')return;const height=Math.min(6000,Math.max(20,contentDOM.scrollHeight+6));if(Math.abs(height-live.attrs.height)>2)editor.view.dispatch(editor.state.tr.setNodeMarkup(pos,undefined,{...live.attrs,height}).setMeta('addToHistory',false));});};
+  const grow=()=>{cancelAnimationFrame(growthTask);growthTask=requestAnimationFrame(()=>{if(editor.isDestroyed||!editor.isEditable)return;const pos=getPos();if(typeof pos!=='number')return;const live=editor.state.doc.nodeAt(pos);if(live?.type.name!=='textFrame')return;const height=Math.min(6000,Math.max(20,contentDOM.scrollHeight+6));if(Math.abs(height-live.attrs.height)>2)editor.view.dispatch(editor.state.tr.setNodeMarkup(pos,undefined,{...live.attrs,height}).setMeta('addToHistory',false).setStoredMarks(editor.state.storedMarks));});};
   const selectionChanged=()=>{const pos=getPos(),s=editor.state.selection;dom.classList.toggle('frame-selected',typeof pos==='number'&&!s.empty&&s.from>pos&&s.to<pos+current.nodeSize);};
   editor.on('selectionUpdate',selectionChanged);
   move.onpointerdown=drag;resize.onpointerdown=drag;dom.onpointerdown=drag;
@@ -79,7 +77,12 @@ export function canvasTyping(){return new Plugin({
  state:{init:()=>null,apply(tr,caret){const supplied=tr.getMeta(canvasCaretKey);if(supplied!==undefined)return supplied;if(!caret)return null;const mapped=tr.mapping.mapResult(caret.pos,-1);return mapped.deleted?null:{...caret,pos:mapped.pos};}},
  props:{
   nodeViews:{paragraph:(node,view,getPos)=>positionedParagraphView(node,view,getPos)},
-  decorations(state){const caret=canvasCaretKey.getState(state);if(!caret)return null;const node=state.doc.nodeAt(caret.pos);if(!node||node.type.name!=='paragraph')return null;return DecorationSet.create(state.doc,[Decoration.node(caret.pos,caret.pos+node.nodeSize,{class:'ink-page-caret',style:`position:absolute;left:${caret.x}px;top:${caret.y}px;width:${caret.width}px;margin:0;`})]);},
+  decorations(state){
+   const decorations=[],caret=canvasCaretKey.getState(state),node=caret&&state.doc.nodeAt(caret.pos);
+   if(node?.type.name==='paragraph')decorations.push(Decoration.node(caret.pos,caret.pos+node.nodeSize,{class:'ink-page-caret',style:`--caret-x:${caret.x}px;--caret-y:${caret.y}px;--caret-width:${caret.width}px;`}));
+   const {$from}=state.selection;for(let depth=$from.depth;depth>0;depth--){const frame=$from.node(depth);if(frame.type.name==='textFrame'||frame.type.name==='paragraph'&&frame.attrs.inkFrame){const pos=$from.before(depth);decorations.push(Decoration.node(pos,pos+frame.nodeSize,{class:'frame-active'}));break;}}
+   return decorations.length?DecorationSet.create(state.doc,decorations):null;
+  },
   handlePaste(view,event,slice){
    const caret=canvasCaretKey.getState(view.state),{$from}=view.state.selection,paragraph=$from.parent;
    if(caret){const content=slice.content.firstChild?.isBlock?slice.content:view.state.schema.nodes.paragraph.create(null,slice.content);const frame=view.state.schema.nodes.textFrame.create(cleanFrame({x:caret.x,y:caret.y,width:caret.width,height:caret.height}),content),node=view.state.doc.nodeAt(caret.pos);let tr=view.state.tr.replaceWith(caret.pos,caret.pos+node.nodeSize,frame).setMeta(canvasCaretKey,null);if(tr.doc.lastChild.type.name!=='paragraph'||tr.doc.lastChild.content.size)tr=tr.insert(tr.doc.content.size,view.state.schema.nodes.paragraph.create());tr.setSelection(TextSelection.near(tr.doc.resolve(caret.pos+frame.nodeSize-2)));view.dispatch(tr);return true;}
@@ -103,16 +106,16 @@ export function canvasTyping(){return new Plugin({
 
 function positionedParagraphView(node,view,getPos){
  let current=node;
- const dom=document.createElement('div'),contentDOM=document.createElement('p');contentDOM.className='ink-paragraph-content';
- const move=document.createElement('button');move.type='button';move.className='frame-handle';move.textContent='⠿';move.contentEditable='false';move.setAttribute('aria-label','Move text');move.title='Drag to move text';
+ const dom=document.createElement('div'),contentDOM=document.createElement('p');dom.className='ink-paragraph';contentDOM.className='ink-paragraph-content';
+ const move=document.createElement('button');move.type='button';move.className='frame-handle';move.textContent='····';move.contentEditable='false';move.setAttribute('aria-label','Move text');move.title='Drag to move text';
  const resize=document.createElement('button');resize.type='button';resize.className='frame-resize';resize.contentEditable='false';resize.setAttribute('aria-label','Resize text');dom.append(move,contentDOM,resize);
- const paint=()=>{const a=current.attrs.inkFrame;dom.className='ink-paragraph'+(a?' folio-text-frame':'');move.hidden=resize.hidden=!a||!view.editable;if(a){dom.dataset.folioTextFrame='';Object.assign(dom.style,{display:'block',position:'absolute',left:a.x+'px',top:a.y+'px',width:a.width+'px',height:'auto'});}else{delete dom.dataset.folioTextFrame;dom.style.cssText='display:contents';}};paint();
+ const paint=()=>{const a=current.attrs.inkFrame;dom.classList.toggle('folio-text-frame',!!a);move.hidden=resize.hidden=!a||!view.editable;if(a){dom.dataset.folioTextFrame='';Object.assign(dom.style,{display:'block',position:'absolute',left:a.x+'px',top:a.y+'px',width:a.width+'px',height:'auto'});}else{delete dom.dataset.folioTextFrame;dom.style.cssText='display:contents';}};paint();
  const drag=event=>{
   if(!view.editable||event.button!==0||!current.attrs.inkFrame)return;event.preventDefault();event.stopPropagation();
-  const pos=getPos();view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc,pos+1,pos+current.nodeSize-1)));view.focus();
+  view.focus();dom.classList.add('frame-dragging');
   const before={...current.attrs.inkFrame},start=[event.clientX,event.clientY],handle=event.currentTarget,isResize=handle===resize;let next=before;handle.setPointerCapture(event.pointerId);
   const motion=e=>{const dx=e.clientX-start[0],dy=e.clientY-start[1];next=isResize?{...before,width:Math.max(140,Math.min(2000,before.width+dx))}:{...before,x:Math.max(0,Math.min(5000,before.x+dx)),y:Math.max(0,Math.min(200000,before.y+dy))};Object.assign(dom.style,{left:next.x+'px',top:next.y+'px',width:next.width+'px'});};
-  const finish=e=>{handle.removeEventListener('pointermove',motion);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',cancel);const at=getPos();if(typeof at==='number'&&!view.isDestroyed){const live=view.state.doc.nodeAt(at);if(live?.type.name==='paragraph'&&JSON.stringify(before)!==JSON.stringify(next))view.dispatch(view.state.tr.setNodeMarkup(at,undefined,{...live.attrs,inkFrame:next}));}if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
+  const finish=e=>{handle.removeEventListener('pointermove',motion);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',cancel);dom.classList.remove('frame-dragging');const at=getPos();if(typeof at==='number'&&!view.isDestroyed){const live=view.state.doc.nodeAt(at);if(live?.type.name==='paragraph'&&JSON.stringify(before)!==JSON.stringify(next))view.dispatch(view.state.tr.setNodeMarkup(at,undefined,{...live.attrs,inkFrame:next}).setStoredMarks(view.state.storedMarks));}if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);};
   const cancel=e=>{next=before;finish(e);paint();};handle.addEventListener('pointermove',motion);handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',cancel);
  };
  move.onpointerdown=resize.onpointerdown=drag;

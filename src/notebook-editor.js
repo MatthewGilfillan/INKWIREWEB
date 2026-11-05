@@ -45,13 +45,13 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const buttons = [],formatControls=[],toolWidgets=[];
   const currentEditor=()=>activeEditor;
-  const showCaret=(attrs={x:24,y:24,width:340,height:30})=>{if(activeEditor?.isEditable)placeCanvasCaret(activeEditor.view,attrs);};
+  const showCaret=(attrs={x:24,y:24,width:180,height:30})=>{if(activeEditor?.isEditable)placeCanvasCaret(activeEditor.view,attrs);};
   const placeCaret=(view,event)=>{
     if(!view.editable||view.dom.dataset.tool&&view.dom.dataset.tool!=='text'||event.button!==0||event.target.closest('.folio-text-frame,button,input,select,textarea'))return false;
     const empty=view.state.doc.childCount===1&&view.state.doc.firstChild.type.name==='paragraph'&&!view.state.doc.firstChild.content.size;
     const paragraph=event.target.closest('.ink-paragraph');const blank=paragraph&&!paragraph.classList.contains('folio-text-frame')&&!paragraph.querySelector('.ink-paragraph-content')?.textContent;
     if(event.target!==view.dom&&!empty&&!blank)return false;
-    event.preventDefault();const r=view.dom.getBoundingClientRect(),width=Math.min(340,Math.max(140,r.width-20));
+    event.preventDefault();const r=view.dom.getBoundingClientRect(),width=Math.min(180,Math.max(140,r.width-20));
     const style=getComputedStyle(view.dom.querySelector('.ink-paragraph-content')||view.dom),fontSize=parseFloat(activeEditor.getAttributes('textStyle').fontSize)||parseFloat(style.fontSize)*.75,lineRatio=parseFloat(style.lineHeight)/parseFloat(style.fontSize)||1.45,lineHeight=fontSize*4/3*lineRatio;
     showCaret({x:Math.max(0,Math.min(r.width-width,event.clientX-r.left)),y:Math.max(0,event.clientY-r.top-lineHeight/2-4),width,height:Math.max(30,lineHeight+6)});return true;
   };
