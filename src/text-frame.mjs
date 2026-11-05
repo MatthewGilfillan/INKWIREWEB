@@ -63,14 +63,16 @@ export const canvasCaretKey=new PluginKey('inkCanvasCaret');
 export function ensureCanvasCaret(view){
  const {doc,schema}=view.state;
  if(doc.lastChild?.type.name==='paragraph'&&!doc.lastChild.content.size)return;
- view.dispatch(view.state.tr.insert(doc.content.size,schema.nodes.paragraph.create()).setMeta('addToHistory',false));
+ view.dispatch(view.state.tr.insert(doc.content.size,schema.nodes.paragraph.create()).setMeta('addToHistory',false).setStoredMarks(view.state.storedMarks));
 }
 export function placeCanvasCaret(view,attrs){
  if(!view.editable)return;
  const {doc}=view.state,node=doc.lastChild;
  if(node?.type.name!=='paragraph'||node.content.size)return;
  const pos=doc.content.size-node.nodeSize;
- view.dispatch(view.state.tr.setMeta(canvasCaretKey,{...cleanFrame(attrs),pos}).setSelection(TextSelection.create(doc,pos+1)));view.focus();
+ // Moving the canvas caret is layout navigation, not a request to reset the typing style.
+ const marks=view.state.storedMarks??view.state.selection.$from.marks();
+ view.dispatch(view.state.tr.setMeta(canvasCaretKey,{...cleanFrame(attrs),pos}).setSelection(TextSelection.create(doc,pos+1)).setStoredMarks(marks));view.focus();
 }
 export function canvasTyping(){return new Plugin({
  key:canvasCaretKey,
@@ -95,7 +97,7 @@ export function canvasTyping(){return new Plugin({
   const {pos,...attrs}=caret;
   let tr=state.tr.setNodeMarkup(pos,undefined,{...node.attrs,inkFrame:attrs}).setMeta(canvasCaretKey,null);
   if(tr.doc.lastChild.type.name!=='paragraph'||tr.doc.lastChild.content.size)tr=tr.insert(tr.doc.content.size,state.schema.nodes.paragraph.create());
-  return tr;
+  return tr.setStoredMarks(state.storedMarks);
  }
 });}
 
