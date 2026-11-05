@@ -21,7 +21,7 @@ const notebookContext=query.get('notebook')==='1',embedded=notebookContext&&quer
 if(embedded)(root===document?document.body:root).classList.add('notebook-embed');
 const pdfOptions={cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/',isEvalSupported:false};
 const hints={select:'Drag the handle to move text. Click text to edit.',text:'Click anywhere to type. Drag the handle to move text. Esc finishes editing.',pen:'Draw with your mouse or stylus. Switch to Text to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
-let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='text',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
+let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='text',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer,saveTask,syncSaveError='';
 let activeText=null,worksheetRibbon=null,worksheetInkPresets=null;
 let pageNodes=[],rendering=new Map(),visible=new Set(),pdfTask,fileToUpload,uploadRequestId,queuedFeedback='',textBefore=null;
 const own=m=>meta&&meta.role!=='parent'&&m?.ownerId===meta.userId&&m.layer===meta.role;
@@ -29,7 +29,7 @@ const editable=()=>!!meta?.learnerId&&meta.role!=='parent'&&!conflicts.has('acce
 const raw=m=>{if(!m)return null;const {id,ownerId,layer,version,deleted,...data}=m;return structuredClone(data);};
 const clone=m=>m?structuredClone(m):null;
 function error(message=''){ $('#workspace-error').textContent=message;$('#workspace-error').hidden=!message; }
-function status(message){$('#save-status').textContent=message;}
+function status(message){$('#save-status').textContent=message;options.onStatus?.(message);}
 function updateStatus(){if(embedded){if(options.onDirty)options.onDirty(!!(pending.size||conflicts.size));else window.parent.postMessage({type:'inkwire:worksheet-status',dirty:!!(pending.size||conflicts.size)},location.origin);}if(conflicts.size)status('Needs review');else if(pending.size)status(navigator.onLine?'Saving…':'Offline · changes in this tab');else status(meta?.role==='parent'?'Read only':'Saved');$('#download-recovery').hidden=!pending.size&&!conflicts.size;$('#publish-parent').disabled=!!pending.size||!!conflicts.size||saving||!meta?.learnerId;}
 async function request(path,options={}) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options,signal:AbortSignal.timeout(options.body instanceof File?90000:20000)});
@@ -66,7 +66,7 @@ async function loadLibrary(){
 }
 $('#library-retry').onclick=loadLibrary;
 $('#worksheet-cards').onclick=event=>{const b=event.target.closest('[data-open-worksheet]');if(b)openWorksheet(b.dataset.openWorksheet,requestedLearner||library.learnerId||library.students?.[0]?.id||'');};
-function resetWorkspace(){stopText();clearTimeout(pollTimer);clearTimeout(saveTimer);observer?.disconnect();openToken++;pdfTask?.destroy().catch(()=>{});pdfTask=null;pdf=null;marks=new Map();versions=new Map();pending=new Map();conflicts=new Map();history=[];redo=[];selected=null;editing=null;gesture=null;revision=-1;pageNodes=[];rendering=new Map();visible=new Set();$('#worksheet-pages').replaceChildren();error();}
+function resetWorkspace(){stopText();clearTimeout(pollTimer);clearTimeout(saveTimer);observer?.disconnect();syncSaveError='';openToken++;pdfTask?.destroy().catch(()=>{});pdfTask=null;pdf=null;marks=new Map();versions=new Map();pending=new Map();conflicts=new Map();history=[];redo=[];selected=null;editing=null;gesture=null;revision=-1;pageNodes=[];rendering=new Map();visible=new Set();$('#worksheet-pages').replaceChildren();error();}
 async function openWorksheet(id,learnerId){
   if(pending.size||conflicts.size){error('Wait for saving to finish, or download your unsaved work before leaving this copy.');return;}
   resetWorkspace();const token=openToken;
@@ -244,21 +244,21 @@ $('#text-highlight').addEventListener('clear-text-color',()=>{$('#text-highlight
 for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).onclick=()=>{$('#'+id).setAttribute('aria-pressed',String($('#'+id).getAttribute('aria-pressed')!=='true'));styleSelection(id);};
 $('#feedback-select').onchange=event=>{queuedFeedback=event.target.value;if(queuedFeedback){setTool('text');$('#tool-hint').textContent='Click on the page to place this feedback. You can edit its wording.';}};
 listen(window,'keydown',event=>{if(!meta||!editable()||event.target.matches('input,textarea,select')||event.target.isContentEditable)return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey?'redo':'undo');}else if(['Delete','Backspace'].includes(event.key)&&selected){event.preventDefault();remove(selected);}});
-async function flush(){
-  if(saving||!meta||!editable()||!pending.size||conflicts.size)return;saving=true;updateStatus();const token=openToken;
+function flush(){
+  if(saving)return saveTask;if(!meta||!editable()||!pending.size||conflicts.size)return;saving=true;updateStatus();const token=openToken;saveTask=(async()=>{
   try{
     while(pending.size&&token===openToken){const [id,item]=pending.entries().next().value;const version=versions.get(id)||0;const result=await adapter.save({id,version,deleted:item.mark.deleted===true,mark:raw(item.mark)});if(token!==openToken)return;versions.set(id,result.mark.version);const current=pending.get(id);if(current?.generation===item.generation){pending.delete(id);marks.set(id,result.mark);}else if(marks.has(id))marks.get(id).version=result.mark.version;}
-    if(!pending.size){error();renderMarks();}
+    if(!pending.size){syncSaveError='';options.onSyncError?.('');error();renderMarks();}
   }catch(problem){
-    if(problem.status===401||problem.status===403||problem.status===404){error('Your access has changed. Download any unsaved work, then sign in again.');conflicts.set('access',true);}
+    syncSaveError=problem.message;options.onSyncError?.(problem.message);if(problem.status===401||problem.status===403||problem.status===404){error('Your access has changed. Download any unsaved work, then sign in again.');conflicts.set('access',true);}
     else if(problem.status===409||problem.status===400||problem.status===413){error(problem.message+' Download unsaved work before reloading.');conflicts.set('save',true);}
     else {error('Connection interrupted. Your unsaved changes are still in this tab; saving will retry.');saveTimer=setTimeout(flush,3000);}
-  }finally{saving=false;updateStatus();}
+  }finally{saving=false;updateStatus();}})();return saveTask;
 }
 async function poll(){
   if(!meta?.learnerId)return;const token=openToken;
-  try{const result=await adapter.state();if(token!==openToken)return;if(!result.unchanged&&(meta.role==='parent'||result.revision>=revision)){if(meta.role==='parent'){marks.clear();versions.clear();}revision=result.revision;for(const m of result.marks){if(pending.has(m.id)||editing===m.id||gesture?.id===m.id)continue;if((versions.get(m.id)||0)>m.version)continue;versions.set(m.id,m.version);marks.set(m.id,m);}if(!gesture)renderMarks();if(result.publishedAt)publishedLabel(result.publishedAt);}updateStatus();}
-  catch(problem){if(token!==openToken)return;if(problem.status===401||problem.status===403||problem.status===404){error('This worksheet is no longer accessible. Download unsaved work before returning to your dashboard.');conflicts.set('access',true);$('#drawing-tools').hidden=true;$('#style-tools').hidden=true;return;}status('Reconnecting…');}
+  try{const result=await adapter.state();if(token!==openToken)return;options.onSyncError?.(syncSaveError);if(!result.unchanged&&(meta.role==='parent'||result.revision>=revision)){if(meta.role==='parent'){marks.clear();versions.clear();}revision=result.revision;for(const m of result.marks){if(pending.has(m.id)||editing===m.id||gesture?.id===m.id)continue;if((versions.get(m.id)||0)>m.version)continue;versions.set(m.id,m.version);marks.set(m.id,m);}if(!gesture)renderMarks();if(result.publishedAt)publishedLabel(result.publishedAt);}updateStatus();}
+  catch(problem){if(token!==openToken)return;options.onSyncError?.(problem.message);if(problem.status===401||problem.status===403||problem.status===404){error('This worksheet is no longer accessible. Download unsaved work before returning to your dashboard.');conflicts.set('access',true);$('#drawing-tools').hidden=true;$('#style-tools').hidden=true;return;}status('Reconnecting…');}
   finally{if(token===openToken&&!conflicts.has('access'))pollTimer=setTimeout(poll,document.hidden?12000:2000);}
 }
 listen(window,'online',()=>{flush();});listen(document,'visibilitychange',()=>{if(!document.hidden&&meta&&!conflicts.has('access')){clearTimeout(pollTimer);poll();}});
@@ -288,6 +288,6 @@ if(embedded){
  const legacy=document.createElement('div');legacy.hidden=true;legacy.append(oldTools);toolbar.append(legacy);toolbar.querySelector('.notebook-ribbon-top').append(zoom);
 }
 await loadLibrary();
-return {destroy(){resetWorkspace();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
+return {async sync(){if(editing)stopText();await flush();if(pending.size||conflicts.size)throw Error('Some worksheet changes could not be saved. Review the worksheet message and retry.');clearTimeout(pollTimer);await poll();},destroy(){resetWorkspace();toolWidgets.forEach(w=>w.destroy());controller.abort();resizeObserver.disconnect();}};
 }
 if(document.body.classList.contains('worksheet-app'))await mountWorksheet();
