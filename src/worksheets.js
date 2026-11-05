@@ -1,10 +1,11 @@
+import {mountInkPresets} from './ink-tools.mjs';
 import {mountNotebookRibbon} from './notebook-ribbon.mjs';
 import {Editor,generateHTML} from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import {TextFormat} from './text-format.mjs';
 import {annotationDocument,annotationPlainText,cleanAnnotationDocument} from './annotation-text.mjs';
 const richExtensions=()=>[TextFormat,StarterKit.configure({link:false,heading:{levels:[2,3]}})];
-import {addColorPalette,addSizePresets,addDeviceFonts} from './text-tools.mjs';
+import {addColorPalette,addSizePresets,addFontPicker} from './text-tools.mjs';
 import {fontName,fontChoices} from './text-format.mjs';
 import * as pdfjs from 'pdfjs-dist';
 import {escape,requestId} from '../dist/workspace-shared.js';
@@ -21,7 +22,7 @@ if(embedded)(root===document?document.body:root).classList.add('notebook-embed')
 const pdfOptions={cMapUrl:'/pdf/cmaps/',cMapPacked:true,standardFontDataUrl:'/pdf/standard_fonts/',wasmUrl:'/pdf/wasm/',isEvalSupported:false};
 const hints={select:'Drag the handle to move text. Click text to edit.',text:'Click anywhere to type. Drag the handle to move text. Esc finishes editing.',pen:'Draw with your mouse or stylus. Switch to Text to scroll on a touch screen.',highlight:'Drag to highlight. The PDF background stays locked.',erase:'Click or drag over your own annotations to erase them.'};
 let library,meta,pdf,marks=new Map(),versions=new Map(),pending=new Map(),conflicts=new Map(),history=[],redo=[],selected=null,tool='text',zoom=1,fit=true,revision=-1,activePage=0,editing=null,gesture=null,printing=false,openToken=0,pollTimer,saveTimer,saving=false,observer;
-let activeText=null,worksheetRibbon=null;
+let activeText=null,worksheetRibbon=null,worksheetInkPresets=null;
 let pageNodes=[],rendering=new Map(),visible=new Set(),pdfTask,fileToUpload,uploadRequestId,queuedFeedback='',textBefore=null;
 const own=m=>meta&&meta.role!=='parent'&&m?.ownerId===meta.userId&&m.layer===meta.role;
 const editable=()=>!!meta?.learnerId&&meta.role!=='parent'&&!conflicts.has('access');
@@ -46,7 +47,7 @@ const realAdapter={
   upload:(file,pages,title,id)=>request('/api/worksheets?'+new URLSearchParams({classId,title}),{method:'POST',headers:{'Content-Type':'application/pdf','X-PDF-Pages':JSON.stringify(pages),'X-Worksheet-Id':id},body:file}),
 };
 let textInkColor='#243556';
-const strokeSettings={pen:{color:'#243556',size:1.42},highlight:{color:'#fff176',size:14.17}};
+const strokeSettings={pen:{color:'#243556',size:1.42},highlight:{color:'#ffe45c',size:14.17}};
 let adapter=realAdapter;
 if(demo){
   const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');adapter=await createPreviewAdapter(query.get('role')||'teacher',notebookContext?{classId,learnerId:requestedLearner,liveParent:true}:{});
@@ -110,13 +111,11 @@ $('#zoom-in').onclick=()=>{zoom=Math.min(2.5,zoom+.15);fit=false;applyZoom();};$
 $('#page-navigation').onclick=event=>{const b=event.target.closest('[data-page]');if(b){activePage=Number(b.dataset.page);pageNodes[activePage].wrap.scrollIntoView({block:'start',behavior:'smooth'});$('#page-navigation .active')?.classList.remove('active');b.classList.add('active');}};
 function setTool(next){if(editing)stopText();if(tool!==next){if(tool==='text')textInkColor=$('#ink-color').value;selected=null;renderMarks();}tool=next;pageNodes.forEach(n=>n.stage.dataset.tool=next);root.querySelectorAll('[data-tool]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.tool===next));});if(strokeSettings[next])$('#ink-color').value=strokeSettings[next].color;else if(next==='text')$('#ink-color').value=textInkColor;toolWidgets.forEach(w=>w.sync?.());renderStrokePresets();$('#tool-hint').textContent=editable()?hints[next]:'PDF background locked · read-only view';}
 function renderStrokePresets(){const drawing=tool==='pen'||tool==='highlight';$('#draw-presets').hidden=!drawing;for(const id of ['text-font','text-size','text-highlight'])$('#'+id).closest('label').hidden=drawing;for(const id of ['text-bold','text-italic','text-underline','text-highlight-toggle'])$('#'+id).hidden=drawing;$('#ink-size').closest('label').hidden=true;if(!drawing)return;
- const colors=tool==='highlight'?[['Yellow','#fff176'],['Pink','#ff6ec7'],['Cyan','#67e8f9'],['Lime','#a3e635']]:[['Black','#243556'],['Blue','#0070c0'],['Green','#008000'],['Red','#ff0000']];
- const widths=tool==='highlight'?[2.5,3.5,5,6.5,8]:[0.25,0.35,0.5,0.7,1];
- $('#draw-presets').innerHTML='<span class="stroke-quick-colors" role="group" aria-label="Quick ink colours">'+colors.map(([name,color])=>`<button type="button" data-ink-preset="${color}" aria-label="${name} ink" aria-pressed="${$('#ink-color').value===color}" style="--ink-swatch:${color}"></button>`).join('')+'</span><span class="stroke-widths" role="group" aria-label="Stroke width">'+widths.map(mm=>{const width=Math.round(mm*72/25.4*100)/100;return `<button type="button" data-stroke-width="${width}" aria-label="${mm} millimetre ${tool==='highlight'?'highlighter':'pen'}" aria-pressed="${Math.abs(strokeSettings[tool].size-width)<.02}"><svg width="40" height="18" viewBox="0 0 40 18" aria-hidden="true"><path d="M2 13C10 0 14 20 22 10S30 2 38 5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="${tool==='highlight'?Math.min(9,width/2):Math.max(1,width)}"/></svg><span>${mm} mm</span></button>`;}).join('')+'</span>';
+ worksheetInkPresets?.render(tool,strokeSettings[tool]);
 }
 
 listen($('#style-tools'),'mousedown',event=>{if(event.target.closest('button'))event.preventDefault();});
-listen(document,'pointerdown',event=>{if(activeText&&!activeText.box.contains(event.target)&&!event.composedPath().some(el=>el.matches?.('.ws-toolbar,.worksheet-page')))stopText();});
+listen(document,'pointerdown',event=>{if(activeText&&!activeText.box.contains(event.target)&&!event.composedPath().some(el=>el.matches?.('.ws-toolbar,.worksheet-page,.text-tools-popover')))stopText();});
 $('#drawing-tools').onclick=event=>{const b=event.target.closest('button[data-tool]');if(b)setTool(b.dataset.tool);};
 function select(id){if(editing&&editing!==id)stopText();selected=id;const mark=marks.get(id);if(mark?.kind==='text'){$('#text-font').value=mark.fontFamily||'Calibri';$('#text-size').value=mark.fontSize;$('#ink-color').value=mark.color;$('#text-highlight').value=mark.backgroundColor||'#fff176';for(const [key,control]of [['bold','text-bold'],['italic','text-italic'],['underline','text-underline'],['backgroundColor','text-highlight-toggle']])$('#'+control).setAttribute('aria-pressed',String(!!mark[key]));}toolWidgets.forEach(w=>w.sync?.());renderMarks();$('#delete-mark').disabled=!own(marks.get(id));}
 function makeStroke(mark){const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',mark.points.map(p=>p.join(',')).join(' '));line.setAttribute('fill','none');line.setAttribute('stroke',mark.color);line.setAttribute('stroke-width',mark.size);line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');if(mark.kind==='highlight')line.setAttribute('opacity','.32');line.classList.add('stroke');if(mark.id===selected)line.classList.add('selected-stroke');line.dataset.mark=mark.id||'';return line;}
@@ -232,10 +231,11 @@ function styleSelection(control){
 }
 function textAppearance(){let family='Calibri';try{family=fontName($('#text-font').value)||'Calibri';}catch{}return {fontSize:Math.max(8,Math.min(96,Number($('#text-size').value)||16)),fontFamily:family,bold:$('#text-bold').getAttribute('aria-pressed')==='true',italic:$('#text-italic').getAttribute('aria-pressed')==='true',underline:$('#text-underline').getAttribute('aria-pressed')==='true',backgroundColor:$('#text-highlight-toggle').getAttribute('aria-pressed')==='true'?$('#text-highlight').value:null};}
 for(const id of ['ink-color','text-size','text-font','text-highlight','ink-size'])$('#'+id).onchange=()=>{if(strokeSettings[tool]&&id==='ink-color')strokeSettings[tool].color=$('#ink-color').value;styleSelection(id);if(strokeSettings[tool])renderStrokePresets();};
-const presets=document.createElement('div');presets.id='draw-presets';presets.className='draw-presets';$('#style-tools').append(presets);presets.onclick=event=>{const button=event.target.closest('button');if(!button||!strokeSettings[tool])return;if(button.dataset.inkPreset){$('#ink-color').value=button.dataset.inkPreset;strokeSettings[tool].color=button.dataset.inkPreset;}if(button.dataset.strokeWidth)strokeSettings[tool].size=Number(button.dataset.strokeWidth);toolWidgets.forEach(w=>w.sync?.());styleSelection();renderStrokePresets();};
-toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection('text-highlight');}}),addSizePresets($('#text-size')),addDeviceFonts($('#text-font'),$('#pdf-fonts'),fontChoices));
+const presets=document.createElement('div');presets.id='draw-presets';presets.className='draw-presets ink-presets';$('#style-tools').append(presets);
+worksheetInkPresets=mountInkPresets(presets,{unitsPerInch:72,onColor(value){$('#ink-color').value=value;strokeSettings[tool].color=value;toolWidgets.forEach(w=>w.sync?.());renderStrokePresets();},onWidth(value){strokeSettings[tool].size=value;renderStrokePresets();}});
+toolWidgets.push(addColorPalette($('#ink-color'),{label:'Text and ink color'}),addColorPalette($('#text-highlight'),{label:'Text highlight color',highlight:true,onChoose:()=>{$('#text-highlight-toggle').setAttribute('aria-pressed','true');styleSelection('text-highlight');}}),addSizePresets($('#text-size')),addFontPicker($('#text-font'),$('#pdf-fonts'),fontChoices));
 const fontRow=document.createElement('div');fontRow.className='pdf-font-row';const characterRow=document.createElement('div');characterRow.className='pdf-character-row';
-fontRow.append($('#text-font').closest('label'),$('#text-size').closest('label'),$('#pdf-fonts'));
+fontRow.append($('#text-font').closest('label'),$('#text-size').closest('label'));
 characterRow.append($('#text-bold'),$('#text-italic'),$('#text-underline'),$('#ink-color').closest('label'),$('#text-highlight').closest('label'),$('#text-highlight-toggle'));
 $('#style-tools').prepend(fontRow,characterRow);$('#print-worksheet').before($('#feedback-tools'));
 $('#text-highlight-toggle').textContent='Apply';$('#text-highlight-toggle').setAttribute('aria-label','Apply text highlight');
