@@ -1,4 +1,4 @@
-import {studentPageHTML} from './educade-student-view.js?v=20261103-progress-estimates';
+import {studentPageHTML} from './educade-student-view.js?v=20261107-profile-header';
 import {assessmentDemoClasses,isAssessmentDemo,loadAssessmentDemo} from './assessment-demo.mjs';
 import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261103-progress-estimates';
 import catalogue from './assessment-catalogue.mjs?v=20261103-class-view';
@@ -122,7 +122,7 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     if(button.dataset.studentMode){studentMode=button.dataset.studentMode;renderStudent();}
     if(button.dataset.profileEvidence){selectedSkill=button.dataset.profileEvidence;renderStudent();$('#student-response-evidence')?.focus();}
   });
-  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
+  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();$('[data-switch-learner]')?.focus({preventScroll:true});}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
     if(event.target.matches('[data-assessment-framework]')){framework=event.target.value;renderCatalogue();$('[data-assessment-framework]').focus({preventScroll:true});}});
   root.addEventListener('input',event=>{if(event.target.matches('[data-class-search]')){learnerSearch=event.target.value;refreshRows();}if(event.target.matches('[data-library-search]')){librarySearch=event.target.value;renderStandardsCriteria();}if(event.target.matches('[data-assessment-search]')){search=event.target.value;renderSkills();}});
   for(const type of ['inkwire:quiz-changed','inkwire:feedback-published'])document.addEventListener(type,event=>{if(event.detail?.classId===classId&&!root.hidden)load();});
