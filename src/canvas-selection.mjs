@@ -17,7 +17,7 @@ export function deleteSelectedTextBoxes(view){
 export function mountCanvasSelection(editor,{onBlankClick}){
  const view=editor.view,root=view.dom,doc=root.ownerDocument,overlay=doc.createElement('div'),menu=doc.createElement('div');
  overlay.className='canvas-selection-rectangle';overlay.hidden=true;menu.className='notebook-context-menu canvas-text-menu';menu.hidden=true;menu.setAttribute('role','menu');menu.setAttribute('aria-label','Text box actions');
- const remove=doc.createElement('button');remove.type='button';remove.setAttribute('role','menuitem');menu.append(remove);doc.body.append(overlay,menu);
+ const remove=doc.createElement('button');remove.type='button';remove.setAttribute('role','menuitem');menu.append(remove);(root.closest('main')||doc.body).append(overlay,menu);
  const selected=()=>canvasSelectionKey.getState(view.state)||[],set=positions=>view.dispatch(view.state.tr.setMeta(canvasSelectionKey,positions).setMeta('addToHistory',false));
  const entries=()=>{const result=[];view.state.doc.descendants((node,pos)=>{if(isTextBox(node)){const dom=view.nodeDOM(pos);if(dom?.getBoundingClientRect)result.push({pos,dom});return false;}});return result;};
  const close=()=>{menu.hidden=true;},erase=()=>{close();deleteSelectedTextBoxes(view);};remove.onclick=erase;

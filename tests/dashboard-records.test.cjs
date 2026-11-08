@@ -1,0 +1,22 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+test('dashboard records stay private, validate roster membership, and preserve intervention and award histories',async()=>{
+ const {fixture,users,cid,origin}=require('./helpers/quiz-fixture.cjs'),f=await fixture(),objects=new Map();
+ f.env.WORKSHEETS={async get(key){const value=objects.get(key);return value?{arrayBuffer:async()=>new TextEncoder().encode(value)}:null;},async put(key,value,options){if(options?.onlyIf&&objects.has(key))return null;objects.set(key,value);return {};},async list({prefix}){return {objects:[...objects.keys()].filter(key=>key.startsWith(prefix)).map(key=>({key})),truncated:false};}};
+ const {handleDashboardRecords}=await import('../cloudflare/dashboard-records.mjs');
+ const call=(body,user=users.t,headers={})=>handleDashboardRecords(new Request(origin+'/api/dashboard/records',{method:body?'POST':'GET',headers:{Origin:origin,...headers},...(body?{body:JSON.stringify(body)}:{})}),f.env,user,f.helpers);
+ const input={action:'create',id:'88888888-8888-4888-8888-888888888888',kind:'intervention',classId:cid,learnerId:'a',title:'Evidence paragraphs',notes:'Model a quotation, then review independent writing.',reviewDate:'2026-11-12'};
+ assert.equal((await call(undefined,null)).status,401);assert.equal((await call(undefined,users.sa)).status,403);
+ assert.equal((await call(input,users.u)).status,400);assert.equal((await call({...input,learnerId:'foreign'})).status,404);
+ assert.equal((await call({...input,reviewDate:'2026-13-31'})).status,400);assert.equal((await call({...input,title:' '})).status,400);
+ assert.equal((await call(input,users.t,{Origin:'https://other.invalid'})).status,403);
+ const saved=await(await call(input)).json();assert.equal(saved.record.learnerName,'Alice');assert.equal(saved.record.status,'active');
+ assert.equal((await(await call(input)).json()).record.id,input.id);assert.equal(objects.size,1);
+ assert.deepEqual((await(await call(undefined,users.u)).json()).records,[]);
+ let response=await call({action:'status',id:input.id,status:'resolved'});assert.equal((await response.json()).record.status,'resolved');
+ response=await call({action:'status',id:input.id,status:'active'});assert.equal((await response.json()).record.status,'active');
+ assert.equal((await call({action:'status',id:input.id,status:'resolved'},users.u)).status,404);
+ const award={...input,id:'99999999-9999-4999-8999-999999999999',kind:'award',title:'Resilience'};assert.equal((await(await call(award)).json()).record.status,'awarded');
+ assert.equal((await call({action:'status',id:award.id,status:'resolved'})).status,400);
+ const rows=(await(await call()).json()).records;assert.equal(rows.length,2);assert.equal(rows[0].className,'Fictional literature');
+ f.db.prepare('UPDATE classes SET deleted_at=1 WHERE id=?').run(cid);assert.deepEqual((await(await call()).json()).records,[]);f.db.close();
+});

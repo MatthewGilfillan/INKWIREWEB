@@ -5,7 +5,7 @@ import {createMemberCourse} from './member-course.js?v=20261103-skin';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js?v=20261103-standards';
 import {createTeacherCalendar} from './teacher-calendar.js?v=20261103-scroll-calendar';
-import {createTeacherToday} from './teacher-today.js?v=20261103-local-time';
+import {createTeacherToday} from './teacher-today.js?v=20261108-support';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
 let loading=false,createRequestId='',addRequestId='',classrooms=[],returnFocus,addingClass='',sharing=null;

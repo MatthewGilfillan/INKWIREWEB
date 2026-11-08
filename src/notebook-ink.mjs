@@ -2,7 +2,7 @@ import {canvasPoint,strokeHitsEraser,inkStrokeColor} from './ink-geometry.mjs';
 import {ensureCanvasCaret} from './text-frame.mjs';
 export function mountNotebookInk(editor,element,{getTool,getInk,getEraserSize}){
  const root=editor.view.dom,doc=root.ownerDocument,ns='http://www.w3.org/2000/svg',cursor=doc.createElement('div');
- cursor.className='notebook-eraser-cursor';cursor.hidden=true;doc.body.append(cursor);
+ cursor.className='notebook-eraser-cursor';cursor.hidden=true;(root.closest('main')||doc.body).append(cursor);
  // This sibling overlay and the saved node views now share the canvas origin.
  element.style.position='relative';let gesture;
  const cursorAt=event=>{if(getTool()!=='eraser'||!editor.isEditable||event.target.closest('button')){cursor.hidden=true;return;}const size=getEraserSize();cursor.hidden=false;Object.assign(cursor.style,{left:event.clientX-size/2+'px',top:event.clientY-size/2+'px',width:size+'px',height:size+'px'});};

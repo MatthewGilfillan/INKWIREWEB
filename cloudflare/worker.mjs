@@ -1,3 +1,4 @@
+import {handleDashboardRecords} from './dashboard-records.mjs';
 import {handleClassFiles} from './class-files.mjs';
 import {handleProfile} from './profiles.mjs';
 import {handleAccountPreferences} from './account-preferences.mjs';
@@ -202,6 +203,10 @@ export default {
       if (url.pathname === '/api/teacher/transcript-summary') {
         const session = await auth.api.getSession({headers:request.headers});
         return await handleTranscriptSummary(request,env,session?.user,{json,fail,readJSON});
+      }
+      if (url.pathname === '/api/dashboard/records') {
+        const session=await auth.api.getSession({headers:request.headers});
+        return await handleDashboardRecords(request,env,session?.user,{readJSON});
       }
       if (url.pathname === '/api/notifications') {
         const session=await auth.api.getSession({headers:request.headers});

@@ -1,3 +1,4 @@
+import {createDashboardWidgets} from './dashboard-widgets.js?v=20261108-support';
 import {api,escape} from './workspace-shared.js';
 import {currentDisplayTimeZone,loadDisplayTimeZone,displayTimeZoneLabel} from './display-time-zone.mjs';
 import {nextDashboardLesson,dashboardTime} from './teacher-today-model.mjs';
@@ -8,6 +9,7 @@ import {lessonTiming} from './schedule-model.mjs';
 
 export function createTeacherToday({root,getClasses,openClass,prepareClass,problem}) {
   let generation=0,records=[],timer;
+  const widgets=createDashboardWidgets({getClasses,onChange:()=>{if(!root.hidden)render();}});
   let zone=currentDisplayTimeZone();
   const studentCount=r=>r.count===null?'Student count unavailable':`${r.count} student${r.count===1?'':'s'}`;
   const link=id=>'/notebooks?classId='+encodeURIComponent(id);
@@ -23,10 +25,10 @@ export function createTeacherToday({root,getClasses,openClass,prepareClass,probl
       try{const t=lessonTiming(r.course,lesson);if(!t.date)return [];const startsAt=lessonInstant(t.date,t.startTime,r.course.timeZone),endsAt=startsAt+t.lessonMinutes*60000;return endsAt>now?[{...r,index,title:lesson.title,startsAt,endsAt}]:[];}catch{return [];}
     })).sort((a,b)=>a.startsAt-b.startsAt).slice(0,5);
     const extended=`<div class="today-extended"><section class="today-panel"><div class="today-panel-heading"><h2>Coming up</h2><button class="text-button" type="button" data-today-calendar>View calendar →</button></div>${upcoming.map(r=>`<button type="button" class="upcoming-row" data-today-prepare="${escape(r.classroom.id)}" data-lesson="${r.index}"><span class="upcoming-icon">${courseIcon('calendar')}</span><span><strong>${escape(r.classroom.name)}</strong><small>${escape(r.title)}</small></span><span>${escape(dashboardTime(r,now,zone))}</span><span aria-hidden="true">›</span></button>`).join('') || '<p class="today-panel-empty">New lesson dates will appear here when scheduled.</p>'}</section><section class="today-panel"><h2>Where we are in each unit</h2>${rows.map(r=>`<div class="unit-overview-row"><strong>${escape(r.classroom.name)}</strong>${r.course?unitMeter(r.course,now):'<p class="learning-muted">Course plan not yet available.</p>'}</div>`).join('') || '<p class="today-panel-empty">Your unit timelines will appear here.</p>'}</section></div>`;
-    root.innerHTML=`<div class="today-grid"><div class="today-left"><section class="today-next" aria-label="Next class">${card}</section><section class="today-panel today-class-panel" aria-labelledby="today-classes-heading"><div class="today-panel-heading"><h2 id="today-classes-heading">My classes</h2><button type="button" class="text-button" data-today-join>Join a class</button></div>${classRows||'<p class="today-panel-empty">Your classes will appear here.</p>'}</section></div><div class="today-right"><section class="today-panel today-review" aria-labelledby="today-review-heading"><h2 id="today-review-heading">Review work</h2><p>Choose a class to review student notebooks and assigned work.</p>${rows.map(r=>`<div class="today-review-row"><strong>${escape(r.classroom.name)}</strong><a class="teacher-button secondary" href="${link(r.classroom.id)}" aria-label="Review ${escape(r.classroom.name)} notebooks">Review</a></div>`).join('')||'<p class="today-panel-empty">Add a class and its students to start reviewing work.</p>'}</section><a class="today-master" href="/notebooks"><span class="today-master-icon">${courseIcon('book')}</span><span><strong>Master notebooks</strong><small>Access student notebooks across all your classes.</small></span><span class="today-chevron" aria-hidden="true">›</span></a></div></div>${extended}<p class="today-zone">Lesson times shown in ${escape(displayTimeZoneLabel(zone))}.</p>${rows.some(r=>r.failed)?'<p class="today-data-note" role="status">Some dashboard details could not be loaded. <button type="button" class="text-button" data-today-retry>Try again</button></p>':''}`;
+    root.innerHTML=`<div class="today-grid"><div class="today-left"><section class="today-next" aria-label="Next class">${card}</section><section class="today-panel today-class-panel" aria-labelledby="today-classes-heading"><div class="today-panel-heading"><h2 id="today-classes-heading">My classes</h2><button type="button" class="text-button" data-today-join>Join a class</button></div>${classRows||'<p class="today-panel-empty">Your classes will appear here.</p>'}</section></div><div class="today-right"><section class="today-panel today-review" aria-labelledby="today-review-heading"><h2 id="today-review-heading">Review work</h2><p>Choose a class to review student notebooks and assigned work.</p>${rows.map(r=>`<div class="today-review-row"><strong>${escape(r.classroom.name)}</strong><a class="teacher-button secondary" href="${link(r.classroom.id)}" aria-label="Review ${escape(r.classroom.name)} notebooks">Review</a></div>`).join('')||'<p class="today-panel-empty">Add a class and its students to start reviewing work.</p>'}</section><a class="today-master" href="/notebooks"><span class="today-master-icon">${courseIcon('book')}</span><span><strong>Master notebooks</strong><small>Access student notebooks across all your classes.</small></span><span class="today-chevron" aria-hidden="true">›</span></a></div></div>${widgets.html()}${extended}<p class="today-zone">Lesson times shown in ${escape(displayTimeZoneLabel(zone))}.</p>${rows.some(r=>r.failed)?'<p class="today-data-note" role="status">Some dashboard details could not be loaded. <button type="button" class="text-button" data-today-retry>Try again</button></p>':''}`;
   }
   async function refresh(){
-    const token=++generation,classes=getClasses();
+    const token=++generation,classes=getClasses();widgets.refresh();
     zone=await loadDisplayTimeZone();if(token!==generation)return;
     if(!records.length&&classes.length)root.innerHTML='<p class="today-loading" role="status">Getting your teaching day ready…</p>';
     if(!classes.length){records=[];render();return;}
@@ -39,6 +41,9 @@ export function createTeacherToday({root,getClasses,openClass,prepareClass,probl
   }
   root.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
+    if(button.dataset.newRecord)widgets.open(button.dataset.newRecord,button);
+    if(button.dataset.recordStatus)widgets.status(button.dataset.recordStatus,button.dataset.status,button);
+    if(button.hasAttribute('data-retry-records'))widgets.refresh();
     if(button.dataset.todayPrepare){const index=button.dataset.lesson;prepareClass(button.dataset.todayPrepare,button,index===undefined?undefined:Number(index));}
     if(button.dataset.todayClass)openClass(button.dataset.todayClass,button);
     if(button.hasAttribute('data-today-calendar'))document.querySelector('[data-teacher-view="calendar"]').click();
@@ -47,5 +52,5 @@ export function createTeacherToday({root,getClasses,openClass,prepareClass,probl
     if(button.hasAttribute('data-today-join'))document.querySelector('[data-open="join-class"]').click();
     if(button.hasAttribute('data-today-retry'))refresh();
   });
-  return {refresh,clear(){generation++;clearInterval(timer);records=[];root.replaceChildren();}};
+  return {refresh,clear(){generation++;clearInterval(timer);records=[];widgets.clear();root.replaceChildren();}};
 }
