@@ -161,3 +161,17 @@ html[data-lms-theme=dark] .note-toolbar.notebook-ribbon{--ribbon-bg:#1b353d;--ri
  html[data-lms-theme=dark] .folio-app .note-editor{--notebook-auto-ink:#e9eff8;background:#080f1d;color:var(--notebook-auto-ink);color-scheme:dark}
  html[data-lms-theme=dark] .folio-app .note-editor :is(.folio-canvas,.inkwire-editor,.ink-caret-editor,.frame-content){color:var(--notebook-auto-ink)}
 }
+
+/* Keep stroke samples legible without changing the saved colour choice. */
+html[data-lms-theme=dark] .ink-preset-width[data-dark-ink=true] svg{color:#c5e5ff}
+html[data-lms-theme=dark] :is(.note-toolbar,.ws-toolbar) .ink-preset-color[data-automatic-ink=true]{background:#e9eff8!important}
+.eraser-sizes{display:flex;gap:6px;align-items:center}.note-toolbar .eraser-size{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:70px;min-height:64px;border:1px solid transparent;background:transparent;font-size:11px}
+.eraser-size-square{display:block;border:1.5px solid currentColor;background:var(--theme-panel,#fff);box-shadow:inset 0 0 0 2px var(--ribbon-bg,#e7f2f1)}
+.note-toolbar .eraser-size[aria-pressed=true]{border-color:var(--ribbon-selected,#327c7b);background:var(--theme-panel,#fff);color:var(--ribbon-selected,#327c7b)}
+.notebook-eraser-cursor{position:fixed;pointer-events:none;z-index:200;border:1px solid #fff;outline:1px solid #24465c;background:#c5e5ff1a;box-sizing:border-box}
+.folio-canvas[data-tool=eraser],.folio-canvas[data-tool=eraser] *{cursor:none!important}
+.canvas-selection-rectangle{position:fixed;pointer-events:none;z-index:190;border:1px solid #58aab3;background:#68bcc926}
+.folio-text-frame.frame-object-selected{border-color:#338e9c!important;box-shadow:0 0 0 2px #5cb7c347;background:#7cc5ce15}
+.folio-text-frame.frame-object-selected>:is(.frame-handle,.frame-resize){opacity:1}
+html[data-lms-theme=dark] .folio-text-frame.frame-object-selected{border-color:#9ddce9!important}
+@media print{.notebook-eraser-cursor,.canvas-selection-rectangle,.canvas-text-menu{display:none!important}.folio-text-frame.frame-object-selected{border-color:transparent!important;box-shadow:none;background:none}}

@@ -1,3 +1,4 @@
+import {canvasSelectionPlugin} from './canvas-selection.mjs';
 import {Node} from '@tiptap/core';
 import {Plugin,PluginKey,TextSelection} from '@tiptap/pm/state';
 import {Decoration,DecorationSet} from '@tiptap/pm/view';
@@ -21,7 +22,7 @@ export const TextFrame=Node.create({
  addAttributes(){return Object.fromEntries(Object.entries({x:24,y:24,width:340,height:30}).map(([key,value])=>[key,{default:value,parseHTML:e=>e.hasAttribute('data-'+key)?Number(e.getAttribute('data-'+key)):value}]));},
  parseHTML(){return [{tag:'div[data-folio-text-frame]',contentElement:'.frame-content'}];},
  renderHTML({node}){const a=cleanFrame(node.attrs);return ['div',{'data-folio-text-frame':'','data-x':a.x,'data-y':a.y,'data-width':a.width,'data-height':a.height,class:'folio-text-frame',style:`position:absolute;left:${a.x}px;top:${a.y}px;width:${a.width}px;height:${a.height}px`},['div',{class:'frame-content'},0]];},
- addProseMirrorPlugins(){return [textFrameCleanup(()=>this.editor.isEditable,this.options.onEmpty),...(this.options.canvas?[canvasTyping()]:[])];},
+ addProseMirrorPlugins(){return [textFrameCleanup(()=>this.editor.isEditable,this.options.onEmpty),...(this.options.canvas?[canvasTyping(),canvasSelectionPlugin()]:[])];},
  addNodeView(){return ({node,editor,getPos})=>{
   let current=node;
   const dom=document.createElement('div');dom.className='folio-text-frame';dom.dataset.folioTextFrame='';

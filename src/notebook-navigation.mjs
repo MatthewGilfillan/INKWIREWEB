@@ -24,3 +24,8 @@ export function mountNotebookNavigation({grid,onToggle,onSearch,onRecent}){
   setExpanded(expanded){rail.setAttribute('aria-pressed',String(expanded));rail.setAttribute('aria-label',expanded?'Restore notebook view':'Expand page view');rail.title=expanded?'Restore notebook view':'Expand page view';}
  };
 }
+
+// A teacher's unscoped hub opens the chooser; deep links still open their target.
+export function initialNotebook(notebooks,{role,notebookId,classId}){
+ return notebooks.find(book=>book.id===notebookId)||((role!=='teacher'||classId)?notebooks[0]:null);
+}

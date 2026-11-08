@@ -1,6 +1,6 @@
 import {pageTitleSession,formatPageCreatedAt} from './notebook-page-title.mjs';
 import {mountCloudSync} from './notebook-cloud.mjs';
-import {mountNotebookNavigation} from './notebook-navigation.mjs';
+import {mountNotebookNavigation,initialNotebook} from './notebook-navigation.mjs';
 import {notebookFileType} from './notebook-file-node.mjs';
 import {officeJob,cleanOfficeJobs} from '../dist/office-jobs.mjs';
 import {mountNotebookMenus} from './notebook-menus.mjs';
@@ -244,7 +244,7 @@ async function initialize(){
     $('#notebook-join').textContent=teacher?'Join with an invite code':library.role==='parent'?'Connect to my child':'Join a class';
     $('#notebook-signout').disabled=practice;
     $('#class-filter').innerHTML='<option value="">All classes</option>'+library.classes.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');$('#class-filter').value=library.classes.some(c=>c.id===query.get('classId'))?query.get('classId'):'';
-    renderLists();const visible=library.notebooks.filter(b=>!$('#class-filter').value||b.classId===$('#class-filter').value),first=visible.find(b=>b.id===query.get('notebookId'))||visible[0];if(first)await openBook(first.id,{initial:true});else{$('#connection').textContent='No notebooks yet';$('#page-meta').textContent='Add students to a class to see their notebooks here.';}
+    renderLists();const visible=library.notebooks.filter(b=>!$('#class-filter').value||b.classId===$('#class-filter').value),first=initialNotebook(visible,{role:library.role,notebookId:query.get('notebookId'),classId:$('#class-filter').value});if(first)await openBook(first.id,{initial:true});else{pane('notebooks');$('#connection').textContent=visible.length?(practice?'Saved on this device':'Connected'):'No notebooks yet';$('#page-meta').textContent=visible.length?'Choose a notebook to open its sections and pages.':'Add students to a class to see their notebooks here.';}
   }catch(e){problem(e);$('#connection').textContent='Could not load notebooks';if(e.status===401){const a=document.createElement('a');a.href='/account';a.textContent='Sign in to your website account →';$('#page-empty').append(a);}}}
 async function offerPrintout(file,point){
   if(!file){$('#printout-file').click();return;}

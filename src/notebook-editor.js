@@ -1,3 +1,6 @@
+import {canvasSelectionKey,mountCanvasSelection} from './canvas-selection.mjs';
+import {eraserSizes} from './ink-geometry.mjs';
+import {mountNotebookInk} from './notebook-ink.mjs';
 import {mountInkPresets} from './ink-tools.mjs';
 import {NotebookFile,cleanNotebookFile} from './notebook-file-node.mjs';
 import {mountNotebookRibbon} from './notebook-ribbon.mjs';
@@ -133,26 +136,24 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   history.append(more);
   let ribbonDrawing=null;
   if(ydoc&&!readOnly){
-    const editor=activeEditor,root=editor.view.dom,ns='http://www.w3.org/2000/svg';let tool='text',color='#18395d';
+    const editor=activeEditor,root=editor.view.dom;let tool='text',color='#18395d',eraserSize=24;
     const drawing=window.document.createElement('div');drawing.className='note-drawing-group';drawing.setAttribute('role','group');drawing.setAttribute('aria-label','Writing and drawing tools');toolbar.append(drawing);
     const options=window.document.createElement('div');options.className='note-ink-options';
     const inkLabel=window.document.createElement('label');inkLabel.textContent='Colour';const ink=window.document.createElement('input');ink.type='color';ink.value=color;ink.setAttribute('aria-label','Ink colour');inkLabel.append(ink);options.append(inkLabel);
     const presetHost=window.document.createElement('div');presetHost.className='ink-presets';options.prepend(presetHost);
     const memories={pen:{color:'#243556',size:1.89},highlight:{color:'#ffe45c',size:15.12}};
     const palette=addColorPalette(ink,{label:'Ink colour',ink:true});toolWidgets.push(palette);const presets=mountInkPresets(presetHost,{onColor(value){ink.value=color=value;memories[tool].color=value;palette.sync?.();presets.render(tool,memories[tool]);},onWidth(value){memories[tool].size=value;presets.render(tool,memories[tool]);}});presetHost.insertBefore(inkLabel,presets.widths);inkLabel.firstChild.textContent='';ink.onchange=()=>{if(memories[tool])memories[tool].color=ink.value;color=ink.value;presets.render(tool,memories[tool]);};
-    const eraseOptions=window.document.createElement('div');eraseOptions.className='note-eraser-options';eraseOptions.textContent='Click an ink stroke to erase it.';
+    const eraseOptions=window.document.createElement('div');eraseOptions.className='note-eraser-options';eraseOptions.textContent='Drag over ink to erase strokes.';
+    const sizes=window.document.createElement('div');sizes.className='eraser-sizes';sizes.setAttribute('role','group');sizes.setAttribute('aria-label','Eraser sizes');
+    for(const {name,size}of eraserSizes){const button=window.document.createElement('button');button.type='button';button.className='eraser-size';button.setAttribute('aria-label',name+' eraser');button.setAttribute('aria-pressed',String(size===eraserSize));const square=window.document.createElement('span');square.className='eraser-size-square';square.style.width=square.style.height=size*.6+'px';square.setAttribute('aria-hidden','true');button.append(square,window.document.createTextNode(name));button.onmousedown=e=>e.preventDefault();button.onclick=()=>{eraserSize=size;for(const b of sizes.children)b.setAttribute('aria-pressed',String(b===button));};sizes.append(button);}eraseOptions.append(sizes);
     const eraseAll=window.document.createElement('button');eraseAll.type='button';eraseAll.textContent='Erase all ink';eraseAll.onclick=()=>{const positions=[];editor.state.doc.descendants((node,pos)=>{if(node.type.name==='inkStroke')positions.push([pos,node.nodeSize]);});let tr=editor.state.tr;for(const [pos,size]of positions.reverse())tr=tr.delete(pos,pos+size);if(positions.length)editor.view.dispatch(tr);};eraseOptions.append(eraseAll);
     const penPanel=window.document.createElement('div'),highlightPanel=window.document.createElement('div');
-    ribbonDrawing={penPanel,highlightPanel,eraseOptions,select(value){tool=['pen','highlight','eraser'].includes(value)?value:'text';root.dataset.tool=tool;editor.storage.inkStroke.tool=tool;
+    ribbonDrawing={penPanel,highlightPanel,eraseOptions,select(value){tool=['pen','highlight','eraser'].includes(value)?value:'text';root.dataset.tool=tool;editor.storage.inkStroke.tool=tool;inkInteraction.hideCursor();if((canvasSelectionKey.getState(editor.state)||[]).length)editor.view.dispatch(editor.state.tr.setMeta(canvasSelectionKey,[]));
       if(memories[tool]){presets.render(tool,memories[tool]);ink.value=color=memories[tool].color;(tool==='pen'?penPanel:highlightPanel).append(options);palette.sync?.();}
       if(tool!=='text')root.blur();}};
-    const draw=event=>{if(!editor.isEditable||!['pen','highlight'].includes(tool)||event.button!==0||event.target.closest('button'))return;event.preventDefault();event.stopPropagation();
-      const bounds=root.getBoundingClientRect(),point=e=>[Math.round(Math.max(0,Math.min(10000,e.clientX-bounds.left))*10)/10,Math.round(Math.max(0,Math.min(200000,e.clientY-bounds.top))*10)/10],points=[point(event)],svg=window.document.createElementNS(ns,'svg'),line=window.document.createElementNS(ns,'polyline'),size=memories[tool].size,highlight=tool==='highlight',strokeColor=color;
-      svg.classList.add('ink-stroke','ink-stroke-preview');svg.append(line);line.setAttribute('stroke',strokeColor);line.setAttribute('stroke-width',size);line.setAttribute('fill','none');line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');line.setAttribute('opacity',highlight?'.32':'1');element.append(svg);const r=element.getBoundingClientRect();Object.assign(svg.style,{left:bounds.left-r.left+element.scrollLeft+'px',top:bounds.top-r.top+element.scrollTop+'px'});root.setPointerCapture(event.pointerId);
-      const motion=e=>{if(points.length<1500)points.push(point(e));line.setAttribute('points',points.map(p=>p.join(',')).join(' '));};
-      const finish=e=>{root.removeEventListener('pointermove',motion,true);root.removeEventListener('pointerup',finish,true);root.removeEventListener('pointercancel',cancel,true);svg.remove();if(root.hasPointerCapture(e.pointerId))root.releasePointerCapture(e.pointerId);if(points.length===1)points.push([points[0][0]+.1,points[0][1]]);if(!editor.isDestroyed)editor.view.dispatch(editor.state.tr.insert(editor.state.doc.content.size,editor.schema.nodes.inkStroke.create({points,color:strokeColor,size,highlight})));ensureCanvasCaret(editor.view);};
-      const cancel=e=>{points.length=0;root.removeEventListener('pointermove',motion,true);root.removeEventListener('pointerup',finish,true);root.removeEventListener('pointercancel',cancel,true);svg.remove();if(root.hasPointerCapture(e.pointerId))root.releasePointerCapture(e.pointerId);};root.addEventListener('pointermove',motion,true);root.addEventListener('pointerup',finish,true);root.addEventListener('pointercancel',cancel,true);
-    };root.addEventListener('pointerdown',draw,true);const previous=cleanup;cleanup=()=>{root.removeEventListener('pointerdown',draw,true);previous();};
+    const selectionCleanup=mountCanvasSelection(editor,{onBlankClick:event=>placeCaret(editor.view,event)});
+    const inkInteraction=mountNotebookInk(editor,element,{getTool:()=>tool,getInk:()=>memories[tool],getEraserSize:()=>eraserSize});
+    const previous=cleanup;cleanup=()=>{selectionCleanup();inkInteraction.destroy();previous();};
   }
   toolbar.append(history);
   const typography=window.document.createElement('div');typography.className='note-type-group';typography.setAttribute('role','group');typography.setAttribute('aria-label','Font and character formatting');
