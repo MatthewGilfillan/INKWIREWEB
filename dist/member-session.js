@@ -1,7 +1,9 @@
+import {createAssignmentDashboard} from './assignments-workspace.js?v=20261108-assignments';
 import {createClassFiles} from './class-files.js';
-import {createMemberCourse} from './member-course.js?v=20261108-timeline-actions';
+import {createMemberCourse} from './member-course.js?v=20261108-assignments';
 import {api,escape,signOut} from './workspace-shared.js';
 const role=document.body.dataset.memberRole,list=document.querySelector('#class-list'),status=document.querySelector('#dashboard-status'),retry=document.querySelector('#retry-classes');
+const assignmentRoot=document.createElement('section');assignmentRoot.className='member-assignments';list.before(assignmentRoot);const assignmentDashboard=createAssignmentDashboard({root:assignmentRoot,parent:role==='parent'});
 let loading=false;
 const accountMenu=document.querySelector('.today-account');
 document.addEventListener('click',event=>{if(accountMenu && !accountMenu.contains(event.target))accountMenu.open=false;});
@@ -22,7 +24,7 @@ const card=(c,learnerId='',i=0)=>`<article class="member-class"><span class="mem
 async function load(){
   if(loading)return;loading=true;retry.hidden=true;
   try{
-    const data=await api('/api/enrollment/mine');
+    const data=await api('/api/enrollment/mine');assignmentDashboard.load();
     if(role==='student'){enrolled=data.classes;enrolledLearner=data.learner?.id || '';if(openedClass && !enrolled.some(c=>c.id===openedClass))showClasses();list.innerHTML=data.classes.length?data.classes.map((c,i)=>card(c,enrolledLearner,i)).join(''):'<div class="empty-classes"><h2>No classes yet</h2><p>Use your teacher’s invitation link or join code to connect to your class.</p></div>';}
     else list.innerHTML=data.children.length?data.children.map(child=>`<h2 class="child-heading"><img class="profile-face" src="/api/profiles/learners/${encodeURIComponent(child.id)}/image" alt="" loading="lazy">${escape(child.name)}</h2>${child.classes.length?child.classes.map(c=>card(c,child.id)).join(''):'<p>Your parent connection is active. This student has no classes yet.</p>'}`).join(''):'<div class="empty-classes"><h2>Connect to your child</h2><p>Use the parent invitation your teacher shared. You’ll see your child’s classes here once connected.</p></div>';
     status.textContent='';

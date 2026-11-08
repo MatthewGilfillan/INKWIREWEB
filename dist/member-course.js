@@ -1,3 +1,4 @@
+import {createAssignments} from './assignments-workspace.js?v=20261108-assignments';
 import {createLessonQuiz} from './lesson-quiz.js';
 import {quizScoreHTML,teacherStudentHTML} from './quiz-results.js';
 import {api,escape} from './workspace-shared.js';
@@ -6,12 +7,13 @@ import {renderSummary} from './summary-format.mjs';
 import {createLessonFeedback} from './lesson-feedback.js';
 import {learningWorkspace} from './learning-workspace.js?v=20261108-segments';
 
-export function createMemberCourse({teacher=false,parent=false,root=null,onEditLesson}={}) {
+export function createMemberCourse({teacher=false,parent=false,root=null,onEditLesson,onOpenAssignment}={}) {
   const titleId=root?(teacher?'teacher-timeline-title':'student-course-title'):'member-course-title';
   const dialog=document.createElement(root ? 'section' : 'dialog');dialog.className='member-course'+(!teacher?' learning-workspace':'');dialog.setAttribute('aria-labelledby',titleId);
   dialog.innerHTML=`<button type="button" class="teacher-close" aria-label="Close course timeline">×</button><p class="teacher-eyebrow" data-timeline-kind></p><h2 id="${titleId}">Course timeline</h2><p data-timeline-person></p><p data-timeline-status role="status"></p><button type="button" class="text-button" data-timeline-refresh>Refresh timeline</button><div data-timeline-body></div>`;
   (root || document.body).append(dialog); if(root) dialog.querySelector('.teacher-close').hidden=true;const $=s=>dialog.querySelector(s),feedback=teacher?createLessonFeedback():null,quizPlayer=createLessonQuiz();
   let route='',classId='',learner='',trigger,epoch=0,data,timer,loadedAt=0,selectedLesson=null;
+  const assignmentWorkspace=!teacher?createAssignments({root:document.createElement('div'),parent}):null;
   const isOpen=()=>root ? Boolean(classId) && !root.hidden : dialog.open;
   function clear(){if(!root && dialog.open)dialog.close();epoch++;clearTimeout(timer);data=null;classId='';$('[data-timeline-body]').replaceChildren();selectedLesson=null;}
   $('.teacher-close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{epoch++;clearTimeout(timer);$('[data-timeline-body]').replaceChildren();trigger?.focus();});
@@ -50,6 +52,7 @@ export function createMemberCourse({teacher=false,parent=false,root=null,onEditL
         const target=$(`[data-lesson-quiz-summary="${lesson.id}"]`),quiz=lesson.quiz;
         target.innerHTML=`<h4>Pre-lesson quiz</h4><p>${quiz?escape(quiz.title)+' · '+quiz.total+' questions':'Not assigned'}</p>${data.teacher?`<button type="button" class="teacher-button secondary timeline-quiz-action" data-open-quiz="${escape(lesson.id)}">${lesson.hasQuizDraft?'Review AI draft':quiz?'View / edit quiz':'Set up quiz'}</button>${quiz && !lesson.report?teacherStudentHTML(lesson,assessmentHTML):''}`:quiz?`${quizScoreHTML(quiz.result)}${data.canTakeQuiz?`<button type="button" class="teacher-button secondary" data-open-quiz="${escape(lesson.id)}">${lesson.status==='cancelled'?'Review quiz':quiz.result?.inProgress?'Continue quiz':quiz.result?.latest?'Review / retry quiz':'Take quiz'}</button>`:''}`:''}`;
       }
+      if(!data.demo){try{const assignmentData=await api('/api/assignments/classes/'+classId);if(version!==epoch)return;for(const lesson of course.lessons){const target=$(`[data-lesson-quiz-summary="${lesson.id}"]`);const linked=assignmentData.assignments.filter(a=>a.lessonId===lesson.id);if(linked.length){const holder=document.createElement('section');holder.className='timeline-linked-assignments';holder.innerHTML='<h4>Assignments</h4>'+linked.map(a=>`<button type="button" class="teacher-button secondary" data-linked-assignment="${escape(a.id)}">${escape(a.title)}${a.state==='draft'?' · Teacher draft':''}</button>`).join('');target.after(holder);}}}catch{const hint=document.createElement('p');hint.className='planner-hint';hint.textContent='Assignment links could not load. Open Assignments or refresh the timeline.';$('[data-timeline-body]').append(hint);}}
       status(data.demo?'Demo profile — no email or password. Only teachers of this class can open this preview.':'');updateButtons();
     }catch(error){if(version===epoch){status(error.message);$('[data-timeline-body]').replaceChildren();}}
   }
@@ -67,6 +70,7 @@ export function createMemberCourse({teacher=false,parent=false,root=null,onEditL
   $('[data-timeline-refresh]').onclick=load;
   dialog.addEventListener('click',event=>{const button=event.target.closest('[data-timeline-feedback]');if(button && !button.disabled)feedback.open(classId,button.dataset.timelineFeedback,button);});
   dialog.addEventListener('click',event=>{const button=event.target.closest('[data-timeline-edit]');if(button)onEditLesson?.(classId,button,Number(button.dataset.timelineEdit));});
+  dialog.addEventListener('click',event=>{const b=event.target.closest('[data-linked-assignment]');if(b){if(teacher)onOpenAssignment?.(classId,b.dataset.linkedAssignment);else assignmentWorkspace.open(classId,b.dataset.linkedAssignment,'all',learner);}});
   dialog.addEventListener('click',event=>{const button=event.target.closest('[data-open-quiz]');if(button)quizPlayer.open(classId,button.dataset.openQuiz,button);});
   document.addEventListener('inkwire:quiz-changed',async event=>{
     if(event.detail.classId!==classId)return;const restoreFocus=isOpen() && dialog.contains(document.activeElement);await load();

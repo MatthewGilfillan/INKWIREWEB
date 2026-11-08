@@ -119,7 +119,7 @@ async function copyAssets(source,target,pageId,document){
   await source.env.WORKSHEETS.put(targetKey,await object.arrayBuffer(),{httpMetadata:{contentType:pdf?'application/pdf':node.attrs.mime},...(pdf?{}:{customMetadata:object.customMetadata||{fileName:node.attrs.fileName,mime:node.attrs.mime,size:String(node.attrs.size)}})});
  }
 }
-async function originalDocument(ctx,page){
+export async function originalDocument(ctx,page){
  if(page.kind==='note'){const row=await ctx.prepare('SELECT document_json,version FROM notebook_pages WHERE class_id=? AND learner_id=? AND id=?').bind(...ctx.scope,page.id).first();if(!row)throw error('Page not found.',404);return {document:JSON.parse(row.document_json),version:row.version};}
  const worksheet=await ctx.env.DB.prepare('SELECT pdf_key,pages_json FROM worksheets WHERE class_id=? AND id=?').bind(ctx.classId,page.id).first();if(!worksheet)throw error('PDF page not found.',404);
  const dimensions=JSON.parse(worksheet.pages_json),assetId=await uuidFor('legacy-pdf:'+page.id),content=[],offsets=[];let y=24;

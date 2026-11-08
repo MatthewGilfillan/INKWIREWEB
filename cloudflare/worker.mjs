@@ -3,6 +3,7 @@ import {handleClassFiles} from './class-files.mjs';
 import {handleProfile} from './profiles.mjs';
 import {handleAccountPreferences} from './account-preferences.mjs';
 import {handleNotifications} from './notifications.mjs';
+import {handleAssignments} from './assignments.mjs';
 import {handleNotebooks} from './notebooks.mjs';
 import {handleWorksheets} from './worksheets.mjs';
 import {handleCourseResources} from './course-resources.mjs';
@@ -107,14 +108,15 @@ export default {
         } catch { return unavailable(); }
       }
 
-      if (['/notebooks','/notebooks/','/notebooks.html'].includes(url.pathname)) {
+      if (['/notebooks','/notebooks/','/notebooks.html','/assignment-page','/assignment-page/','/assignment-page.html'].includes(url.pathname)) {
         if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/notebooks${url.search}`);
         if(!await ready(env))return unavailable();
         const session=await createAuth(env).api.getSession({headers:request.headers});
         if(!session?.user?.emailVerified)return privateRedirect('/account');
         if(!['teacher','student','parent'].includes(session.user.requestedRole))return privateRedirect('/account?manage=1');
-        if(url.pathname!=='/notebooks')return privateRedirect('/notebooks'+url.search);
-        const response=await env.ASSETS.fetch(new Request(new URL('/notebooks',env.APP_ORIGIN)));
+        const pagePath=url.pathname.startsWith('/assignment-page')?'/assignment-page':'/notebooks';
+        if(url.pathname!==pagePath)return privateRedirect(pagePath+url.search);
+        const response=await env.ASSETS.fetch(new Request(new URL(pagePath,env.APP_ORIGIN)));
         return new Response(response.body,{headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',
           'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'none'"}});
       }
@@ -181,6 +183,7 @@ export default {
         const session=await auth.api.getSession({headers:request.headers});
         return await handleProfile(request,env,session?.user,{json,fail,readJSON});
       }
+      if(url.pathname==='/api/assignments'||url.pathname.startsWith('/api/assignments/')){const session=await auth.api.getSession({headers:request.headers});return await handleAssignments(request,env,session?.user,{readJSON});}
       if(url.pathname==='/api/notebooks'||url.pathname.startsWith('/api/notebooks/')){const session=await auth.api.getSession({headers:request.headers});return await handleNotebooks(request,env,session?.user);}
       if(url.pathname==='/api/worksheets'||url.pathname.startsWith('/api/worksheets/')){const session=await auth.api.getSession({headers:request.headers});return await handleWorksheets(request,env,session?.user);}
       if (url.pathname==='/api/drive-config' && request.method==='GET') {

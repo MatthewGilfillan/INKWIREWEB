@@ -1,7 +1,8 @@
+import {createAssignments} from './assignments-workspace.js?v=20261108-assignments';
 import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261107-profile-header';
 import {createClassSetup} from './class-setup.js?v=20261103-standards';
 import {createClassFiles} from './class-files.js';
-import {createMemberCourse} from './member-course.js?v=20261108-timeline-actions';
+import {createMemberCourse} from './member-course.js?v=20261108-assignments';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
 import {createCoursePlanner} from './course-planner.js?v=20261108-segments';
 import {unitMeter} from './learning-workspace.js?v=20261108-segments';
@@ -23,19 +24,20 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
 });
-const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['files','Class files'],['notebooks','Notebooks']];
+const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['assignments','Assignments'],['files','Class files'],['notebooks','Notebooks']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
   <h1 class="visually-hidden">Class workspace</h1><div class="class-workspace-heading"><div class="class-selection"><label for="selected-class">Class</label><select id="selected-class"></select><div class="class-selection-detail"><p id="selected-class-detail"></p><span class="class-badge" id="class-membership"></span></div></div><div id="selected-class-progress" aria-live="polite"></div><div class="class-header-actions"></div></div>
   <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='overview'}" tabindex="${id==='overview'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
-  ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='overview'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Homework completion will appear when submission tracking is connected.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
+  ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='overview'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Submission and marking queues are available in Assignments.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
 function renderClassProgress({classId,course,now,error}){if(classId!==activeClassId)return;progressVersion++;$('#selected-class-progress').innerHTML=error?'<p class="class-progress-message">Progress unavailable. Open Course overview to retry.</p>':course?unitMeter(course,now):'<p class="class-progress-message">Save a timetable to see course progress.</p>';}
 async function loadClassProgress(classId){const version=++progressVersion;try{const data=await api('/api/classes/'+encodeURIComponent(classId)+'/overview');if(version===progressVersion)renderClassProgress({classId,course:data.course,now:data.serverNow});}catch(error){if(version===progressVersion)renderClassProgress({classId,error});}}
 const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onCourseLoaded:renderClassProgress,onSaved:progress=>{renderClassProgress(progress);calendar.refresh();classCalendar.refresh();today.refresh();}});
 const classFiles=createClassFiles({root:$('#class-panel-files'),teacher:true,onPlan:async id=>{await openCourseTab(id);coursePlanner.prepare();}});
+const assignments=createAssignments({root:$('#class-panel-assignments'),teacher:true});
 const newClassSetup=createClassSetup({root:$('#create-class-schedule'),onReady:ready=>{$('#create-form [type=submit]').disabled=!ready;}});
-const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-timeline'),onEditLesson:openCourseTab});
+const teacherTimeline=createMemberCourse({teacher:true,root:$('#class-panel-timeline'),onEditLesson:openCourseTab,onOpenAssignment:async(id,aid)=>{await showClassTab('assignments');const a=(await api('/api/assignments/classes/'+id)).assignments.find(a=>a.id===aid);if(a?.state==='draft')assignments.edit(a);else assignments.open(id,aid);}});
 const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
@@ -62,13 +64,14 @@ async function selectClass(id){
   if(id===activeClassId)return true;
   if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return false;}
   if(!coursePlanner.canLeave()){$('#selected-class').value=activeClassId;return false;}
-  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();
+  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();
   progressVersion++;activeClassId=id;$('#selected-class-progress').innerHTML='<p class="class-progress-message">Loading course progress…</p>';$('#student-search').value='';$('#selected-roster').textContent='Loading students…';$('#roster-count').textContent='';renderClassHeading();
   await showClassTab(classTabs.get(id)||'overview');if(activeClassId!==id)return false;if(activeTab!=='overview')loadClassProgress(id);if(activeTab!=='students')loadRoster(id);return true;
 }
 async function showClassTab(tab,button,lessonIndex){
   if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}if(tab==='notebooks'){if(!coursePlanner.canLeave())return;coursePlanner.reset();location.assign('/notebooks?'+new URLSearchParams({classId:activeClassId}));return;}activeTab=tab;classTabs.set(activeClassId,tab);
   for(const [id]of tabs){const selected=id===tab;$('#class-tab-'+id).setAttribute('aria-selected',String(selected));$('#class-tab-'+id).tabIndex=selected?0:-1;$('#class-panel-'+id).hidden=!selected;}
+  if(tab==='assignments')await assignments.load(activeClassId);
   if(tab==='students')await loadRoster(activeClassId);
   if(tab==='overview')await coursePlanner.open(activeClassId,button,lessonIndex);
   if(tab==='files')await classFiles.open(activeClassId);
@@ -213,7 +216,7 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{assessmentWorkspace.clear();today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{assessmentWorkspace.clear();today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();
 
