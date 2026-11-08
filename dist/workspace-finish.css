@@ -102,8 +102,21 @@
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.text-button,a){color:#e1ebfc;text-underline-offset:3px}
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .text-button:hover{text-decoration:underline}
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.secondary{background:linear-gradient(180deg,#334963,#20324c);border-color:#a0b2cb66;color:#f1f6ff;box-shadow:inset 0 1px 0 #fff2,0 2px 5px #0003}
- html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.secondary:hover:not(:disabled){background:linear-gradient(180deg,#405874,#293d59);box-shadow:inset 0 1px 0 #fff3,0 0 12px #d7e6ff19}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.secondary:hover:not(:disabled){background:linear-gradient(180deg,#c4f9e9,#8ce7ce);border-color:#b5f0dd;color:#102d46;box-shadow:inset 0 1px 0 #fff9,0 0 14px #a3edd52b}
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.timeline-details,.feedback-corrections,.quiz-attempt-review){border-color:#8a9fbc50}
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(button,a,summary):focus-visible{outline-color:#d7e6ff}
  html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .is-cancelled h3{color:#bac7da}
+}
+
+@media screen {
+ [data-lms-skin] .lesson-timeline .timeline-quiz-action{margin-top:8px;min-height:40px;font-size:12px}
+ [data-lms-skin] .lesson-timeline .teacher-button:hover:not(:disabled){background:linear-gradient(180deg,#c4f9e9,#8ce7ce);border-color:#8edbc5;color:#102d46}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button:active:not(:disabled){background:#89d9c0;color:#102d46}
+}
+
+@media screen {
+ [data-lms-skin] .lesson-timeline .teacher-button:is(.timeline-quiz-action,.timeline-edit),html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button:is(.timeline-quiz-action,.timeline-edit){background:linear-gradient(180deg,#334963,#20324c);border-color:#a0b2cb66;color:#f1f6ff;box-shadow:inset 0 1px 0 #fff2,0 2px 5px #0003}
+ [data-lms-skin] .lesson-timeline .teacher-button.timeline-edit:hover:not(:disabled){background:linear-gradient(180deg,#c4f9e9,#8ce7ce);border-color:#b5f0dd;color:#102d46}
+ [data-lms-skin] .lesson-timeline .teacher-button.timeline-quiz-action:hover:not(:disabled),html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.timeline-quiz-action:hover:not(:disabled){background:linear-gradient(180deg,#d9dcff,#b8bdea);border-color:#c8cdf3;color:#182e4c;box-shadow:inset 0 1px 0 #ffffffb3,0 0 12px #bdc6ff2b}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.timeline-quiz-action:active:not(:disabled){background:#b2b9e7;color:#182e4c}
 }
