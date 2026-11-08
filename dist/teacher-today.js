@@ -1,4 +1,4 @@
-import {createDashboardWidgets} from './dashboard-widgets.js?v=20261108-support';
+import {createDashboardWidgets} from './dashboard-widgets.js?v=20261108-evidence';
 import {api,escape} from './workspace-shared.js';
 import {currentDisplayTimeZone,loadDisplayTimeZone,displayTimeZoneLabel} from './display-time-zone.mjs';
 import {nextDashboardLesson,dashboardTime} from './teacher-today-model.mjs';
@@ -41,6 +41,8 @@ export function createTeacherToday({root,getClasses,openClass,prepareClass,probl
   }
   root.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
+    if(button.dataset.reviewSuggestion)widgets.review(button.dataset.reviewSuggestion,button);
+    if(button.dataset.hideSuggestion)widgets.hide(button.dataset.hideSuggestion);
     if(button.dataset.newRecord)widgets.open(button.dataset.newRecord,button);
     if(button.dataset.recordStatus)widgets.status(button.dataset.recordStatus,button.dataset.status,button);
     if(button.hasAttribute('data-retry-records'))widgets.refresh();

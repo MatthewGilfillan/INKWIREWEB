@@ -15,8 +15,10 @@ test('dashboard records stay private, validate roster membership, and preserve i
  let response=await call({action:'status',id:input.id,status:'resolved'});assert.equal((await response.json()).record.status,'resolved');
  response=await call({action:'status',id:input.id,status:'active'});assert.equal((await response.json()).record.status,'active');
  assert.equal((await call({action:'status',id:input.id,status:'resolved'},users.u)).status,404);
- const award={...input,id:'99999999-9999-4999-8999-999999999999',kind:'award',title:'Resilience'};assert.equal((await(await call(award)).json()).record.status,'awarded');
+ const award={...input,id:'99999999-9999-4999-8999-999999999999',kind:'award',title:'Resilience',suggestionKey:cid+':a:award:effort:abc123'};
+ for(const suggestionKey of [42,'a'.repeat(321),'bad<script>'])assert.equal((await call({...award,suggestionKey})).status,400);
+ const recognition=(await(await call(award)).json()).record;assert.equal(recognition.status,'awarded');assert.equal(recognition.suggestionKey,award.suggestionKey);
  assert.equal((await call({action:'status',id:award.id,status:'resolved'})).status,400);
- const rows=(await(await call()).json()).records;assert.equal(rows.length,2);assert.equal(rows[0].className,'Fictional literature');
+ const rows=(await(await call()).json()).records;assert.equal(rows.length,2);assert.equal(rows[0].className,'Fictional literature');assert.equal(rows.find(r=>r.kind==='award').suggestionKey,award.suggestionKey);assert.equal(rows.find(r=>r.kind==='intervention').suggestionKey,undefined);
  f.db.prepare('UPDATE classes SET deleted_at=1 WHERE id=?').run(cid);assert.deepEqual((await(await call()).json()).records,[]);f.db.close();
 });
