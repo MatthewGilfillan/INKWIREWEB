@@ -1,5 +1,5 @@
 import {createClassFiles} from './class-files.js';
-import {createMemberCourse} from './member-course.js?v=20261103-skin';
+import {createMemberCourse} from './member-course.js?v=20261108-segments';
 import {api,escape,signOut} from './workspace-shared.js';
 const role=document.body.dataset.memberRole,list=document.querySelector('#class-list'),status=document.querySelector('#dashboard-status'),retry=document.querySelector('#retry-classes');
 let loading=false;

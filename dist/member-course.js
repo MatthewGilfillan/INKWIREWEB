@@ -4,7 +4,7 @@ import {api,escape} from './workspace-shared.js';
 import {renderLessonReport,assessmentHTML} from './lesson-feedback-view.js?v=20261103-skin';
 import {renderSummary} from './summary-format.mjs';
 import {createLessonFeedback} from './lesson-feedback.js';
-import {learningWorkspace} from './learning-workspace.js';
+import {learningWorkspace} from './learning-workspace.js?v=20261108-segments';
 
 export function createMemberCourse({teacher=false,parent=false,root=null,onEditLesson}={}) {
   const titleId=root?(teacher?'teacher-timeline-title':'student-course-title'):'member-course-title';

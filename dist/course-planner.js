@@ -14,7 +14,7 @@ import { api, escape } from './workspace-shared.js';
 import { presets, defaults, generateLessons, validateCourse, courseSummary, lessonDate, readCourseFile } from './course-model.mjs?v=20261103-standards';
 import { createCourseAssistant } from './course-assistant.js';
 
-export function createCoursePlanner({ list, getClasses, status, problem, onSaved, root }) {
+export function createCoursePlanner({ list, getClasses, status, problem, onSaved, onCourseLoaded, root }) {
   const dialog = document.createElement(root ? 'section' : 'dialog');
   const isOpen = () => root ? Boolean(currentId) : dialog.open;
   dialog.className = 'course-planner'; dialog.setAttribute('aria-labelledby', 'planner-title');
@@ -105,7 +105,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       saving=true;controls.forEach(el=>el.disabled=true);$('[data-timetable-error]').textContent='Saving timetable…';
       const saved=await api(`/api/classes/${currentId}/overview`,{course:next,revision});revision=saved.revision;savedCourse=structuredClone(saved.course);dirty=false;serverTime=saved.serverNow||Date.now();localTime=performance.now();
       const classroom=getClasses().find(c=>c.id===currentId);if(classroom)Object.assign(classroom,{overviewRevision:revision,courseWeeks:next.weeks,courseFrequency:next.lessonsPerWeek,courseMinutes:next.lessonMinutes,coursePacing:'weekly',courseLessonCount:next.lessonCount});
-      success=true;onSaved?.();status.textContent='Timetable saved. Calendar and timeline are ready.';
+      success=true;onSaved?.({classId:currentId,course:savedCourse,now:serverTime});status.textContent='Timetable saved. Calendar and timeline are ready.';
     }catch(e){$('[data-timetable-error]').textContent=e.message;}finally{saving=false;controls.forEach((el,i)=>el.disabled=disabled[i]);if(success){fill(savedCourse);showOverview(true);loadQuizStates();message('Timetable saved. Add lesson details using the pencil icons, or upload a unit plan.');}}
   };
   $('[data-edit-unit-plan]').onclick=()=>editPlan();
@@ -290,7 +290,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
         if (summary) summary.textContent = courseSummary(course);
         const button = list.querySelector(`[data-plan-course="${currentId}"]`);
         if (button) button.textContent = 'Edit course overview';
-        onSaved?.();
+        onSaved?.({classId:currentId,course:savedCourse,now:serverTime});
         didSave=true;
         try{const prepared=await preparation.afterSave();if(prepared)message('Course overview saved. '+prepared.saved.length+' quiz drafts saved for review.'+(prepared.skipped.length?' Existing quizzes or edited lessons were kept unchanged.':''));}
         catch(e){message('Overview saved. Quiz drafts remain in Prepare Course with AI; open it and choose Save prepared quiz drafts to retry. '+e.message);}
@@ -300,6 +300,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
   });
   async function open(classId, button, lessonIndex) {
     if (root && currentId === classId && course) {
+      onCourseLoaded?.({classId,course:savedCourse,now:serverTime+performance.now()-localTime});
       if (Number.isInteger(lessonIndex)) editPlan(lessonIndex);
       return;
     }
@@ -312,6 +313,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
     try {
       const result = await api(`/api/classes/${classId}/overview`); if (generation !== token || !isOpen()) return;
       revision = result.revision; savedCourse=result.course?structuredClone(result.course):null; serverTime=result.serverNow || Date.now();localTime=performance.now();
+      onCourseLoaded?.({classId,course:savedCourse,now:serverTime});
       const initial = result.course || {...useFormat(defaults(getClasses().find(c => c.id === classId)?.name), 'full'),preset:'blank',description:'',organization:'',lessons:[]};
       fill(initial);if(result.course)showOverview();else editSchedule();loadQuizStates();
       message('');
@@ -319,7 +321,7 @@ export function createCoursePlanner({ list, getClasses, status, problem, onSaved
       if (Number.isInteger(lessonIndex)) {
         editPlan(lessonIndex);
       }
-    } catch (e) { if (generation !== token) return; message(e.message + (root ? ' Select Course overview again to retry.' : ' Close and reopen to try again.')); if (e.status === 401) problem(e); }
+    } catch (e) { if (generation !== token) return; onCourseLoaded?.({classId,error:e});message(e.message + (root ? ' Select Course overview again to retry.' : ' Close and reopen to try again.')); if (e.status === 401) problem(e); }
   }
   if (!root) list.addEventListener('click', event => { const button = event.target.closest('[data-plan-course]'); if (button) open(button.dataset.planCourse, button); });
   window.addEventListener('beforeunload', event => { if (dirty && isOpen()) { event.preventDefault(); event.returnValue = ''; } });

@@ -85,3 +85,25 @@
  @media(prefers-reduced-motion:reduce){:is([data-lms-skin] .teacher-button,.folio-app #toggle-navigation,.folio-app #distribute-page){transition:none;transform:none!important}}
  @media(forced-colors:active){:is(body[data-lms-skin],body.folio-app){background:Canvas}.workspace-header .today-nav :is(a[aria-current=page],button[aria-pressed=true]):after{background:Highlight;box-shadow:none}}
 }
+
+/* Course timeline: monochromatic navy, silver edges and readable nested panels. */
+@media screen {
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .timeline-content{position:relative;background:linear-gradient(145deg,#192b45,#101c30)!important;border:1px solid #8297b566;color:#edf3fc;box-shadow:inset 0 1px 0 #f0f5ff18,0 0 18px #c2d5f509,0 8px 24px #0003}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .timeline-content:before{content:'';position:absolute;left:20px;right:20px;top:0;height:1px;background:linear-gradient(90deg,transparent,#eaf1ff99,#93a8c355,transparent);pointer-events:none}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .timeline-lesson:not(:last-child):before{background:linear-gradient(180deg,#e8f1ffd9,#8b9fbd70);box-shadow:0 0 7px #d5e5ff22}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .timeline-number{background:linear-gradient(145deg,#49617e,#1b2b43);border:1px solid #becce573;color:#f5f8ff;box-shadow:inset 0 1px 0 #fff3,0 0 12px #d5e5ff19}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .timeline-lesson.is-cancelled .timeline-number{background:#17243a;border-style:dashed;color:#bac7da;box-shadow:none}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(h3,h4,h5,h6,strong,.teacher-eyebrow,.timeline-details>summary){color:#edf3fc}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(p,small,.timeline-date,.planner-hint,.feedback-caption,.empty-stars){color:#bbc9de}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.timeline-quiz,.timeline-student-assessment,.student-quiz-score,.feedback-parent,.feedback-metric,.feedback-quote){background:linear-gradient(145deg,#101b2e,#17263d);border-color:#7990ae59;color:#e8effb;box-shadow:inset 0 1px 0 #f0f6ff0a}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.feedback-stars,.feedback-stars b,.quiz-score strong){color:#e8f0ff}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .class-badge{background:linear-gradient(145deg,#2d405b,#1e2d44);border:1px solid #91a5c15c;color:#e2ebf9}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .lesson-billing{background:#20314b;color:#d8e5f8!important;border:1px solid #8197b34d}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.text-button,a){color:#e1ebfc;text-underline-offset:3px}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .text-button:hover{text-decoration:underline}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.secondary{background:linear-gradient(180deg,#334963,#20324c);border-color:#a0b2cb66;color:#f1f6ff;box-shadow:inset 0 1px 0 #fff2,0 2px 5px #0003}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .teacher-button.secondary:hover:not(:disabled){background:linear-gradient(180deg,#405874,#293d59);box-shadow:inset 0 1px 0 #fff3,0 0 12px #d7e6ff19}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(.timeline-details,.feedback-corrections,.quiz-attempt-review){border-color:#8a9fbc50}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline :is(button,a,summary):focus-visible{outline-color:#d7e6ff}
+ html[data-lms-theme=dark] [data-lms-skin] .lesson-timeline .is-cancelled h3{color:#bac7da}
+}

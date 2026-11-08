@@ -3,7 +3,7 @@ import {api,escape} from './workspace-shared.js';
 import {currentDisplayTimeZone,loadDisplayTimeZone,displayTimeZoneLabel} from './display-time-zone.mjs';
 import {nextDashboardLesson,dashboardTime} from './teacher-today-model.mjs';
 import {courseIcon} from './course-overview.js';
-import {unitMeter} from './learning-workspace.js';
+import {unitMeter} from './learning-workspace.js?v=20261108-segments';
 import {lessonInstant} from './calendar-model.mjs';
 import {lessonTiming} from './schedule-model.mjs';
 

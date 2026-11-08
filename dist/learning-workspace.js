@@ -4,7 +4,7 @@ import {unitPosition} from './unit-position.mjs';
 
 export function unitMeter(course,now) {
   const p=unitPosition(course,now);
-  return `<div class="unit-meter"><div><span>Unit timeline</span><strong>${p.held} of ${p.total} lessons held</strong></div><progress max="${p.total || 1}" value="${p.held}" aria-label="Unit timeline: ${p.held} of ${p.total} lessons held"></progress></div>`;
+  return `<div class="unit-meter"><div><span>Unit timeline</span><strong>${p.held} of ${p.total} lessons held</strong></div><span class="unit-meter-track"><progress max="${p.total || 1}" value="${p.held}" aria-label="Unit timeline: ${p.held} of ${p.total} lessons held; one segment per lesson"></progress><span class="unit-meter-segments" aria-hidden="true">${Array.from({length:p.total},()=>'<i></i>').join('')}</span></span></div>`;
 }
 
 export function learningWorkspace(data,notebookURL) {
