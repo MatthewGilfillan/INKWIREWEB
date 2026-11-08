@@ -41,7 +41,7 @@
  .workspace-header .today-nav{--nav-wash-bottom:-16px;--nav-wash-mint:104,220,193}
  .workspace-header .today-nav :is(a,button){isolation:isolate}
  .workspace-header .today-nav :is(a,button):before{content:'';position:absolute;z-index:-1;left:-7px;right:-7px;bottom:var(--nav-wash-bottom);height:calc(100% + 16px);border-radius:12px 12px 0 0;background:linear-gradient(to top,rgba(var(--nav-wash-mint),.34),rgba(var(--nav-wash-mint),.14) 45%,rgba(var(--nav-wash-mint),0) 95%);opacity:0;transform:translateY(8px) scaleY(.7);transform-origin:center bottom;transition:opacity .2s ease,transform .28s cubic-bezier(.2,.7,.3,1);pointer-events:none}
- .workspace-header .today-nav :is(a,button):is(:hover,:focus-visible):before{opacity:1;transform:translateY(0) scaleY(1)}
+ .workspace-header .today-nav :is(a,button):hover:before{opacity:1;transform:translateY(0) scaleY(1)}
  .workspace-header .today-nav :is(a,button):is(:hover,:focus-visible){color:#173552}
  html[data-lms-theme=dark] .workspace-header .today-nav :is(a,button):before{background:linear-gradient(to top,rgba(var(--nav-wash-mint),.24),rgba(var(--nav-wash-mint),.1) 45%,rgba(var(--nav-wash-mint),0) 95%)}
  html[data-lms-theme=dark] .workspace-header .today-nav :is(a,button):is(:hover,:focus-visible){color:#f0f6ff}

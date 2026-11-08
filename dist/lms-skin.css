@@ -268,8 +268,20 @@ body[data-lms-skin]{background:#f6f8fa}
 [data-lms-skin] #class-panel-overview #planner-title{font-size:20px;margin:0 0 16px}
 
 /* Lesson divisions remain visible across completed and upcoming portions. */
+html[data-lms-theme=dark] [data-lms-skin] .class-tab-list button:is(:hover,:focus-visible){color:#f0f6ff}
 .unit-meter-track{display:block;position:relative;border-radius:9px;overflow:hidden}.unit-meter .unit-meter-track progress{height:10px}.unit-meter-segments{display:flex;position:absolute;inset:0;pointer-events:none}.unit-meter-segments i{flex:1;min-width:0;box-sizing:border-box;border-left:1px solid #fff}.unit-meter-segments i:first-child{border-left:0}html[data-lms-theme=dark] .unit-meter-segments i{border-left-color:#0a1425}
 /* The selector and course position form the class page header. */
 [data-lms-skin] .class-workspace-heading{display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(220px,1fr) auto;align-items:start;gap:24px;margin:0 0 22px}[data-lms-skin] .class-workspace-heading>div{max-width:none;min-width:0}[data-lms-skin] .class-workspace-heading label{display:block;margin-bottom:8px}.class-selection-detail{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}[data-lms-skin] .class-selection-detail #selected-class-detail{margin:9px 0 0}.class-selection-detail .class-badge{margin:0;white-space:nowrap;font-size:9px;padding:3px 8px}[data-lms-skin] #selected-class-progress{padding-top:30px}.class-progress-message{font-size:11px;color:var(--theme-muted,#718294);margin:0}.class-header-actions{padding-top:22px;display:flex;justify-content:flex-end}.class-header-actions .teacher-button{white-space:nowrap;font-size:12px;min-height:48px}
 @media(max-width:960px){[data-lms-skin] .class-workspace-heading{grid-template-columns:minmax(0,1fr) auto;gap:16px 24px}[data-lms-skin] #selected-class-progress{grid-column:1/-1;grid-row:2;padding-top:0}.class-header-actions{grid-column:2;grid-row:1}.class-selection-detail .class-badge{display:inline-block}}
 @media(max-width:480px){[data-lms-skin] .class-workspace-heading{gap:14px 10px}.class-header-actions .teacher-button{font-size:10px;padding:9px 10px}[data-lms-skin] #selected-class{font-size:15px}.class-selection-detail{gap:5px}.class-selection-detail .class-badge{font-size:8px}}
+
+/* Class tabs rest on an underline; the wash belongs only to pointer hover. */
+[data-lms-skin] .class-tab-list{overflow-y:hidden}
+[data-lms-skin] .class-tab-list button:is([aria-selected=true],[aria-selected=false]){position:relative;isolation:isolate;background:transparent}
+[data-lms-skin] .class-tab-list button:before{content:'';position:absolute;z-index:-1;inset:0;background:linear-gradient(to top,#68dcc14d,#68dcc11f 45%,#68dcc100 95%);opacity:0;transform:translateY(6px) scaleY(.7);transform-origin:center bottom;transition:opacity .2s ease,transform .28s cubic-bezier(.2,.7,.3,1);pointer-events:none}
+[data-lms-skin] .class-tab-list button:hover:before{opacity:1;transform:translateY(0) scaleY(1)}
+html[data-lms-theme=dark] [data-lms-skin] .class-tab-list button:is([aria-selected=true],[aria-selected=false]){background:transparent;color:#f0f6ff}
+html[data-lms-theme=dark] [data-lms-skin] .class-tab-list button:before{background:linear-gradient(to top,#68dcc13d,#68dcc119 45%,#68dcc100 95%)}
+html[data-lms-theme=dark] [data-lms-skin] .class-tab-list button[aria-selected=true]{border-bottom-color:#79c7b3}
+@media(prefers-reduced-motion:reduce){[data-lms-skin] .class-tab-list button:before{transition:none;transform:none}}
+@media(forced-colors:active){[data-lms-skin] .class-tab-list button:before{display:none}}
