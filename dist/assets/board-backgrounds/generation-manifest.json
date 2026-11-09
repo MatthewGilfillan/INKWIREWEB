@@ -1,0 +1,27 @@
+{
+  "mode": "built-in image_gen",
+  "created": "2026-11-09",
+  "assets": [
+    {
+      "key": "bookworms",
+      "prompt": "Use case: illustration-story. Create a seamless repeating square wallpaper tile for a school digital class pinboard. Theme: tiny cute smiling bookworms curling around little closed books and open books, with a few small leaves and dots. Hand-drawn paper-cut illustration, clean gently imperfect outlines, sophisticated cute classroom style. Soft pale mint background, muted teal and periwinkle accents, warm butter-yellow highlights. Very low contrast and sparse tiny motifs occupying at most 20 percent of the area, lots of calm empty background so text cards placed over it remain readable. Flat top-down pattern, uniform scale and even spacing, no focal hero, no text, no letters, no numbers, no logo or watermark. Seamless edges, wallpaper pattern only, no mockup, no card frames. Square 1024x1024."
+    },
+    {
+      "key": "pencil-constellations",
+      "prompt": "Use case: illustration-story. Create a seamless repeating square wallpaper tile for a school digital pinboard. Theme: little cute pencils, erasers and tiny star constellations, softly drawn rounded stationery shapes, charming hand-drawn paper-cut style. Pale periwinkle-lavender background, dusty blue and soft mint motifs, tiny muted golden stars. Sophisticated classroom illustration, low contrast, tiny sparse motifs covering no more than 20 percent of the area, generous quiet space for overlaying readable content cards. Uniform pattern, no central focal point. Seamless repeating edges. No text, letters, numbers, logos, watermark, drop-in UI or frame. Square 1024x1024."
+    },
+    {
+      "key": "woodland-friends",
+      "prompt": "Use case: illustration-story. Create a seamless repeating square wallpaper tile for a school digital class board. Theme: tiny friendly woodland foxes, hedgehogs and owls nestled among small leaves, acorns and simple mushrooms. Cute but refined flat hand-drawn cut-paper illustrations, soft rounded forms and gently imperfect outlines. Pale warm sage background, dusty peach, muted sage, cream and subtle brown accents. Keep contrast low, motifs very small and sparse, maximum 20 percent illustrated coverage with lots of open calm background for content cards. Uniform scale, evenly dispersed repeat, no large central character. Seamless tile edges. No text, letters, logos, watermarks, UI, frames or typography. Square 1024x1024."
+    },
+    {
+      "key": "ocean-pals",
+      "prompt": "Use case: illustration-story. Create a seamless repeating square wallpaper tile for a school digital class board. Theme: tiny cheerful whales, sea turtles, starfish, little shells and a few softly drawn bubbles. Refined cute classroom wallpaper, flat paper-cut hand illustration with gently irregular outlines. Very pale aqua background, dusty seafoam, soft muted blue, gentle lavender and occasional pale coral details. Very low contrast and sparse tiny motifs over less than 20 percent of the area; leave calm generous background so overlay content cards remain easy to read. Even repeated scale, no focal image, seamless repeating edges. No text, lettering, numbers, logos, watermark, UI or decorative border. Square 1024x1024."
+    },
+    {
+      "key": "stationery-kit",
+      "transparent": true,
+      "prompt": "Use case: stylized-concept. Create a coordinated digital stationery sticker asset sheet on a genuinely transparent background, 2048x1536 landscape canvas, exact 4-column by 3-row grid of twelve equal 512x512 cells. No visible grid, cell borders, labels or text. Exactly one isolated stationery item centered in each cell with generous clear transparent margins; no items may touch or overlap another cell. Same gentle top-down paper-cut illustration style and subtle realistic paper texture for every object, soft edge shadows contained closely around each item. Row 1 left to right: blank butter-yellow square sticky note with slightly lifted bottom-right corner; blank mint square sticky note; blank periwinkle square sticky note; blank blush-pink square sticky note. Row 2: blank lined cream index card; blank cream torn notebook-paper scrap; blank light-blue graph-paper card; one silver paperclip. Row 3: short pastel teal pencil diagonally; small pale wooden ruler with ticks but no numbers; one strip of pastel washi tape with tiny dots and torn ends; a small gold star sticker. Notes and paper items should be large within their own cells with ample blank central writing room. All stationery unbranded, no handwriting, no words, no watermark. True alpha transparency everywhere outside objects, absolutely no checkerboard texture or opaque background."
+    }
+  ]
+}
