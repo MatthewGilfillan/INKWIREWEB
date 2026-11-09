@@ -1,3 +1,4 @@
+import {handleClassBoards,classBoardBooks} from './class-boards.mjs';
 import {handleNotebookFile} from './notebook-files.mjs';
 import {notebookContext,notebookPrepare,handleNotebookOrganization,notebookVersion,notebookTemplate} from './notebook-organization.mjs';
 import {cleanDocument,emptyDocument,PRINT_SECTION,catalogPages,notebookKey} from '../src/notebook-model.mjs';
@@ -28,9 +29,10 @@ export async function handleNotebooks(request,env,user) {
       ${classId?'AND c.id=?':''} ORDER BY c.name,l.display_name,l.id`).bind(...(teacher?[user.id,user.id]:[user.id]),...(classId?[classId]:[])).all();
     const classes=teacher?(await env.DB.prepare(`SELECT c.id,c.name FROM classes c WHERE c.deleted_at IS NULL AND (c.owner_id=? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id=c.id AND t.user_id=?)) ${classId?'AND c.id=?':''} ORDER BY c.name`).bind(user.id,user.id,...(classId?[classId]:[])).all()).results:[];
     const teacherBooks=classes.map(c=>({id:notebookKey(c.id,'teacher'),classId:c.id,className:c.name,learnerId:'teacher',learnerName:'Teacher notebook',title:'Teacher notebook',teacherBook:true,pinned:true}));
-    return json({userId:user.id,role:user.requestedRole,notebooks:[...teacherBooks,...rows.results.map(r=>({...r,id:notebookKey(r.classId,r.learnerId),title:r.learnerName}))],classes});
+    return json({userId:user.id,role:user.requestedRole,notebooks:[...teacherBooks,...rows.results.map(r=>({...r,id:notebookKey(r.classId,r.learnerId),title:r.learnerName})),...(parent?[]:classBoardBooks(teacher?classes:[...new Map(rows.results.map(r=>[r.classId,{id:r.classId,name:r.className}])).values()]))],classes});
   }
   const [classId,learnerId,kind,id]=parts;
+  if(learnerId==='boards'&&parts.length===2&&request.method==='GET')return handleClassBoards(new Request(new URL('/api/class-boards/classes/'+classId,env.APP_ORIGIN),request),env,user);
   const teacherBook=learnerId==='teacher';
   if(!ID.test(classId||'')||!(teacherBook&&teacher||ID.test(learnerId||'')||/^[a-f0-9]{32}$/.test(learnerId||'')))return fail('Notebook not found.',404,'NOT_FOUND');
   if(teacher&&!await canTeach(env,user,classId))return fail('Notebook not found.',404,'NOT_FOUND');

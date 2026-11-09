@@ -1,3 +1,4 @@
+import {mountClassBoard} from './class-board.mjs';
 import {pageTitleSession,formatPageCreatedAt} from './notebook-page-title.mjs';
 import {mountCloudSync} from './notebook-cloud.mjs';
 import {mountNotebookNavigation,initialNotebook} from './notebook-navigation.mjs';
@@ -15,7 +16,10 @@ const $=s=>document.querySelector(s),query=new URLSearchParams(location.search);
 const practice=query.get('preview')==='1'&&!['inkwire-education.com','www.inkwire-education.com'].includes(location.hostname);
 let titleSession=null,inlineRename=null,newSectionOptions={},fileBusy=false,syncBusy=false,syncError='',refreshTask,embeddedSyncStatus='',embeddedSyncError='',embeddedLocalFailure=false;
 const namedUntitledPages=new Set();
+let boardMount=null,lastBoardListPoll=0;
 let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null,worksheetMount=null,worksheetLoading=false;
+const boardRoot=document.createElement('section');boardRoot.id='class-board-host';boardRoot.className='class-board-host';boardRoot.hidden=true;$('.folio-content').append(boardRoot);
+const boardsButton=document.createElement('button');boardsButton.id='open-class-boards';boardsButton.type='button';boardsButton.className='add-printout';boardsButton.textContent='Live Boards';boardsButton.hidden=true;$('#add-printout').before(boardsButton);boardsButton.onclick=()=>{if(book&&mayNavigate())openBook(book.classId+'.boards');};
 const colors=['#9d89be','#67a7a3','#ccaa70','#7c9fc1','#b38ba4'];
 async function request(path,body) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(body?.action==='translate'?120000:60000)});
@@ -50,10 +54,10 @@ const cloudSync=mountCloudSync($('#notebook-sync'),{observe:[$('#connection'),$(
  }catch(error){syncError=error.message;problem(error);}finally{syncBusy=false;cloudSync.render();}
 }});
 function renamePending(){return !!inlineRename&&(inlineRename.saving||inlineRename.input.value.trim()!==inlineRename.title);}
-function pending(){return titleSession?.dirty||titleSession?.saving||renamePending()||fileBusy||worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
-function locallyRecoverable(){if(titleSession?.dirty&&!titleSession.locallySaved)return false;if(renamePending()||fileBusy||worksheetLoading||printoutImport?.busy)return false;if(active)return active.dirty<=active.saved||!active.localFailure&&active.localSaved>=active.dirty;return !embeddedDirty||!!worksheetMount?.locallySaved();}
+function pending(){return boardMount?.pending()||titleSession?.dirty||titleSession?.saving||renamePending()||fileBusy||worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
+function locallyRecoverable(){if(boardMount?.pending())return boardMount.locallySaved();if(titleSession?.dirty&&!titleSession.locallySaved)return false;if(renamePending()||fileBusy||worksheetLoading||printoutImport?.busy)return false;if(active)return active.dirty<=active.saved||!active.localFailure&&active.localSaved>=active.dirty;return !embeddedDirty||!!worksheetMount?.locallySaved();}
 function mayNavigate(){if(!pending()||locallyRecoverable())return true;problem(Error('Your browser is still saving this page. Keep it open for a moment, then try again.'));return false;}
-function row(value,current,icon,subtitle='',extra='') {const menu=(value.sectionId||selection?.sections?.some(s=>s.id===value.id))?`<button type="button" class="folio-row-menu" data-item-menu data-id="${escape(value.id)}" aria-label="Options for ${escape(value.title)}" aria-haspopup="menu" title="More options">⋯</button>`:'';return `<div class="folio-nav-item" style="--item-depth:${value.depth||0}"><button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>${menu}</div>`;}
+function row(value,current,icon,subtitle='',extra='') {const menu=!book?.classBoards&&(value.sectionId||selection?.sections?.some(s=>s.id===value.id))?`<button type="button" class="folio-row-menu" data-item-menu data-id="${escape(value.id)}" aria-label="Options for ${escape(value.title)}" aria-haspopup="menu" title="More options">⋯</button>`:'';return `<div class="folio-nav-item" style="--item-depth:${value.depth||0}"><button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>${menu}</div>`;}
 
 function updateLinks(){
   const url=new URL(location.href);for(const k of ['notebookId','sectionId','pageId'])url.searchParams.delete(k);
@@ -68,7 +72,7 @@ function renderBooks(){
   const classId=$('#class-filter').value,search=$('#notebook-search').value.trim().toLowerCase();
   const visible=library.notebooks.filter(b=>(!classId||b.classId===classId)&&(!search||(b.learnerName+' '+b.className).toLowerCase().includes(search)));
   $('#notebook-count').textContent=String(visible.length);
-  $('#notebook-list').innerHTML=visible.length?visible.map(b=>row(b,b.id===book?.id,b.teacherBook?'<span class="teacher-book-pin" aria-hidden="true">⌖</span>':`<span class="book-icon" style="--book-color:${colors[library.notebooks.indexOf(b)%colors.length]}" aria-hidden="true"></span>`,b.className+(b.teacherBook?' · Private':''))).join(''):'<p class="nav-empty">No notebooks match this view.</p>';
+  $('#notebook-list').innerHTML=visible.length?visible.map(b=>row(b,b.id===book?.id,b.teacherBook?'<span class="teacher-book-pin" aria-hidden="true">⌖</span>':`<span class="book-icon" style="--book-color:${colors[library.notebooks.indexOf(b)%colors.length]}" aria-hidden="true"></span>`,b.className+(b.teacherBook?' · Private':b.classBoards?' · Shared with class':''))).join(''):'<p class="nav-empty">No notebooks match this view.</p>';
   const scoped=library.classes.find(c=>c.id===classId);$('#hub-title').textContent=scoped?scoped.name+' notebooks':library.role==='teacher'?'Master notebooks':library.role==='parent'?'My child’s notebooks':'My notebooks';
   $('#scope-label').textContent=scoped?'CLASS NOTEBOOKS':library.role==='teacher'?'YOUR TEACHING WORKSPACE':'YOUR LEARNING WORKSPACE';
   $('#scope-description').textContent='';
@@ -79,13 +83,14 @@ function renderLists(){
   const section=selection?.sections.find(s=>s.id===selection.sectionId);$('#selected-section').textContent=section?.title||'Choose a section';$('#page-breadcrumb').textContent=book?book.learnerName+' / '+(section?.title||'Sections'):'A LITTLE SPACE FOR BIG IDEAS';
   const page=selection?.pages.find(p=>p.id===selection.pageId),location=page?[book?.teacherBook?'Teacher notebook':book?.learnerName,section?.title,page.title].filter(Boolean).join(' / '):'';$('#notebook-page-location').textContent=location;$('#notebook-page-location').title=location;
   const pages=(selection?.pages||[]).filter(p=>p.sectionId===selection.sectionId);
-  if(inlineRename?.kind!=='page')$('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':'☷'}</span>`,'')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
-  for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';$('#add-page').disabled ||= !!section?.group||!!section?.locked;$('#notebook-deleted-items').hidden=library.role!=='teacher';$('#distribute-page').hidden=library.role!=='teacher'||!selection?.pageId;
-  $('#add-printout').hidden=!book||library.role!=='teacher';
-  $('#printout-hint').hidden=!book||library.role!=='teacher';
+  if(inlineRename?.kind!=='page')$('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':p.kind==='board'?'▤':'☷'}</span>`,p.kind==='board'?p.state:'')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
+  for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';$('#add-page').disabled ||= !!section?.group||!!section?.locked;$('#notebook-deleted-items').hidden=library.role!=='teacher';$('#distribute-page').hidden=library.role!=='teacher'||!selection?.pageId||!!book?.classBoards;
+  $('#add-printout').hidden=!book||library.role!=='teacher'||!!book?.classBoards;boardsButton.hidden=!book||library.role==='parent'||practice||!!book?.classBoards;if(book?.classBoards){$('#add-section').disabled=true;$('#notebook-deleted-items').hidden=true;$('#add-page').title='New shared board';$('#add-page').setAttribute('aria-label','New shared board');}else{$('#add-page').title='Add page';$('#add-page').setAttribute('aria-label','Add page');}
+  $('#printout-hint').hidden=!book||library.role!=='teacher'||!!book?.classBoards;
   updateLinks();
 }
 function closePage(){
+  boardMount?.destroy();boardMount=null;boardRoot.hidden=true;boardRoot.replaceChildren();
   titleSession?.release();titleSession=null;
   openEpoch++;syncError='';embeddedSyncStatus='';embeddedSyncError='';embeddedLocalFailure=false;if(active){clearTimeout(active.timer);active.pdfHandles?.forEach(task=>task.destroy());active.doc.destroy();active=null;}window.InkWireEditor?.destroy();embeddedDirty=false;
   $('#pdf-attachment').hidden=true;worksheetMount?.destroy();worksheetMount=null;const frame=$('#worksheet-embed');frame.hidden=true;frame.replaceChildren();$('#note-editor').hidden=true;$('#note-body').replaceChildren();$('#note-toolbar').hidden=true;$('#note-toolbar').replaceChildren();$('#page-empty').hidden=false;$('#page-status').textContent='';$('#distribute-page').hidden=true;$('#page-title').value='Choose a page';$('#page-meta').textContent='Open a page, or create a space for the next lesson.';
@@ -107,6 +112,7 @@ async function flush(c){
 async function openPage(id){
   if(!mayNavigate())return;const page=selection?.pages.find(p=>p.id===id);if(!page)return;closePage();const epoch=openEpoch;selection.pageId=id;rememberPage(page);renderLists();pane('content');
   $('#page-title').readOnly=true;$('#page-title').value=page.title;$('#page-breadcrumb').textContent=book.learnerName+' / '+selection.sections.find(s=>s.id===page.sectionId)?.title;$('#page-meta').textContent=book.className+(book.teacherBook?' · Private teacher notebook':library.role==='parent'?' · Parent view · read only':' · Shared student notebook');$('#page-empty').hidden=true;
+  if(page.kind==='board'){boardRoot.hidden=false;$('#page-status').textContent='Loading class board…';try{const mounted=await mountClassBoard({root:boardRoot,classId:book.classId,boardId:page.id,userId:library.userId,isCurrent:()=>epoch===openEpoch,onMeta:meta=>{if(epoch!==openEpoch)return;page.title=meta.title;page.state=meta.state;const item=selection?.pages.find(p=>p.id===page.id);if(item)Object.assign(item,meta);renderLists();},onStatus:(text,error)=>{if(epoch!==openEpoch)return;$('#page-status').textContent=error?'Needs review':text?'Saved':'';if(error)problem(Error(text));else clearProblem();}});if(epoch!==openEpoch){mounted.destroy();return;}boardMount=mounted;$('#page-status').textContent='Saved';}catch(error){if(epoch===openEpoch){problem(error);$('#page-status').textContent='Could not load class board';}}return;}
   if(page.kind==='worksheet'&&page.displayMode==='attachment'){
     $('#pdf-attachment').hidden=false;$('#attachment-title').textContent=page.title;$('#page-status').textContent='Downloadable PDF file';const link=$('#download-pdf');link.download=page.title+'.pdf';
     if(practice){link.href='#';link.onclick=async e=>{e.preventDefault();const {createPreviewAdapter}=await import('./worksheet-preview-adapter.js');const ws=await createPreviewAdapter(library.role,{classId:book.classId,learnerId:book.learnerId,liveParent:true});await ws.metadata(page.id);const url=URL.createObjectURL(new Blob([await ws.pdf()],{type:'application/pdf'}));const a=document.createElement('a');a.href=url;a.download=page.title+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
@@ -139,7 +145,7 @@ async function openPage(id){
 }
 const titleField=$('#page-title');
 async function renameInline(kind,item){
- if(library?.role!=='teacher'||!book||!item||!mayNavigate())return;
+ if(library?.role!=='teacher'||!book||book.classBoards||!item||!mayNavigate())return;
  if(titleSession?.dirty||titleSession?.saving){await titleSession.flush();if(titleSession.error)return;}
  const section=kind==='section'?item:selection.sections.find(s=>s.id===item.sectionId);if(section?.locked)return;
  if(inlineRename){inlineRename.input.focus();return;}
@@ -215,7 +221,7 @@ for(const nav of document.querySelectorAll('.folio-column nav'))nav.addEventList
 for(const [id,kind] of [['add-section','section']])$('#'+id).onclick=()=>{if(!mayNavigate()||!book||library.role!=='teacher')return;newSectionOptions={};naming=kind;$('#name-heading').textContent=kind==='section'?'New section':'New page';$('#new-name').placeholder=kind==='section'?'e.g. Week 3 · Character study':'e.g. Class summary';$('#new-name').value='';$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();};
 $('#add-page').onclick=async()=>{
  if(!mayNavigate()||!book||library.role!=='teacher'||!selection?.sectionId)return;
- const button=$('#add-page');button.disabled=true;const id=requestId();
+ const button=$('#add-page');button.disabled=true;const id=requestId();if(book.classBoards){try{await request('/api/class-boards/classes/'+book.classId,{action:'create',title:'Untitled board',requestId:id});const data=await adapter.book(book.id);selection={...data,sectionId:'boards'};renderLists();await openPage(id);}catch(error){problem(error);}finally{button.disabled=false;}return;}
  try{await adapter.create(book.id,{id,title:'Untitled page',sectionId:selection.sectionId});const data=await adapter.book(book.id);selection={...data,sectionId:selection.sectionId};renderLists();await openPage(id);titleField.focus();titleField.select();}
  catch(error){problem(error);}finally{button.disabled=false;}
 };
@@ -227,9 +233,9 @@ function downloadDraft(){if(!active)return;const bytes=JSON.stringify({notebook:
 
 window.addEventListener('beforeunload',e=>{if(pending()&&!locallyRecoverable()){e.preventDefault();e.returnValue='';}});
 window.addEventListener('online',()=>{if(active)flush(active);poll();});
-function poll({force=false}={}){if(refreshing)return refreshTask;if(!book||!selection||!force&&document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;refreshTask=(async()=>{
-  try{if(c){const {page}=await adapter.page(c.bookId,c.pageId);if(c===active&&page?.syncState){Y.applyUpdate(c.doc,decodeState(page.syncState),'remote');c.version=page.version;window.InkWireEditor?.setEditable(!c.readOnly);saveStatus(c);}}
-    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){syncError='';$('#connection').textContent=practice?'Saved on this device':'Connected';const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind,displayMode:p.displayMode,parentId:p.parentId,position:p.position,depth:p.depth}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};const current=selection.pages.find(p=>p.id===selection.pageId);if(titleSession&&(titleSession.dirty||titleSession.saving)&&current)current.title=titleSession.value.trim()||'Untitled page';else if(current?.kind==='note'&&titleSession&&current.title!==titleSession.saved)titleEditing(current);if(changed)renderLists();}
+function poll({force=false}={}){if(book?.classBoards&&!force&&Date.now()-lastBoardListPoll<15000)return;if(book?.classBoards)lastBoardListPoll=Date.now();if(refreshing)return refreshTask;if(!book||!selection||!force&&document.hidden)return;refreshing=true;const currentBook=book,epoch=openEpoch,c=active;refreshTask=(async()=>{
+  try{if(currentBook.classBoards&&force)await boardMount?.refresh({force:true});if(c){const {page}=await adapter.page(c.bookId,c.pageId);if(c===active&&page?.syncState){Y.applyUpdate(c.doc,decodeState(page.syncState),'remote');c.version=page.version;window.InkWireEditor?.setEditable(!c.readOnly);saveStatus(c);}}
+    const fresh=await adapter.book(currentBook.id);if(book===currentBook&&epoch===openEpoch){syncError='';$('#connection').textContent=practice?'Saved on this device':'Connected';const shape=v=>JSON.stringify({sections:v.sections,pages:v.pages.map(p=>({id:p.id,title:p.title,sectionId:p.sectionId,kind:p.kind,state:p.state,displayMode:p.displayMode,parentId:p.parentId,position:p.position,depth:p.depth}))});const changed=shape(selection)!==shape(fresh);selection={...fresh,sectionId:selection.sectionId,pageId:selection.pageId};const current=selection.pages.find(p=>p.id===selection.pageId);if(titleSession&&(titleSession.dirty||titleSession.saving)&&current)current.title=titleSession.value.trim()||'Untitled page';else if(current?.kind==='note'&&titleSession&&current.title!==titleSession.saved)titleEditing(current);if(changed)renderLists();}
   }catch(e){if(epoch===openEpoch){syncError=e.message;problem(e);$('#connection').textContent=e.status===401?'Sign-in expired':'Reconnecting…';if([401,403,404].includes(e.status))window.InkWireEditor?.setEditable(false);}}
   finally{refreshing=false;cloudSync.render();}})();return refreshTask;}
 async function initialize(){
@@ -315,10 +321,10 @@ $('#add-printout').onclick=()=>offerFiles();
 $('#printout-file').onchange=e=>{if(e.target.files.length)offerFiles([...e.target.files]);};
 let fileDragDepth=0;
 const fileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
-document.addEventListener('dragenter',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth++;if(library?.role==='teacher'&&book)$('#pdf-drop-overlay').hidden=false;});
+document.addEventListener('dragenter',e=>{if(!fileDrag(e))return;if(book?.classBoards){e.preventDefault();return;}e.preventDefault();fileDragDepth++;if(library?.role==='teacher'&&book)$('#pdf-drop-overlay').hidden=false;});
 document.addEventListener('dragover',e=>{if(fileDrag(e)){e.preventDefault();e.dataTransfer.dropEffect=library?.role==='teacher'?'copy':'none';}});
 document.addEventListener('dragleave',e=>{if(!fileDrag(e))return;if(--fileDragDepth<=0){fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;}});
-document.addEventListener('drop',e=>{if(!fileDrag(e))return;e.preventDefault();fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;const root=$('#note-editor .folio-canvas'),r=root?.getBoundingClientRect();const point=r&&e.target.closest('#note-editor')?{x:Math.round(Math.max(0,Math.min(5000,e.clientX-r.left))),y:Math.round(Math.max(0,Math.min(200000,e.clientY-r.top)))}:null;offerFiles([...e.dataTransfer.files],point);});
+document.addEventListener('drop',e=>{if(!fileDrag(e))return;if(book?.classBoards){e.preventDefault();problem(Error('Use Add post, then choose an image for your board post.'));return;}e.preventDefault();fileDragDepth=0;$('#pdf-drop-overlay').hidden=true;const root=$('#note-editor .folio-canvas'),r=root?.getBoundingClientRect();const point=r&&e.target.closest('#note-editor')?{x:Math.round(Math.max(0,Math.min(5000,e.clientX-r.left))),y:Math.round(Math.max(0,Math.min(200000,e.clientY-r.top)))}:null;offerFiles([...e.dataTransfer.files],point);});
 async function refreshNotebook(){
  if(!book)return;const previousSection=selection?.sectionId,previousPage=selection?.pageId,data=await adapter.book(book.id);
  const page=data.pages.find(p=>p.id===previousPage);if(previousPage&&!page)closePage();
