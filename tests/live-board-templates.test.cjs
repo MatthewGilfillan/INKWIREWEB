@@ -41,3 +41,6 @@ test('ranking snapshots require an explicit class reveal, then remain immutable'
 test('lesson links must belong to the current course and snapshot previews retain access checks',async()=>{
  const f=await fixture(),id=await create(f);const b=(await f.board('teacher',id)).board;await f.board('teacher',id,{action:'settings',...b,settingsVersion:b.settingsVersion,lessonId:'foreign-lesson'},400);await settings(f,id,{published:true,open:true});const saved=await f.board('teacher',id,{action:'snapshot'}),sid=saved.board.snapshots[0].id;await f.board('parent',id+'/thumbnail/'+sid,undefined,403);f.db.close();
 });
+test('teacher boards load with invited students who have no linked sign-in account',async()=>{
+ const f=await fixture(),unlinked=randomUUID();f.db.prepare('INSERT INTO learners(id,user_id,display_name,created_at) VALUES(?,NULL,?,0)').run(unlinked,'Invited learner');f.db.prepare('INSERT INTO class_students VALUES(?,?,0)').run(f.classId,unlinked);const id=await create(f),b=(await f.board('teacher',id)).board;assert.equal(b.roster.length,3);assert.ok(b.roster.find(r=>r.id===unlinked).appearance.color);await settings(f,id,{published:true,open:true});assert.equal((await f.board('teacher',id)).board.roster.length,3);f.db.close();
+});
