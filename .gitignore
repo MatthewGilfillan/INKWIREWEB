@@ -13,3 +13,6 @@ dist/notebooks.js.LEGAL.txt
 dist/worksheets.js
 dist/worksheets.js.LEGAL.txt
 dist/pdf/
+
+dist/board-embed.js
+dist/board-embed.js.LEGAL.txt

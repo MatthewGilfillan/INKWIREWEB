@@ -1,3 +1,4 @@
+import {cleanLiveBoardReference} from './live-board-reference.mjs';
 import {cleanNotebookFile} from './notebook-file-node.mjs';
 import {cleanFrame} from './text-frame.mjs';
 import {cleanPrintout} from './printout-node.mjs';
@@ -7,11 +8,11 @@ export const PRINT_SECTION = 'printouts';
 export const emptyDocument = () => ({type:'doc',content:[{type:'paragraph'}]});
 export function cleanDocument(value) {
   let count=0,chars=0;
-  const types=new Set(['doc','paragraph','heading','text','bulletList','orderedList','listItem','blockquote','horizontalRule','hardBreak','codeBlock','textFrame','pdfPrintout','inkStroke','notebookFile']);
+  const types=new Set(['doc','paragraph','heading','text','bulletList','orderedList','listItem','blockquote','horizontalRule','hardBreak','codeBlock','textFrame','pdfPrintout','inkStroke','notebookFile','liveBoard']);
   function node(n,depth=0) {
     if(!n||typeof n!=='object'||!types.has(n.type)||depth>20||++count>5000)throw Error('This page is too large or contains unsupported formatting.');
     const out={type:n.type};
-    const allowedAttrs=n.type==='pdfPrintout'?['assetId','page','x','y','width','height','originalWidth','originalHeight','background']:n.type==='notebookFile'?['assetId','fileName','mime','size','x','y','width','height']:n.type==='inkStroke'?['points','color','size','highlight']:n.type==='heading'?['level']:n.type==='orderedList'?['start','type']:n.type==='codeBlock'?['language']:n.type==='textFrame'?['x','y','width','height']:n.type==='paragraph'?['inkFrame']:[];
+    const allowedAttrs=n.type==='liveBoard'?['classId','boardId','snapshotId','title','x','y','width','height']:n.type==='pdfPrintout'?['assetId','page','x','y','width','height','originalWidth','originalHeight','background']:n.type==='notebookFile'?['assetId','fileName','mime','size','x','y','width','height']:n.type==='inkStroke'?['points','color','size','highlight']:n.type==='heading'?['level']:n.type==='orderedList'?['start','type']:n.type==='codeBlock'?['language']:n.type==='textFrame'?['x','y','width','height']:n.type==='paragraph'?['inkFrame']:[];
     if(n.attrs&&(typeof n.attrs!=='object'||Array.isArray(n.attrs)||Object.keys(n.attrs).some(k=>!allowedAttrs.includes(k))))throw Error('Unsupported page attributes.');
     if(n.type==='text') {
       if(typeof n.text!=='string'||!n.text)throw Error('Invalid text.');
@@ -19,6 +20,7 @@ export function cleanDocument(value) {
       if(n.marks){if(!Array.isArray(n.marks))throw Error('Invalid formatting.');out.marks=n.marks.map(m=>{if(m?.type==='textStyle')return {type:'textStyle',attrs:cleanTextStyle(m.attrs||{})};if(!['bold','italic','underline','strike','code'].includes(m?.type)||m.attrs&&Object.keys(m.attrs).length)throw Error('Invalid formatting.');return {type:m.type};});}
     } else if(n.content!==undefined) {if(!Array.isArray(n.content))throw Error('Invalid page.');out.content=n.content.map(c=>node(c,depth+1));}
     if(n.type==='pdfPrintout'){if(n.content)throw Error('Invalid PDF printout.');out.attrs=cleanPrintout(n.attrs);}
+    if(n.type==='liveBoard'){if(n.content)throw Error('Invalid Live Board reference.');out.attrs=cleanLiveBoardReference(n.attrs);}
     if(n.type==='notebookFile'){if(n.content)throw Error('Invalid notebook file.');out.attrs=cleanNotebookFile(n.attrs);}
     if(n.type==='inkStroke'){if(n.content)throw Error('Invalid notebook ink.');out.attrs=cleanStroke(n.attrs);}
     if(n.type==='paragraph'&&n.attrs?.inkFrame)out.attrs={inkFrame:cleanFrame(n.attrs.inkFrame)};

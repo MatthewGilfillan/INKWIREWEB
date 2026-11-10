@@ -109,13 +109,13 @@ export default {
         } catch { return unavailable(); }
       }
 
-      if (['/notebooks','/notebooks/','/notebooks.html','/assignment-page','/assignment-page/','/assignment-page.html'].includes(url.pathname)) {
+      if (['/notebooks','/notebooks/','/notebooks.html','/assignment-page','/assignment-page/','/assignment-page.html','/board-embed','/board-embed/','/board-embed.html'].includes(url.pathname)) {
         if(url.origin!==env.APP_ORIGIN)return privateRedirect(`${env.APP_ORIGIN}/notebooks${url.search}`);
         if(!await ready(env))return unavailable();
         const session=await createAuth(env).api.getSession({headers:request.headers});
         if(!session?.user?.emailVerified)return privateRedirect('/account');
         if(!['teacher','student','parent'].includes(session.user.requestedRole))return privateRedirect('/account?manage=1');
-        const pagePath=url.pathname.startsWith('/assignment-page')?'/assignment-page':'/notebooks';
+        const pagePath=url.pathname.startsWith('/board-embed')?'/board-embed':url.pathname.startsWith('/assignment-page')?'/assignment-page':'/notebooks';
         if(url.pathname!==pagePath)return privateRedirect(pagePath+url.search);
         const response=await env.ASSETS.fetch(new Request(new URL(pagePath,env.APP_ORIGIN)));
         return new Response(response.body,{headers:{...secureHeaders,'Content-Type':'text/html; charset=utf-8',

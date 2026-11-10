@@ -1,3 +1,4 @@
+import {LiveBoardReference,cleanLiveBoardReference} from './live-board-node.mjs';
 import {canvasSelectionKey,mountCanvasSelection} from './canvas-selection.mjs';
 import {eraserSizes} from './ink-geometry.mjs';
 import {mountNotebookInk} from './notebook-ink.mjs';
@@ -35,7 +36,7 @@ function destroy() {
   activeProvider = undefined;
 }
 
-function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople, ydoc, loadPdf, loadAsset, onInsertPdf, readOnly = false }) {
+function mount({ element, toolbar, document, text, label, onChange, onRecovery, shared, onStatus, onPeople, ydoc, loadPdf, loadAsset, onInsertPdf, onInsertLiveBoard, readOnly = false }) {
   destroy();
   let connection;
   const sharedDocument = shared && demoDocument(shared.key);
@@ -68,7 +69,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   }
   const options = {
     element,
-    extensions: [NotebookFile.configure({loadAsset}),PdfPrintout.configure({loadPdf}),InkStroke,TextFrame.configure({canvas:!!ydoc,onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
+    extensions: [LiveBoardReference,NotebookFile.configure({loadAsset}),PdfPrintout.configure({loadPdf}),InkStroke,TextFrame.configure({canvas:!!ydoc,onEmpty:attrs=>{if(activeEditor?.view.hasFocus())showCaret(attrs);}}),TextFormat,StarterKit.configure({ heading: { levels: [2, 3] }, link: false, ...((shared || ydoc) ? { undoRedo: false } : {}) }),
       ...(ydoc ? [Collaboration.configure({document:ydoc,field:"document"})] : shared ? [
         Collaboration.configure({ document: activeProvider.getYDoc(), field: sharedDocument.field }),
         CollaborationCaret.configure({ provider: activeProvider, user: {
@@ -164,7 +165,7 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
   if(ribbonDrawing){
     const insertPanel=window.document.createElement('div');insertPanel.className='note-insert-options';
     const add=(label,run)=>{const button=window.document.createElement('button');button.type='button';button.textContent=label;button.onmousedown=e=>e.preventDefault();button.onclick=run;insertPanel.append(button);};
-    add('Text box',()=>showCaret());if(onInsertPdf)add('File or printout',onInsertPdf);add('Divider',()=>currentEditor().chain().focus().setHorizontalRule().run());add('Date',()=>currentEditor().chain().focus().insertContent(new Intl.DateTimeFormat(undefined,{dateStyle:'long'}).format(new Date())).run());
+    add('Text box',()=>showCaret());if(onInsertPdf)add('File or printout',onInsertPdf);if(onInsertLiveBoard)add('Live Board',onInsertLiveBoard);add('Divider',()=>currentEditor().chain().focus().setHorizontalRule().run());add('Date',()=>currentEditor().chain().focus().insertContent(new Intl.DateTimeFormat(undefined,{dateStyle:'long'}).format(new Date())).run());
     mountNotebookRibbon({toolbar,history,panels:[{id:'text',label:'Text',content:[typography,advanced]},{id:'pen',label:'Pen',content:[ribbonDrawing.penPanel]},{id:'highlight',label:'Highlighter',content:[ribbonDrawing.highlightPanel]},{id:'eraser',label:'Eraser',content:[ribbonDrawing.eraseOptions]},{id:'insert',label:'Insert',content:[insertPanel]}],onSelect:ribbonDrawing.select});
   }
   updateToolbar(activeEditor);
@@ -191,10 +192,11 @@ function mount({ element, toolbar, document, text, label, onChange, onRecovery, 
 
 function insertPrintout(assetId,pages,point){
  const editor=activeEditor;if(!editor?.isEditable)return false;
- let bottom=24;editor.state.doc.descendants(node=>{const a=['pdfPrintout','notebookFile'].includes(node.type.name)?node.attrs:node.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});
+ let bottom=24;editor.state.doc.descendants(node=>{const a=['pdfPrintout','notebookFile','liveBoard'].includes(node.type.name)?node.attrs:node.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});
  const nodes=printoutNodes(assetId,pages,point||{x:24,y:bottom});
  const pos=editor.state.doc.content.size;editor.view.dispatch(editor.state.tr.insert(pos,nodes.map(n=>editor.schema.nodeFromJSON(n))));ensureCanvasCaret(editor.view);return true;
 }
-function insertFile(attrs){const e=activeEditor;if(!e?.isEditable)return false;let bottom=24;e.state.doc.descendants(n=>{const a=['pdfPrintout','notebookFile'].includes(n.type.name)?n.attrs:n.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});const value=cleanNotebookFile({x:24,y:bottom,width:320,height:100,...attrs});e.view.dispatch(e.state.tr.insert(e.state.doc.content.size,e.schema.nodes.notebookFile.create(value)));ensureCanvasCaret(e.view);return true;}
-window.InkWireEditor = { mount, insertFile, insertPrintout, destroy, hasPendingChanges,
+function insertFile(attrs){const e=activeEditor;if(!e?.isEditable)return false;let bottom=24;e.state.doc.descendants(n=>{const a=['pdfPrintout','notebookFile','liveBoard'].includes(n.type.name)?n.attrs:n.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});const value=cleanNotebookFile({x:24,y:bottom,width:320,height:100,...attrs});e.view.dispatch(e.state.tr.insert(e.state.doc.content.size,e.schema.nodes.notebookFile.create(value)));ensureCanvasCaret(e.view);return true;}
+function insertLiveBoard(attrs){const e=activeEditor;if(!e?.isEditable)return false;let bottom=24;e.state.doc.descendants(n=>{const a=['pdfPrintout','notebookFile','liveBoard'].includes(n.type.name)?n.attrs:n.attrs?.inkFrame;if(a)bottom=Math.max(bottom,a.y+(a.height||40)+24);});const value=cleanLiveBoardReference({x:24,y:bottom,width:880,height:680,snapshotId:'',...attrs});e.view.dispatch(e.state.tr.insert(e.state.doc.content.size,e.schema.nodes.liveBoard.create(value)));ensureCanvasCaret(e.view);return true;}
+window.InkWireEditor = { mount, insertFile, insertPrintout, insertLiveBoard, destroy, hasPendingChanges,
   focusPage:()=>activeEditor?.focusPage?.(), getText: () => activeEditor?.getText() || '', setEditable: value => activeEditor?.setEditable(value) };

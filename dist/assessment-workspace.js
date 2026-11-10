@@ -1,4 +1,5 @@
-import {studentPageHTML} from './educade-student-view.js?v=20261107-profile-header';
+import {liveBoardEvidenceHTML} from './live-board-evidence.mjs?v=20261110-library';
+import {studentPageHTML} from './educade-student-view.js?v=20261110-live-library';
 import {assessmentDemoClasses,isAssessmentDemo,loadAssessmentDemo} from './assessment-demo.mjs';
 import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261103-progress-estimates';
 import catalogue from './assessment-catalogue.mjs?v=20261103-class-view';
@@ -9,6 +10,7 @@ import {api,escape} from './workspace-shared.js';
 
 export function createAssessmentWorkspace({root,getClasses,openTimeline,openStandards,onDemoInstalled}) {
   const entry=new URLSearchParams(location.search);
+  let boardEvidence=[],boardEvidenceUnavailable=false;
   let classId=entry.get('class') || assessmentDemoClasses.find(c=>c.id===new URLSearchParams(location.search).get('demo'))?.id || (new URLSearchParams(location.search).get('demo')==='1'?assessmentDemoClasses[0].id:''),learnerId=entry.get('learner') || '',view='evidence',framework='ccss',domain='all',search='',students=[],lessons=[],courseAssessment=null,libraryPack='ccss-ela',librarySearch='',loading=false,error='',epoch=0,classScope='overall',expandedAxis='',expandedLearner='',classMode='bars',learnerSearch='',learnerSort='name',portrait='photos',skillRecords=[],enduringTargets='',profileScope=Object.hasOwn(learningTabs,entry.get('subject'))?entry.get('subject'):'overall',studentMode='radar',selectedSkill='';
   const $=selector=>root.querySelector(selector),expandedDetails=new Set();
   root.innerHTML=`<div class="assessment-controls"><label><strong>Class</strong><select data-assessment-class aria-label="Class"></select></label><div class="assessment-views" role="group" aria-label="Assessment workspace"><button type="button" data-assessment-view="evidence" aria-pressed="true">Learning evidence</button><button type="button" data-assessment-view="standards" aria-pressed="false">Standards library</button><button type="button" data-assessment-view="catalogue" aria-pressed="false">Skill catalogue</button></div><button type="button" class="text-button" data-assessment-refresh>Refresh</button></div><p data-assessment-status role="status"></p><div data-assessment-body></div>`;
@@ -36,13 +38,13 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     if(learnerId){renderStudent();return;}
     document.title='Assessment | Ink Wire';
     const demo=currentDemo();
-    $('[data-assessment-body]').innerHTML=(demo?`<div class="assessment-demo-notice"><span><strong>Demo class</strong> · Fictional students and sample responses from EDUCADE.</span>${isAssessmentDemo(classId)?'<button type="button" class="text-button" data-install-assessment-demo>Add demo classes to my workspace</button>':''}</div>`:'')+classOverviewHTML(classData())+courseStandardsHTML();
+    $('[data-assessment-body]').innerHTML=(demo?`<div class="assessment-demo-notice"><span><strong>Demo class</strong> · Fictional students and sample responses from EDUCADE.</span>${isAssessmentDemo(classId)?'<button type="button" class="text-button" data-install-assessment-demo>Add demo classes to my workspace</button>':''}</div>`:'')+classOverviewHTML(classData())+courseStandardsHTML()+liveBoardEvidenceHTML(boardEvidence,{classId,students,unavailable:boardEvidenceUnavailable});
   }
   function classData(){return {students,lessons,catalogue,scope:classScope,mode:classMode,search:learnerSearch,sort:learnerSort,portrait,records:skillRecords,expandedAxis,expandedLearner,expandedDetails};}
   function refreshRows(){rememberClassDetails();if($('[data-class-rows]'))$('[data-class-rows]').innerHTML=classRowsHTML(classData());}
   function renderStudent(){
     const student=students.find(s=>s.id===learnerId),className=getClasses().find(c=>c.id===classId)?.name || assessmentDemoClasses.find(c=>c.id===classId)?.name || 'Class';
-    $('[data-assessment-body]').innerHTML=studentPageHTML({classId,className,student,students,catalogue,lessons,records:skillRecords,scope:profileScope,mode:studentMode,selectedSkill,demo:currentDemo(),virtual:isAssessmentDemo(classId),enduringTargets});
+    $('[data-assessment-body]').innerHTML=studentPageHTML({classId,className,student,students,catalogue,lessons,records:skillRecords,scope:profileScope,mode:studentMode,selectedSkill,demo:currentDemo(),virtual:isAssessmentDemo(classId),enduringTargets,boardEvidence,boardEvidenceUnavailable});
     document.title=student?student.name+' · Assessment | Ink Wire':'Assessment | Ink Wire';
   }
   function writeRoute(push=false){
@@ -92,12 +94,12 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
   }
   function syncDemoURL(){writeRoute();}
   async function load(){
-    const token=++epoch;classOptions();students=[];lessons=[];courseAssessment=null;enduringTargets='';skillRecords=[];error='';
+    const token=++epoch;classOptions();students=[];lessons=[];courseAssessment=null;enduringTargets='';skillRecords=[];boardEvidence=[];boardEvidenceUnavailable=false;error='';
     if(!classId){loading=false;render();return;}
     loading=true;render();
     try{
-      const [roster,timeline]=isAssessmentDemo(classId)?await loadAssessmentDemo(classId).then(data=>[{students:data.students},data]):await Promise.all([api('/api/enrollment/classes/'+classId+'/roster'),api('/api/lesson-feedback/classes/'+classId+'/timeline')]);
-      if(token!==epoch)return;students=timeline.demoSource==='educade-v1'?roster.students.map(student=>({...student,demo:true,initials:student.name.split(' ').map(word=>word[0]).join('')})):roster.students;lessons=timeline.course?.lessons || [];courseAssessment=timeline.course?.assessment || null;enduringTargets=timeline.course?.enduringUnderstandings || '';skillRecords=Array.isArray(timeline.skillEvidence)?timeline.skillEvidence.filter(record=>students.some(student=>student.id===record.learnerId)&&catalogue.groups.some(group=>group.skills.some(skill=>skill.id===record.skillId))&&typeof record.correct==='boolean'):[];
+      const [roster,timeline,boards]=isAssessmentDemo(classId)?await loadAssessmentDemo(classId).then(data=>[{students:data.students},data,{records:[]}]):await Promise.all([api('/api/enrollment/classes/'+classId+'/roster'),api('/api/lesson-feedback/classes/'+classId+'/timeline'),api('/api/class-boards/classes/'+classId+'/evidence').catch(()=>({records:[],unavailable:true}))]);
+      if(token!==epoch)return;boardEvidence=boards.records||[];boardEvidenceUnavailable=!!boards.unavailable;students=timeline.demoSource==='educade-v1'?roster.students.map(student=>({...student,demo:true,initials:student.name.split(' ').map(word=>word[0]).join('')})):roster.students;lessons=timeline.course?.lessons || [];courseAssessment=timeline.course?.assessment || null;enduringTargets=timeline.course?.enduringUnderstandings || '';skillRecords=Array.isArray(timeline.skillEvidence)?timeline.skillEvidence.filter(record=>students.some(student=>student.id===record.learnerId)&&catalogue.groups.some(group=>group.skills.some(skill=>skill.id===record.skillId))&&typeof record.correct==='boolean'):[];
       const preferred=courseAssessment?.frameworks?.[0]?.id;if(preferred)libraryPack=preferred;
 
     }catch(e){if(token!==epoch)return;error=e.message;}
@@ -125,7 +127,7 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
   root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();$('[data-switch-learner]')?.focus({preventScroll:true});}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
     if(event.target.matches('[data-assessment-framework]')){framework=event.target.value;renderCatalogue();$('[data-assessment-framework]').focus({preventScroll:true});}});
   root.addEventListener('input',event=>{if(event.target.matches('[data-class-search]')){learnerSearch=event.target.value;refreshRows();}if(event.target.matches('[data-library-search]')){librarySearch=event.target.value;renderStandardsCriteria();}if(event.target.matches('[data-assessment-search]')){search=event.target.value;renderSkills();}});
-  for(const type of ['inkwire:quiz-changed','inkwire:feedback-published'])document.addEventListener(type,event=>{if(event.detail?.classId===classId&&!root.hidden)load();});
+  for(const type of ['inkwire:quiz-changed','inkwire:feedback-published','inkwire:board-assessment-published'])document.addEventListener(type,event=>{if(event.detail?.classId===classId&&!root.hidden)load();});
   root.addEventListener('error',event=>{if(event.target.matches('.educade-avatar img'))event.target.hidden=true;},true);
   root.addEventListener('keydown',event=>{const tab=event.target.closest('[data-class-scope],[data-profile-scope][role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const profile=Boolean(tab.dataset.profileScope),ids=Object.keys(learningTabs),index=ids.indexOf(profile?profileScope:classScope),next=ids[event.key==='Home'?0:event.key==='End'?ids.length-1:(index+(event.key==='ArrowRight'?1:-1)+ids.length)%ids.length];if(profile){profileScope=next;selectedSkill='';writeRoute();renderStudent();$(`[data-profile-scope="${next}"]`).focus({preventScroll:true});}else{classScope=next;render();$(`[data-class-scope="${next}"]`).focus({preventScroll:true});}});
   window.addEventListener('popstate',()=>{const query=new URLSearchParams(location.search);if(query.get('view')!=='assessment')return;const next=query.get('class')||classId,changed=next!==classId;classId=next;learnerId=query.get('learner')||'';profileScope=Object.hasOwn(learningTabs,query.get('subject'))?query.get('subject'):'overall';selectedSkill='';view='evidence';if(changed)load();else render();});
