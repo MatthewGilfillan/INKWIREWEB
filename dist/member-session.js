@@ -1,6 +1,6 @@
-import {createAssignmentDashboard} from './assignments-workspace.js?v=20261108-assignments';
+import {createAssignmentDashboard} from './assignments-workspace.js?v=20261110-gradebook';
 import {createClassFiles} from './class-files.js';
-import {createMemberCourse} from './member-course.js?v=20261110-live-library';
+import {createMemberCourse} from './member-course.js?v=20261110-gradebook';
 import {api,escape,signOut} from './workspace-shared.js';
 const role=document.body.dataset.memberRole,list=document.querySelector('#class-list'),status=document.querySelector('#dashboard-status'),retry=document.querySelector('#retry-classes');
 const assignmentRoot=document.createElement('section');assignmentRoot.className='member-assignments';list.before(assignmentRoot);const assignmentDashboard=createAssignmentDashboard({root:assignmentRoot,parent:role==='parent'});

@@ -1,3 +1,4 @@
+import {handleGradebook} from './gradebook.mjs';
 import {handleClassBoards} from './class-boards.mjs';
 import {handleDashboardRecords} from './dashboard-records.mjs';
 import {handleClassFiles} from './class-files.mjs';
@@ -184,6 +185,7 @@ export default {
         const session=await auth.api.getSession({headers:request.headers});
         return await handleProfile(request,env,session?.user,{json,fail,readJSON});
       }
+      if(url.pathname.startsWith('/api/gradebook/')){const session=await auth.api.getSession({headers:request.headers});return await handleGradebook(request,env,session?.user,{readJSON});}
       if(url.pathname.startsWith('/api/class-boards/')){const session=await auth.api.getSession({headers:request.headers});return await handleClassBoards(request,env,session?.user);}
       if(url.pathname==='/api/assignments'||url.pathname.startsWith('/api/assignments/')){const session=await auth.api.getSession({headers:request.headers});return await handleAssignments(request,env,session?.user,{readJSON});}
       if(url.pathname==='/api/notebooks'||url.pathname.startsWith('/api/notebooks/')){const session=await auth.api.getSession({headers:request.headers});return await handleNotebooks(request,env,session?.user);}

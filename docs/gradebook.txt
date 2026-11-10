@@ -1,0 +1,28 @@
+Gradebook and formative assessment — 11 November 2026
+
+Teacher workflow
+Open Assessment > Gradebook. Choose Automatic / AI, Teacher or Both.
+Automatic evidence currently comes from server-marked quizzes, with first/latest/best attempts shown separately. This release does not generate AI grades. Published lesson ratings and Live Board judgments remain teacher evidence; they are not relabelled AI results.
+
+Create an activity from a lesson, quiz, assignment, master notebook page, or manually for paper work and observations. Formative and summative purposes are separate. Formats: feedback only, points, percentage, letter grade, standards levels. School criterion judgments use Beginning / Approaching / Meeting / Exceeding, with Not enough evidence as an explicit state. They do not claim a validated numeric conversion to a framework's attainment scale.
+
+Record the evidence type, observation, support, optional grade, targeted-standard judgments, feedback, next step, recheck date and a private note. Save draft & next student supports quick teacher recording. Exit-ticket and hinge-question evidence can be recorded here; this is not a new student polling or question-authoring system.
+
+Only explicit teacher publication changes the result visible to students and linked parents. New drafts preserve the prior publication. Publication snapshots the activity details and, for quiz-linked records, captures trusted automatic evidence server-side. Automatic marks never overwrite the teacher result. Missing, absent, exempt and not observed remain distinct from zero. No cross-scale average or mastery conversion is calculated. Reassessment history is retained; private notes and audit details never enter family projections.
+
+Activity title, date and success criteria can be corrected. Once evidence exists, scale, source and standards stay fixed; use a follow-up activity to change them. Historical publications retain their earlier details until explicitly republished.
+
+Data and permissions
+API: /api/gradebook/classes/{classId}[/{activityId}]. Session, current class membership, teacher role, origin and expected-account checks guard mutations. Family GET responses contain only linked learners' latest published snapshots. Archived/deleted classes and withdrawn class members fail closed. R2 records live under gradebook/{classId}/activities/{id}.json. Conditional ETag writes and activity revisions reject conflicting saves. Request IDs make retries idempotent. Each student/activity retains up to 200 historical observations; the server refuses further writes and asks for a follow-up assessment, rather than truncating history. An 8 MiB activity cap bounds records. The existing private R2 binding is reused; no D1 migration is required.
+
+Research informing the design
+NESA: formative evidence becomes useful when it guides teaching, feedback and opportunities to improve:
+https://curriculum.nsw.edu.au/assessment-and-reporting/formative-assessment
+EEF: feedback principles and effective use matter more than choosing written versus verbal delivery:
+https://educationendowmentfoundation.org.uk/education-evidence/guidance-reports/feedback
+British Council: transparency and human control when using AI for marking and assessment:
+https://www.teachingenglish.org.uk/professional-development/teachers/using-digital-technologies/ai-guidelines-teachers
+These design decisions are recommendations, not a claim of compliance with every school's grading policy.
+
+Verification
+258 automated tests pass, including eight gradebook tests covering grades, source integrity, family privacy, membership, drafts/publication, reassessment history, concurrent writes, activity edits and notebook references. Build and Wrangler deployment dry run pass. Browser checks with fictional learners cover source toggles, standards-only activity creation, private draft versus official result, parent view, saving to the next student, and activity corrections.
