@@ -127,4 +127,3 @@ export async function handleClassBoards(request,env,user){
   if(!id)throw issue('Not found.',404);const result=await change(env,user,cid,id,input);return json({board:projection(result.board,result.scope,user),userId:user.id,teacher:result.scope.teacher});
  }catch(error){return json({message:error.message||'Class boards are temporarily unavailable.'},error.status||500);}
 }
-export function classBoardBooks(classes){return classes.map(c=>({id:c.id+'.boards',classId:c.id,className:c.name,learnerId:'boards',learnerName:'Live Boards',title:'Live Boards',classBoards:true}));}

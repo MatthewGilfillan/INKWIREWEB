@@ -21,7 +21,8 @@ const namedUntitledPages=new Set();
 let boardMount=null,lastBoardListPoll=0;
 let library,book,selection,active,openEpoch=0,embeddedDirty=false,naming,refreshing=false,printoutImport=null,worksheetMount=null,worksheetLoading=false;
 const boardRoot=document.createElement('section');boardRoot.id='class-board-host';boardRoot.className='class-board-host';boardRoot.hidden=true;$('.folio-content').append(boardRoot);
-const boardsButton=document.createElement('button');boardsButton.id='open-class-boards';boardsButton.type='button';boardsButton.className='add-printout';boardsButton.textContent='Live Boards';boardsButton.hidden=true;$('#add-printout').before(boardsButton);boardsButton.onclick=()=>{if(book&&mayNavigate())openBook(book.classId+'.boards');};
+const boardsButton=$('#insert-live-board');boardsButton.onclick=()=>insertNotebookBoard();
+let boardInsertBusy=false;
 const colors=['#9d89be','#67a7a3','#ccaa70','#7c9fc1','#b38ba4'];
 async function request(path,body) {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify({...body,expectedUserId:library?.userId})}),signal:AbortSignal.timeout(body?.action==='translate'?120000:60000)});
@@ -56,8 +57,8 @@ const cloudSync=mountCloudSync($('#notebook-sync'),{observe:[$('#connection'),$(
  }catch(error){syncError=error.message;problem(error);}finally{syncBusy=false;cloudSync.render();}
 }});
 function renamePending(){return !!inlineRename&&(inlineRename.saving||inlineRename.input.value.trim()!==inlineRename.title);}
-function pending(){return boardMount?.pending()||titleSession?.dirty||titleSession?.saving||renamePending()||fileBusy||worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
-function locallyRecoverable(){if(boardMount?.pending())return boardMount.locallySaved();if(titleSession?.dirty&&!titleSession.locallySaved)return false;if(renamePending()||fileBusy||worksheetLoading||printoutImport?.busy)return false;if(active)return active.dirty<=active.saved||!active.localFailure&&active.localSaved>=active.dirty;return !embeddedDirty||!!worksheetMount?.locallySaved();}
+function pending(){return boardInsertBusy||boardMount?.pending()||titleSession?.dirty||titleSession?.saving||renamePending()||fileBusy||worksheetLoading||!!printoutImport?.busy||embeddedDirty||!!active&&(active.dirty>active.saved||active.saving||active.localFailure);}
+function locallyRecoverable(){if(boardInsertBusy)return false;if(boardMount?.pending())return boardMount.locallySaved();if(titleSession?.dirty&&!titleSession.locallySaved)return false;if(renamePending()||fileBusy||worksheetLoading||printoutImport?.busy)return false;if(active)return active.dirty<=active.saved||!active.localFailure&&active.localSaved>=active.dirty;return !embeddedDirty||!!worksheetMount?.locallySaved();}
 function mayNavigate(){if(!pending()||locallyRecoverable())return true;problem(Error('Your browser is still saving this page. Keep it open for a moment, then try again.'));return false;}
 function row(value,current,icon,subtitle='',extra='') {const menu=!book?.classBoards&&(value.sectionId||selection?.sections?.some(s=>s.id===value.id))?`<button type="button" class="folio-row-menu" data-item-menu data-id="${escape(value.id)}" aria-label="Options for ${escape(value.title)}" aria-haspopup="menu" title="More options">⋯</button>`:'';return `<div class="folio-nav-item" style="--item-depth:${value.depth||0}"><button class="folio-row" data-id="${escape(value.id)}" aria-current="${String(current)}" ${extra}>${icon}<span class="row-copy"><b>${escape(value.title)}</b>${subtitle?`<small>${escape(subtitle)}</small>`:''}</span></button>${menu}</div>`;}
 
@@ -72,7 +73,7 @@ function pane(name){$('#folio-grid').dataset.pane=name;$('#mobile-pane').value=n
 function renderBooks(){
   notebookNavigation.setBook(book);
   const classId=$('#class-filter').value,search=$('#notebook-search').value.trim().toLowerCase();
-  const visible=library.notebooks.filter(b=>(!classId||b.classId===classId)&&(!search||(b.learnerName+' '+b.className).toLowerCase().includes(search)));
+  const visible=library.notebooks.filter(b=>!b.classBoards&&(!classId||b.classId===classId)&&(!search||(b.learnerName+' '+b.className).toLowerCase().includes(search)));
   $('#notebook-count').textContent=String(visible.length);
   $('#notebook-list').innerHTML=visible.length?visible.map(b=>row(b,b.id===book?.id,b.teacherBook?'<span class="teacher-book-pin" aria-hidden="true">⌖</span>':`<span class="book-icon" style="--book-color:${colors[library.notebooks.indexOf(b)%colors.length]}" aria-hidden="true"></span>`,b.className+(b.teacherBook?' · Private':b.classBoards?' · Shared with class':''))).join(''):'<p class="nav-empty">No notebooks match this view.</p>';
   const scoped=library.classes.find(c=>c.id===classId);$('#hub-title').textContent=scoped?scoped.name+' notebooks':library.role==='teacher'?'Master notebooks':library.role==='parent'?'My child’s notebooks':'My notebooks';
@@ -87,7 +88,7 @@ function renderLists(){
   const pages=(selection?.pages||[]).filter(p=>p.sectionId===selection.sectionId);
   if(inlineRename?.kind!=='page')$('#page-list').innerHTML=pages.length?pages.map(p=>row(p,p.id===selection.pageId,`<span class="page-icon" aria-hidden="true">${p.kind==='worksheet'?'▧':p.kind==='board'?'▤':'☷'}</span>`,p.kind==='board'?p.state:'')).join(''):'<p class="nav-empty">No pages in this section yet.</p>';
   for(const id of ['add-section','add-page'])$('#'+id).disabled=!book||library.role!=='teacher';$('#add-page').disabled ||= !!section?.group||!!section?.locked;$('#notebook-deleted-items').hidden=library.role!=='teacher';$('#distribute-page').hidden=library.role!=='teacher'||!selection?.pageId||!!book?.classBoards;
-  $('#add-printout').hidden=!book||library.role!=='teacher'||!!book?.classBoards;boardsButton.hidden=!book||library.role==='parent'||practice||!!book?.classBoards;if(book?.classBoards){$('#add-section').disabled=true;$('#notebook-deleted-items').hidden=true;$('#add-page').title='New shared board';$('#add-page').setAttribute('aria-label','New shared board');}else{$('#add-page').title='Add page';$('#add-page').setAttribute('aria-label','Add page');}
+  $('#add-printout').hidden=!book||library.role!=='teacher'||!!book?.classBoards;boardsButton.hidden=!book||library.role!=='teacher'||practice||!!book?.classBoards;boardsButton.disabled=boardInsertBusy||!section||!!section.group||!!section.locked;if(book?.classBoards){$('#add-section').disabled=true;$('#notebook-deleted-items').hidden=true;$('#add-page').title='New shared board';$('#add-page').setAttribute('aria-label','New shared board');}else{$('#add-page').title='Add page';$('#add-page').setAttribute('aria-label','Add page');}
   $('#printout-hint').hidden=!book||library.role!=='teacher'||!!book?.classBoards;
   updateLinks();
 }
@@ -221,13 +222,29 @@ fullscreenButton.hidden=!fullscreenRoot.requestFullscreen;fullscreenButton.oncli
 $('#mobile-pane').onchange=e=>{if(e.target.value!=='content'){$('#folio-grid').classList.remove('focus-page');syncNavigationButton();}pane(e.target.value);};
 for(const nav of document.querySelectorAll('.folio-column nav'))nav.addEventListener('keydown',e=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key))return;const buttons=[...nav.querySelectorAll('.folio-row')],i=buttons.indexOf(document.activeElement);if(i<0)return;e.preventDefault();buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:Math.max(0,Math.min(buttons.length-1,i+(e.key==='ArrowDown'?1:-1)))]?.focus();});
 for(const [id,kind] of [['add-section','section']])$('#'+id).onclick=()=>{if(!mayNavigate()||!book||library.role!=='teacher')return;newSectionOptions={};naming=kind;$('#name-heading').textContent=kind==='section'?'New section':'New page';$('#new-name').placeholder=kind==='section'?'e.g. Week 3 · Character study':'e.g. Class summary';$('#new-name').value='';$('#name-error').textContent='';$('#name-dialog').showModal();$('#new-name').focus();};
-async function insertNotebookBoard(){
- if(!book||!active||library.role!=='teacher'||!mayNavigate())return;const current=active,classId=book.classId;
- try{const data=await request('/api/class-boards/classes/'+classId),choice=await new Promise(resolve=>{const d=document.createElement('dialog');d.className='live-board-insert-picker';d.innerHTML='<h2>Insert a Live Board</h2><p>The notebook block uses the shared activity. It does not create separate student copies.</p><form><label>Activity<select name="board"><option value="new">Create a new activity…</option>'+data.pages.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.title)+' · '+escape(p.state)+'</option>').join('')+'</select></label><label>Version<select name="snapshot"><option value="">Live activity</option></select></label><div><button type="submit">Insert board</button><button type="button" data-cancel>Cancel</button></div></form>';let result=null;const f=d.querySelector('form');f.elements.board.onchange=()=>{const p=data.pages.find(p=>p.id===f.elements.board.value);f.elements.snapshot.innerHTML='<option value="">Live activity</option>'+(p?.snapshots||[]).map(s=>'<option value="'+escape(s.id)+'">Saved '+escape(new Date(s.createdAt).toLocaleString())+'</option>').join('');};f.onsubmit=event=>{event.preventDefault();result={boardId:f.elements.board.value,snapshotId:f.elements.snapshot.value};d.close();};d.querySelector('[data-cancel]').onclick=()=>d.close();d.addEventListener('close',()=>{d.remove();resolve(result);},{once:true});document.body.append(d);d.showModal();});if(!choice||active!==current)return;
- let page=data.pages.find(p=>p.id===choice.boardId);if(choice.boardId==='new'){const template=await chooseLiveBoardTemplate();if(!template||active!==current)return;const id=requestId(),definition=templateById(template);await request('/api/class-boards/classes/'+classId,{action:'create',template,title:definition?.name||'Untitled board',prompt:definition?.prompt||'',requestId:id});choice.boardId=id;page={title:definition?.name||'Untitled board'};}
- if(active!==current)return;if(!window.InkWireEditor.insertLiveBoard({classId,boardId:choice.boardId,snapshotId:choice.snapshotId,title:page.title}))throw Error('Open an editable notebook page to insert the board.');await flush(current);
- }catch(error){problem(error);}
+async function chooseExistingBoard(pages,preferred=''){
+ return new Promise(resolve=>{const d=document.createElement('dialog');d.className='live-board-insert-picker';d.innerHTML='<h2>Insert existing board</h2><p>This inserts the same shared activity into this notebook page.</p><form><label>Activity<select name="board">'+pages.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.title)+' · '+escape(p.state)+'</option>').join('')+'</select></label><label>Version<select name="snapshot"></select></label><div><button type="submit">Insert board</button><button type="button" data-cancel>Cancel</button></div></form>';let result=null;const f=d.querySelector('form');f.elements.board.value=pages.some(p=>p.id===preferred)?preferred:pages[0]?.id||'';const versions=()=>{const p=pages.find(p=>p.id===f.elements.board.value);f.elements.snapshot.innerHTML='<option value="">Live activity</option>'+(p?.snapshots||[]).map(s=>'<option value="'+escape(s.id)+'">Saved '+escape(new Date(s.createdAt).toLocaleString())+'</option>').join('');};f.elements.board.onchange=versions;versions();f.onsubmit=event=>{event.preventDefault();result={boardId:f.elements.board.value,snapshotId:f.elements.snapshot.value};d.close();};d.querySelector('[data-cancel]').onclick=()=>d.close();d.addEventListener('close',()=>{d.remove();resolve(result);},{once:true});document.body.append(d);d.showModal();});
 }
+async function insertNotebookBoard(){
+ if(boardInsertBusy||!book||book.classBoards||library.role!=='teacher'||!mayNavigate())return;
+ const targetBook=book,targetSection=selection?.sections.find(s=>s.id===selection.sectionId),currentPage=selection?.pageId;
+ if(!targetSection||targetSection.group||targetSection.locked){problem(Error('Choose an unlocked notebook section first.'));return;}
+ try{
+  const data=await request('/api/class-boards/classes/'+targetBook.classId),preferred=query.get('insertBoardId');let choice,template;
+  if(preferred&&data.pages.some(p=>p.id===preferred))choice=await chooseExistingBoard(data.pages,preferred);
+  else{template=await chooseLiveBoardTemplate({allowExisting:!!data.pages.length,location:targetBook.learnerName+' / '+targetSection.title});if(!template)return;if(template==='existing')choice=await chooseExistingBoard(data.pages);}
+  if(!choice&&(!template||template==='existing'))return;
+  if(book!==targetBook||selection?.sectionId!==targetSection.id||selection?.pageId!==currentPage)return;
+  boardInsertBusy=true;boardsButton.disabled=true;clearProblem();
+  let page=choice?data.pages.find(p=>p.id===choice.boardId):null;
+  if(!choice){const id=requestId(),definition=templateById(template);await request('/api/class-boards/classes/'+targetBook.classId,{action:'create',template,title:definition?.name||'Untitled board',prompt:definition?.prompt||'',requestId:id});choice={boardId:id,snapshotId:''};page={title:definition?.name||'Untitled board'};}
+  if(!active){const id=requestId();await adapter.create(targetBook.id,{id,title:page.title,sectionId:targetSection.id});const updated=await adapter.book(targetBook.id);selection={...updated,sectionId:targetSection.id};boardInsertBusy=false;await openPage(id);boardInsertBusy=true;}
+  if(!active||active.readOnly||book!==targetBook)throw Error('Open an editable notebook page to insert this board.');
+  const current=active;if(!window.InkWireEditor.insertLiveBoard({classId:targetBook.classId,boardId:choice.boardId,snapshotId:choice.snapshotId,title:page.title,width:Math.max(320,Math.min(880,$('#note-body').clientWidth-48))}))throw Error('The board could not be inserted. Try again.');await flush(current);
+  query.delete('insertBoardId');const url=new URL(location.href);url.searchParams.delete('insertBoardId');history.replaceState(null,'',url);
+ }catch(error){problem(error);}finally{boardInsertBusy=false;boardsButton.disabled=false;}
+}
+
 $('#add-page').onclick=async()=>{
  if(!mayNavigate()||!book||library.role!=='teacher'||!selection?.sectionId)return;
  const button=$('#add-page');button.disabled=true;const id=requestId();if(book.classBoards){try{const template=await chooseLiveBoardTemplate();if(!template)return;await request('/api/class-boards/classes/'+book.classId,{action:'create',template,title:templateById(template)?.name||'Untitled board',prompt:templateById(template)?.prompt||'',requestId:id});const data=await adapter.book(book.id);selection={...data,sectionId:'boards'};renderLists();await openPage(id);}catch(error){problem(error);}finally{button.disabled=false;}return;}
@@ -248,6 +265,7 @@ function poll({force=false}={}){if(book?.classBoards&&!force&&Date.now()-lastBoa
   }catch(e){if(epoch===openEpoch){syncError=e.message;problem(e);$('#connection').textContent=e.status===401?'Sign-in expired':'Reconnecting…';if([401,403,404].includes(e.status))window.InkWireEditor?.setEditable(false);}}
   finally{refreshing=false;cloudSync.render();}})();return refreshTask;}
 async function initialize(){
+  const legacy=query.get('notebookId'),legacyPage=query.get('pageId');if(!practice&&legacy?.endsWith('.boards')&&legacyPage){const classId=legacy.slice(0,-7),params=new URLSearchParams({classId,boardId:legacyPage,...(query.get('snapshotId')?{snapshotId:query.get('snapshotId')}:{})});location.replace('/board-embed?'+params);return;}
   try{if(practice){adapter=await(await import('./notebook-preview.mjs')).previewAdapter(query.get('role')||'teacher');$('#practice-banner').hidden=false;}
     library=await adapter.list();if(!library.classes.length)library.classes=[...new Map(library.notebooks.map(b=>[b.classId,{id:b.classId,name:b.className}])).values()];$('#view-label').textContent=library.role==='parent'?'Parent · read only':library.role==='student'?'Student notebook':'Teacher workspace';const teacher=library.role==='teacher',home=practice?'studio.html?role='+library.role:'/'+library.role;
     $('#notebook-today').hidden=!teacher;$('#notebook-calendar').hidden=!teacher;$('#notebook-assessment').hidden=!teacher;$('#notebook-assessment').href=home+(practice?'&':'?')+'view=assessment';
