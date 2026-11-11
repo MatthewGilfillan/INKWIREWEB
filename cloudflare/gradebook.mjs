@@ -55,6 +55,7 @@ export async function handleGradebook(request,env,user,{readJSON}){
    a={...activity,id:aid,classId:cid,revision:1,createdAt:now,createdBy:user.id,entries:[],operations:[]};
   }else{
    if(!a||!id)throw issue('Activity not found.',404);
+   if(a.reporting)throw issue('Open the unit reporting Gradebook to edit or publish this outcome.',409);
    if(input.revision!==a.revision)throw issue('Another teacher changed this activity. Close and reopen it before saving.',409);
    if(input.action==='update'){
     const updated=validate(cleanActivity,input.activity);

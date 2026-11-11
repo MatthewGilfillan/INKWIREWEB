@@ -4,12 +4,13 @@ import {calendarRequestRange,followingMonths,monthTitle,monthEvents,calendarMont
 import {currentDisplayTimeZone,loadDisplayTimeZone,displayTimeZoneLabel} from './display-time-zone.mjs';
 
 export function createTeacherCalendar({root,getClasses,openCourse,problem,getClassId}){
- let zone=currentDisplayTimeZone(),month=zonedClock(Date.now(),zone).date.slice(0,7),mode=matchMedia('(max-width:600px)').matches?'agenda':'month',generation=0,monthChosen=false,loading=false,visible=followingMonths(month),data=new Map(),issues=[];
+ let allClasses=false,scopeClassId='',zone=currentDisplayTimeZone(),month=zonedClock(Date.now(),zone).date.slice(0,7),mode=matchMedia('(max-width:600px)').matches?'agenda':'month',generation=0,monthChosen=false,loading=false,visible=followingMonths(month),data=new Map(),issues=[];
  root.classList.add('calendar-workspace');
- root.innerHTML=`<div class="calendar-toolbar"><div class="calendar-month-navigation"><button type="button" class="calendar-arrow" data-cal="previous" aria-label="Previous month">←</button><label class="calendar-month-heading"><strong data-cal="month-name"></strong><span data-cal="year"></span><input type="month" data-cal="month" min="2000-01" max="2100-12" aria-label="Choose month" required></label><button type="button" class="calendar-arrow" data-cal="next" aria-label="Next month">→</button></div><label class="calendar-class-filter">Class<select data-cal="class"><option value="">All classes</option></select></label><div class="calendar-view-switch" role="group" aria-label="Calendar view"><button type="button" data-calendar-mode="month">Month</button><button type="button" data-calendar-mode="agenda">Agenda</button></div></div><div class="calendar-meta"><p data-cal="status" role="status"></p><a class="calendar-zone-link" href="/account?manage=1" data-cal="zone-label"></a></div><button type="button" class="text-button" data-cal="retry" hidden>Try loading calendar again</button><div data-cal="events"></div><div class="calendar-more"><button type="button" class="teacher-button secondary" data-cal="more">Show next month</button></div><div data-cal="issues"></div><div data-cal="unscheduled"></div>`;
- const $=name=>root.querySelector(`[data-cal="${name}"]`),filter=()=>getClassId?.()||$('class').value;
+ root.innerHTML=`<div class="calendar-toolbar"><div class="calendar-month-navigation"><button type="button" class="calendar-arrow" data-cal="previous" aria-label="Previous month">←</button><label class="calendar-month-heading"><strong data-cal="month-name"></strong><span data-cal="year"></span><input type="month" data-cal="month" min="2000-01" max="2100-12" aria-label="Choose month" required></label><button type="button" class="calendar-arrow" data-cal="next" aria-label="Next month">→</button></div><label class="calendar-class-filter">Class<select data-cal="class"><option value="">All classes</option></select></label><div class="calendar-display-controls">${getClassId?'<div class="calendar-scope-control"><span data-cal="this-label">This class</span><button type="button" role="switch" aria-label="Show all classes" aria-checked="false" class="calendar-scope-switch" data-cal="scope"><span class="scope-switch-track"><span></span></span></button><span data-cal="all-label">All classes</span></div>':''}<div class="calendar-view-switch" role="group" aria-label="Calendar view"><button type="button" data-calendar-mode="month">Month</button><button type="button" data-calendar-mode="agenda">Agenda</button></div></div></div><div class="calendar-meta"><p data-cal="status" role="status"></p><a class="calendar-zone-link" href="/account?manage=1" data-cal="zone-label"></a></div><button type="button" class="text-button" data-cal="retry" hidden>Try loading calendar again</button><div data-cal="events"></div><div class="calendar-more"><button type="button" class="teacher-button secondary" data-cal="more">Show next month</button></div><div data-cal="issues"></div><div data-cal="unscheduled"></div>`;
+ const $=name=>root.querySelector(`[data-cal="${name}"]`),filter=()=>getClassId?(allClasses?'':getClassId()):$('class').value;
  if(getClassId)$('class').closest('label').hidden=true;
  function controls(){
+  if(getClassId){$('scope').setAttribute('aria-checked',String(allClasses));$('this-label').classList.toggle('is-active',!allClasses);$('all-label').classList.toggle('is-active',allClasses);}
   const [name,year]=monthTitle(month).split(' ');$('month-name').textContent=name;$('year').textContent=year;$('month').value=month;
   $('previous').disabled=month<='2000-01';$('next').disabled=month>='2100-12';
   root.querySelectorAll('[data-calendar-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.calendarMode===mode)));
@@ -42,12 +43,14 @@ export function createTeacherCalendar({root,getClasses,openCourse,problem,getCla
   }catch(error){if(token!==generation)return;loading=false;controls();$('status').textContent=error.message;$('more').textContent='Try loading next month again';}
  }
  function refresh(){
+  if(getClassId&&getClassId()!==scopeClassId){scopeClassId=getClassId();allClasses=false;}
   const selected=$('class').value;$('class').innerHTML='<option value="">All classes</option>'+getClasses().map(row=>`<option value="${escape(row.id)}">${escape(row.name)}</option>`).join('');
   if([...$('class').options].some(option=>option.value===selected))$('class').value=selected;return reload();
  }
  $('previous').onclick=()=>{monthChosen=true;month=shiftMonth(month,-1);reload();};$('next').onclick=()=>{monthChosen=true;month=shiftMonth(month,1);reload();};
  $('month').onchange=()=>{if($('month').checkValidity()&&$('month').value){monthChosen=true;month=$('month').value;reload();}};
  $('month').onclick=()=>{try{$('month').showPicker?.();}catch{}};
+ if(getClassId)$('scope').onclick=()=>{allClasses=!allClasses;render();};
  $('class').onchange=render;$('retry').onclick=reload;$('more').onclick=more;
  root.addEventListener('click',event=>{
   const button=event.target.closest('button');if(!button)return;

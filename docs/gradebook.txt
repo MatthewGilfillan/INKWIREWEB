@@ -1,8 +1,8 @@
 Gradebook and formative assessment — 11 November 2026
 
 Teacher workflow
-Open Assessment > Gradebook. Choose Automatic / AI, Teacher or Both.
-Automatic evidence currently comes from server-marked quizzes, with first/latest/best attempts shown separately. This release does not generate AI grades. Published lesson ratings and Live Board judgments remain teacher evidence; they are not relabelled AI results.
+Open Assessment > Gradebook for unit reporting. Choose Activity records for the activity-based Automatic / AI, Teacher or Both view. See docs/unit-reporting.txt for unit selections, AI suggestions and publication review.
+Automatic evidence currently comes from server-marked quizzes, with first/latest/best attempts shown separately. Unit reporting now offers private AI grade suggestions from aligned evidence; the teacher reviews, accepts or modifies them and publishes separately. Published lesson ratings and Live Board judgments remain teacher evidence; they are not relabelled AI results.
 
 Create an activity from a lesson, quiz, assignment, master notebook page, or manually for paper work and observations. Formative and summative purposes are separate. Formats: feedback only, points, percentage, letter grade, standards levels. School criterion judgments use Beginning / Approaching / Meeting / Exceeding, with Not enough evidence as an explicit state. They do not claim a validated numeric conversion to a framework's attainment scale.
 
@@ -25,4 +25,4 @@ https://www.teachingenglish.org.uk/professional-development/teachers/using-digit
 These design decisions are recommendations, not a claim of compliance with every school's grading policy.
 
 Verification
-258 automated tests pass, including eight gradebook tests covering grades, source integrity, family privacy, membership, drafts/publication, reassessment history, concurrent writes, activity edits and notebook references. Build and Wrangler deployment dry run pass. Browser checks with fictional learners cover source toggles, standards-only activity creation, private draft versus official result, parent view, saving to the next student, and activity corrections.
+275 automated tests pass, including eight activity gradebook tests and thirteen unit reporting tests covering grades, source integrity, family privacy, membership, drafts/publication, reassessment history, concurrent writes, activity edits and notebook references. Build and Wrangler deployment dry run pass. Browser checks with fictional learners cover source toggles, standards-only activity creation, private draft versus official result, parent view, saving to the next student, and activity corrections.

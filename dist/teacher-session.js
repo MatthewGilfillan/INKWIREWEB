@@ -1,12 +1,12 @@
 import {createAssignments} from './assignments-workspace.js?v=20261110-gradebook';
-import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261110-gradebook';
+import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261111-unified';
 import {createClassSetup} from './class-setup.js?v=20261103-standards';
 import {createClassFiles} from './class-files.js';
 import {createMemberCourse} from './member-course.js?v=20261110-gradebook';
 import {api,escape,copy,signOut,requestId} from './workspace-shared.js';
-import {createCoursePlanner} from './course-planner.js?v=20261108-segments';
+import {createCoursePlanner} from './course-planner.js?v=20261111-reporting';
 import {unitMeter} from './learning-workspace.js?v=20261108-segments';
-import {createTeacherCalendar} from './teacher-calendar.js?v=20261103-scroll-calendar';
+import {createTeacherCalendar} from './teacher-calendar.js?v=20261111-unified';
 import {createTeacherToday} from './teacher-today.js?v=20261108-segments';
 const $=selector=>document.querySelector(selector);
 const list=$('#class-list'),status=$('#dashboard-status'),retry=$('#retry-classes');
@@ -24,7 +24,7 @@ document.querySelectorAll('dialog').forEach(dialog=>{
   dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus();});
 });
-const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['assignments','Assignments'],['files','Class files'],['notebooks','Notebooks']];
+const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['assignments','Assignments'],['assessment','Assessment'],['notebooks','Notebooks'],['files','Class files']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
   <h1 class="visually-hidden">Class workspace</h1><div class="class-workspace-heading"><div class="class-selection"><label for="selected-class">Class</label><select id="selected-class"></select><div class="class-selection-detail"><p id="selected-class-detail"></p><span class="class-badge" id="class-membership"></span></div></div><div id="selected-class-progress" aria-live="polite"></div><div class="class-header-actions"></div></div>
   <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='overview'}" tabindex="${id==='overview'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
@@ -42,12 +42,13 @@ const demoTimeline=createMemberCourse({teacher:true});
 const calendar=createTeacherCalendar({root:$('#teacher-calendar'),getClasses:()=>classrooms,openCourse:openCourseTab,problem});
 const classCalendar=createTeacherCalendar({root:$('#class-panel-calendar'),getClasses:()=>classrooms,getClassId:()=>activeClassId,openCourse:openCourseTab,problem});
 const today=createTeacherToday({root:$('#teacher-today'),getClasses:()=>classrooms,prepareClass:openCourseTab,openClass:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('overview',button);$('#selected-class').focus();},problem});
-const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,onDemoInstalled:()=>loadClasses(true),openStandards:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editStandards();},openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
+const assessmentWorkspace=createAssessmentWorkspace({root:$('#teacher-assessment'),getClasses:()=>classrooms,onDemoInstalled:()=>loadClasses(true),openReporting:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editReporting();},openStandards:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editStandards();},openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
+const classAssessment=createAssessmentWorkspace({root:$('#class-panel-assessment'),getClassId:()=>activeClassId,getClasses:()=>classrooms,onDemoInstalled:()=>loadClasses(true),openReporting:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editReporting();},openStandards:async(id,button)=>{await openCourseTab(id,button);coursePlanner.editStandards();},openTimeline:async(id,button)=>{if(!await selectClass(id))return;showView('classes');await showClassTab('timeline',button);}});
 function renderClasses(){
   $('#selected-class').innerHTML=classrooms.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('');
   $('#class-empty').hidden=Boolean(classrooms.length);$('#class-workspace').hidden=!classrooms.length;
   if(classrooms.some(c=>c.id===activeClassId)){$('#selected-class').value=activeClassId;renderClassHeading();loadRoster(activeClassId);if(activeTab==='overview' && !coursePlanner.isOpen())showClassTab('overview');}
-  else {coursePlanner.reset();teacherTimeline.clear();activeClassId='';if(classrooms.length)selectClass(classrooms[0].id);}
+  else {coursePlanner.reset();teacherTimeline.clear();activeClassId='';if(classrooms.length)selectClass(classrooms.some(c=>c.id===new URLSearchParams(location.search).get('class'))?new URLSearchParams(location.search).get('class'):classrooms[0].id);}
   if(currentView==='classes')showView('classes');
 }
 function renderClassHeading(){
@@ -63,14 +64,16 @@ function renderClassHeading(){
 async function selectClass(id){
   if(id===activeClassId)return true;
   if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return false;}
-  if(!coursePlanner.canLeave()){$('#selected-class').value=activeClassId;return false;}
-  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();
+  if(!classAssessment.canLeave()||!coursePlanner.canLeave()){$('#selected-class').value=activeClassId;return false;}
+  coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();classAssessment.clear();
   progressVersion++;activeClassId=id;$('#selected-class-progress').innerHTML='<p class="class-progress-message">Loading course progress…</p>';$('#student-search').value='';$('#selected-roster').textContent='Loading students…';$('#roster-count').textContent='';renderClassHeading();
-  await showClassTab(classTabs.get(id)||'overview');if(activeClassId!==id)return false;if(activeTab!=='overview')loadClassProgress(id);if(activeTab!=='students')loadRoster(id);return true;
+  await showClassTab(classTabs.get(id)||(new URLSearchParams(location.search).get('class')===id&&tabs.some(([tab])=>tab===new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'overview'));if(activeClassId!==id)return false;if(activeTab!=='overview')loadClassProgress(id);if(activeTab!=='students')loadRoster(id);return true;
 }
 async function showClassTab(tab,button,lessonIndex){
-  if(!activeClassId)return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}if(tab==='notebooks'){if(!coursePlanner.canLeave())return;coursePlanner.reset();location.assign('/notebooks?'+new URLSearchParams({classId:activeClassId}));return;}activeTab=tab;classTabs.set(activeClassId,tab);
+  if(!activeClassId)return;if(activeTab==='assessment'&&!classAssessment.canLeave())return;if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return;}if(tab==='notebooks'){if(!coursePlanner.canLeave())return;coursePlanner.reset();location.assign('/notebooks?'+new URLSearchParams({classId:activeClassId}));return;}activeTab=tab;classTabs.set(activeClassId,tab);
   for(const [id]of tabs){const selected=id===tab;$('#class-tab-'+id).setAttribute('aria-selected',String(selected));$('#class-tab-'+id).tabIndex=selected?0:-1;$('#class-panel-'+id).hidden=!selected;}
+  const url=new URL(location.href);if(currentView==='classes'){url.searchParams.set('class',activeClassId);url.searchParams.set('tab',tab);history.replaceState(null,'',url);}
+  if(tab==='assessment')await classAssessment.refresh();
   if(tab==='assignments')await assignments.load(activeClassId);
   if(tab==='students')await loadRoster(activeClassId);
   if(tab==='overview')await coursePlanner.open(activeClassId,button,lessonIndex);
@@ -97,6 +100,7 @@ async function loadTrash(){
   }catch(error){$('#trash-list').textContent=error.message;$('#retry-trash').hidden=false;if(error.status===401)problem(error);}
 }
 function showView(view){
+  if(view!==currentView&&((currentView==='assessment'&&!assessmentWorkspace.canLeave())||(currentView==='classes'&&activeTab==='assessment'&&!classAssessment.canLeave())))return;
   if(view!=='assessment')document.title='Teacher dashboard | Ink Wire Education';
   $('.teacher-heading h1').textContent=view==='today'?'Ready for your next class':view==='calendar'?'Class calendar':view==='trash'?'Deleted classes':view==='assessment'?'Assessment':'Classes';
   $('#teacher-heading-description').textContent=view==='today'?'A clear plan for your teaching day.':view==='classes'?'Your students, lesson plans and class notebooks.':view==='calendar'?'Your lessons, across all classes.':view==='assessment'?'Learning evidence, skills and curriculum standards.':'Restore classes and their course plans.';
@@ -216,7 +220,7 @@ for(const [id,action]of[['reset-learning-invite','reset'],['disable-learning-inv
   catch(error){$('#learning-copy-status').textContent=error.message;}finally{button.disabled=false;}
 });
 signOut($('[data-session-signout]'),status);
-retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{assessmentWorkspace.clear();today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
+retry.addEventListener('click',()=>loadClasses());window.addEventListener('pageshow',()=>loadClasses());window.addEventListener('pagehide',()=>{assessmentWorkspace.clear();classAssessment.clear();today.clear();rosters.clear();coursePlanner.reset();teacherTimeline.clear();classCalendar.clear();classFiles.clear();assignments.clear();calendar.clear();$('#selected-roster').replaceChildren();$('#trash-list').replaceChildren();document.querySelectorAll('dialog[open]').forEach(d=>d.close());});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!document.querySelector('dialog[open]'))loadClasses();});
 loadClasses();
 

@@ -30,10 +30,10 @@ test('learner evidence expands only that row while names retain profile navigati
  assert.match(expanded,/data-expand-learner="alex"[^>]*aria-expanded="true"/);
  assert.match(expanded,/data-expand-learner="maya"[^>]*aria-expanded="false"/);
  assert.match(expanded,/1\/2<\/strong> correct · 1 hints/);assert.match(expanded,/1 independent · 1 supported/);
- assert.match(expanded,/Skills encountered/);assert.match(expanded,/Explore reading skills/);
+ assert.match(expanded,/Skills encountered/);assert.match(expanded,/Explore learning skills/);
  assert.match(expanded,/A &lt;script&gt;response&lt;\/script&gt;/);assert.ok(!expanded.includes('Only Maya'));
  assert.ok(expanded.indexOf('Week 2 · Day 3')<expanded.indexOf('Week 1 · Day 1'));
- assert.match(expanded,/No evidence yet for this area/);assert.ok(!expanded.includes('style='));
+ assert.match(expanded,/No evidence yet/);assert.ok(!expanded.includes('style='));
  // Column expansion remains independent: Maya's writing evidence is visible
  // even with Alex's row collapsed; reading responses are still hidden.
  const column=classRowsHTML({...data,expandedAxis:'writing'});

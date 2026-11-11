@@ -2,7 +2,7 @@ import {liveBoardEvidenceHTML} from './live-board-evidence.mjs?v=20261110-librar
 /* Student-page layout, subject navigation, cumulative progress and Glows & Grows
    adapted from EDUCADE public/teacher.js at 1a49552d1d76d4d3d9f973369454331b0fe7ba7c. */
 import {escape} from './workspace-shared.js';
-import {learningTabs,classAxes,axisStats,summarizePractice,practiceRadarHTML,progressBar,estimatedProgressHTML,estimatedScaleKeyHTML} from './educade-assessment-view.js?v=20261103-progress-estimates';
+import {learningTabs,classAxes,axisStats,summarizePractice,practiceRadarHTML,progressBar,estimatedProgressHTML,estimatedScaleKeyHTML} from './educade-assessment-view.js?v=20261111-unified';
 import {learnerEvidence} from './assessment-model.mjs';
 import {quizScoreHTML} from './quiz-results.js';
 import {assessmentHTML} from './lesson-feedback-view.js';

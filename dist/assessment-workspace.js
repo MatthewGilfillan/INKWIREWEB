@@ -1,23 +1,29 @@
-import {createGradebook} from './gradebook.js?v=20261110-gradebook';
+import {createReportingGradebook} from './reporting-gradebook.js?v=20261111-reporting';
+import {createGradebook} from './gradebook.js?v=20261111-unified';
+import {createStandardsProgress} from './standards-progress.mjs?v=20261111-unified';
+import {connectEvidencePanels} from './evidence-expansion.js';
+import {gradeLabel,standardsLevels} from './gradebook-model.mjs';
 import {liveBoardEvidenceHTML} from './live-board-evidence.mjs?v=20261110-library';
-import {studentPageHTML} from './educade-student-view.js?v=20261110-live-library';
+import {studentPageHTML} from './educade-student-view.js?v=20261111-unified';
 import {assessmentDemoClasses,isAssessmentDemo,loadAssessmentDemo} from './assessment-demo.mjs';
-import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261103-progress-estimates';
+import {learningTabs,classAxes,axisStats,classOverviewHTML,classRowsHTML,practiceRadarHTML} from './educade-assessment-view.js?v=20261111-unified';
 import catalogue from './assessment-catalogue.mjs?v=20261103-class-view';
 import {standardsPacks,packById,schoolProgressScale} from './standards-registry.mjs';
 import curricula from './assessment-curricula.mjs';
 import {achievementLevels,learnerEvidence,evidenceSummary} from './assessment-model.mjs';
 import {api,escape} from './workspace-shared.js';
 
-export function createAssessmentWorkspace({root,getClasses,openTimeline,openStandards,onDemoInstalled}) {
+export function createAssessmentWorkspace({root,getClasses,openTimeline,openStandards,onDemoInstalled,getClassId,openReporting}) {
   const entry=new URLSearchParams(location.search);
-  let boardEvidence=[],boardEvidenceUnavailable=false,gradebook=null;
-  let classId=entry.get('class') || assessmentDemoClasses.find(c=>c.id===new URLSearchParams(location.search).get('demo'))?.id || (new URLSearchParams(location.search).get('demo')==='1'?assessmentDemoClasses[0].id:''),learnerId=entry.get('learner') || '',view=entry.get('assessment')==='gradebook'||!entry.get('learner')?'gradebook':'evidence',framework='ccss',domain='all',search='',students=[],lessons=[],courseAssessment=null,libraryPack='ccss-ela',librarySearch='',loading=false,error='',epoch=0,classScope='overall',expandedAxis='',expandedLearner='',classMode='bars',learnerSearch='',learnerSort='name',portrait='photos',skillRecords=[],enduringTargets='',profileScope=Object.hasOwn(learningTabs,entry.get('subject'))?entry.get('subject'):'overall',studentMode='radar',selectedSkill='';
+  let reportingGradebook=null,pendingReportingCell=null;
+  let boardEvidence=[],boardEvidenceUnavailable=false,gradebook=null,gradebookData={activities:[]},teacherUnavailable=false,disconnectEvidence=()=>{},standardsWorkspace=null,source='both',layout=new URLSearchParams(location.search).get('assessment')==='gradebook'?'reporting':'students',pendingStandard=null,pendingLearner='';
+  let classId=entry.get('class') || assessmentDemoClasses.find(c=>c.id===new URLSearchParams(location.search).get('demo'))?.id || (new URLSearchParams(location.search).get('demo')==='1'?assessmentDemoClasses[0].id:''),learnerId=entry.get('learner') || '',view=['standards','catalogue','skills'].includes(entry.get('assessment'))?'standards':entry.get('assessment')==='gradebook'?'gradebook':'evidence',framework='ccss',domain='all',search='',students=[],lessons=[],courseAssessment=null,libraryPack='ccss-ela',librarySearch='',loading=false,error='',epoch=0,classScope='overall',expandedAxis='',expandedLearner='',classMode='bars',learnerSearch='',learnerSort='name',portrait='photos',skillRecords=[],enduringTargets='',profileScope=Object.hasOwn(learningTabs,entry.get('subject'))?entry.get('subject'):'overall',studentMode='radar',selectedSkill='';
   const $=selector=>root.querySelector(selector),expandedDetails=new Set();
-  root.innerHTML=`<div class="assessment-controls"><label><strong>Class</strong><select data-assessment-class aria-label="Class"></select></label><div class="assessment-views" role="group" aria-label="Assessment workspace"><button type="button" data-assessment-view="gradebook" aria-pressed="false">Gradebook</button><button type="button" data-assessment-view="evidence" aria-pressed="true">Learning evidence</button><button type="button" data-assessment-view="standards" aria-pressed="false">Standards library</button><button type="button" data-assessment-view="catalogue" aria-pressed="false">Skill catalogue</button></div><button type="button" class="text-button" data-assessment-refresh>Refresh</button></div><p data-assessment-status role="status"></p><div data-assessment-body></div>`;
+  root.innerHTML=`<div class="assessment-controls"><label ${getClassId?'hidden':''}><strong>Class</strong><select data-assessment-class aria-label="Assessment class"></select></label><div class="assessment-views" role="group" aria-label="Assessment workspace"><button type="button" data-assessment-view="evidence" aria-pressed="true">Learning evidence</button><button type="button" data-assessment-view="standards" aria-pressed="false">Standards progress</button><button type="button" data-assessment-view="gradebook" aria-pressed="false">Gradebook</button></div><button type="button" class="text-button" data-assessment-refresh>Refresh</button></div><p data-assessment-status role="status"></p><div data-assessment-body></div>`;
   const previewRequested=new URLSearchParams(location.search).has('demo');
   const currentDemo=()=>isAssessmentDemo(classId) || Boolean(getClasses().find(c=>c.id===classId)?.demoKey);
   function classOptions(){
+    if(getClassId)classId=getClassId()||'';
     const saved=getClasses(),preview=saved.some(c=>c.demoKey)?[]:previewRequested?assessmentDemoClasses:[],classes=[...saved,...preview];
     if(isAssessmentDemo(classId)){const installed=saved.find(c=>c.demoKey===classId.replace('demo-educade-',''));if(installed){classId=installed.id;syncDemoURL();}}
     if(!classes.some(c=>c.id===classId)&&!(entry.get('class')===classId&&!saved.length)){classId=saved[0]?.id || '';learnerId='';}
@@ -28,35 +34,51 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     root.querySelectorAll('[data-class-detail]').forEach(detail=>{if(detail.open)expandedDetails.add(detail.dataset.classDetail);else expandedDetails.delete(detail.dataset.classDetail);});
   }
   function render(){
-    gradebook?.clear();gradebook=null;
+    reportingGradebook?.clear();reportingGradebook=null;disconnectEvidence();disconnectEvidence=()=>{};standardsWorkspace?.clear();standardsWorkspace=null;gradebook?.clear();gradebook=null;
     rememberClassDetails();
     root.querySelectorAll('[data-assessment-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.assessmentView===view)));
     if(!learnerId)document.title='Assessment | Ink Wire';
     $('[data-assessment-status]').textContent=loading?'Loading learning evidence…':error;
-    if(view==='standards'){renderStandards();return;}
-    if(view==='catalogue'){renderCatalogue();return;}
     if(loading){$('[data-assessment-body]').innerHTML='<div class="assessment-empty">Getting the class ready…</div>';return;}
     if(error){$('[data-assessment-body]').innerHTML='<div class="assessment-empty"><h2>Evidence could not be loaded</h2><button type="button" class="teacher-button secondary" data-assessment-retry>Try again</button></div>';return;}
+    if(view==='standards'){renderStandards();return;}
     if(view==='gradebook'){
-      const target=$('[data-assessment-body]');target.replaceChildren();
-      if(isAssessmentDemo(classId)){target.innerHTML='<p>Install this fictional demo class to try the gradebook.</p><button type="button" class="teacher-button secondary" data-install-assessment-demo>Add demo classes to my workspace</button>';return;}
-      if(!classId){target.innerHTML='<p>Choose a class to open its gradebook.</p>';return;}
-      gradebook=createGradebook({root:target,classId,students,lessons,boardEvidence,boardEvidenceUnavailable});return;
+      const target=$('[data-assessment-body]');
+      if(!classId){target.innerHTML='<p>Choose a class to open its Gradebook.</p>';return;}
+      if(isAssessmentDemo(classId)){target.innerHTML='<p>Install the fictional demo class to enter or publish grades.</p>';return;}
+      if(layout!=='activities'){
+        reportingGradebook=createReportingGradebook({root:target,classId,students,initialCell:pendingReportingCell,onConfigure:planId=>{if(planId){const url=new URL(location.href);url.searchParams.set('reportingPlan',planId);history.replaceState(null,'',url);}openReporting?.(classId);},onActivities:()=>{layout='activities';render();},onData:a=>{gradebookData.activities=gradebookData.activities.filter(v=>v.id!==a.id);gradebookData.activities.push(a);}});pendingReportingCell=null;return;
+      }
+      target.innerHTML='<button type="button" class="teacher-button secondary" data-back-reporting>← Unit reporting Gradebook</button><div data-gradebook-activities></div>';
+      gradebook=createGradebook({root:target.querySelector('[data-gradebook-activities]'),classId,students,lessons,boardEvidence,boardEvidenceUnavailable,initialData:teacherUnavailable?null:gradebookData,initialSource:source,onData:next=>{gradebookData=next;},compact:false});
+      target.querySelector('[data-back-reporting]').onclick=()=>{layout='reporting';render();};
+      if(pendingStandard){const standard=pendingStandard,person=pendingLearner;pendingStandard=null;pendingLearner='';gradebook.createActivityForStandard(standard,person);}return;
     }
     if(learnerId){renderStudent();return;}
-    document.title='Assessment | Ink Wire';
-    const demo=currentDemo();
-    $('[data-assessment-body]').innerHTML=(demo?`<div class="assessment-demo-notice"><span><strong>Demo class</strong> · Fictional students and sample responses from EDUCADE.</span>${isAssessmentDemo(classId)?'<button type="button" class="text-button" data-install-assessment-demo>Add demo classes to my workspace</button>':''}</div>`:'')+classOverviewHTML(classData())+courseStandardsHTML()+liveBoardEvidenceHTML(boardEvidence,{classId,students,unavailable:boardEvidenceUnavailable});
+    const target=$('[data-assessment-body]'),demo=currentDemo();
+    target.innerHTML=(demo?`<div class="assessment-demo-notice"><span><strong>Demo class</strong> · Fictional learners and sample evidence.</span>${isAssessmentDemo(classId)?'<button type="button" class="text-button" data-install-assessment-demo>Add demo classes to my workspace</button>':''}</div>`:'')+`<div class="assessment-evidence-toolbar"><div class="gb-toggle" role="group" aria-label="Evidence source">${[['both','Both'],['teacher','Teacher'],['automatic','Automatic / AI']].map(([id,label])=>`<button type="button" data-evidence-source="${id}" aria-pressed="${source===id}">${label}</button>`).join('')}</div><div class="assessment-evidence-layout" role="group" aria-label="Evidence layout">${[['students','By student'],['activities','By activity']].map(([id,label])=>`<button type="button" data-evidence-layout="${id}" aria-pressed="${layout===id}">${label}</button>`).join('')}</div>${!isAssessmentDemo(classId)?'<button type="button" class="teacher-button" data-new-assessment>+ Record assessment</button>':''}</div>${teacherUnavailable?'<p role="status">Teacher records are unavailable. Refresh to retry; the view below may be incomplete.</p>':''}<div data-learning-content></div>`;
+    const content=$('[data-learning-content]');
+    if(layout==='activities'){
+      if(!classId){content.innerHTML='<p>Choose a class to see learning evidence.</p>';return;}
+      if(isAssessmentDemo(classId)){content.innerHTML='<p>Install this fictional class to create assessment activities. Practice evidence is available under By student.</p>';return;}
+      gradebook=createGradebook({root:content,classId,students,lessons,boardEvidence,boardEvidenceUnavailable,initialData:teacherUnavailable?null:gradebookData,initialSource:source,onSource:next=>{source=next;},onData:next=>{gradebookData=next;},compact:true});
+      if(pendingStandard){const standard=pendingStandard,person=pendingLearner;pendingStandard=null;pendingLearner='';gradebook.createActivityForStandard(standard,person);}
+    }else{
+      content.className='assessment-source-'+source;content.innerHTML=classOverviewHTML(classData())+(source!=='automatic'?liveBoardEvidenceHTML(boardEvidence,{classId,students,unavailable:boardEvidenceUnavailable}):'');disconnectEvidence=connectEvidencePanels(content);
+    }
   }
-  function classData(){return {students,lessons,catalogue,scope:classScope,mode:classMode,search:learnerSearch,sort:learnerSort,portrait,records:skillRecords,expandedAxis,expandedLearner,expandedDetails};}
-  function refreshRows(){rememberClassDetails();if($('[data-class-rows]'))$('[data-class-rows]').innerHTML=classRowsHTML(classData());}
+
+  function classData(){return {students,lessons,catalogue,source,activities:gradebookData.activities,scope:classScope,mode:classMode,search:learnerSearch,sort:learnerSort,portrait,records:skillRecords,expandedAxis,expandedLearner,expandedDetails};}
+  function refreshRows(){rememberClassDetails();disconnectEvidence();if($('[data-class-rows]'))$('[data-class-rows]').innerHTML=classRowsHTML(classData());disconnectEvidence=connectEvidencePanels(root);}
   function renderStudent(){
     const student=students.find(s=>s.id===learnerId),className=getClasses().find(c=>c.id===classId)?.name || assessmentDemoClasses.find(c=>c.id===classId)?.name || 'Class';
-    $('[data-assessment-body]').innerHTML=studentPageHTML({classId,className,student,students,catalogue,lessons,records:skillRecords,scope:profileScope,mode:studentMode,selectedSkill,demo:currentDemo(),virtual:isAssessmentDemo(classId),enduringTargets,boardEvidence,boardEvidenceUnavailable});
+    if(source==='teacher'){const target=$('[data-assessment-body]');target.innerHTML=`<div class="educade-student-heading"><div><p>${escape(className)}</p><h2>${escape(student?.name||'Student')}</h2></div><button type="button" class="teacher-button secondary" data-back-class>← Back to class</button></div>`+teacherEvidenceHTML(learnerId)+liveBoardEvidenceHTML(boardEvidence,{classId,learnerId,students,unavailable:boardEvidenceUnavailable});return;}
+    $('[data-assessment-body]').innerHTML=studentPageHTML({classId,className,student,students,catalogue,lessons,records:skillRecords,scope:profileScope,mode:studentMode,selectedSkill,demo:currentDemo(),virtual:isAssessmentDemo(classId),enduringTargets,boardEvidence:source==='automatic'?[]:boardEvidence,boardEvidenceUnavailable});
+    const heading=$('[data-assessment-body] .educade-student-heading');if(source!=='automatic'&&heading)heading.insertAdjacentHTML('afterend',teacherEvidenceHTML(learnerId));
     document.title=student?student.name+' · Assessment | Ink Wire':'Assessment | Ink Wire';
   }
   function writeRoute(push=false){
-    const url=new URL(location.href);url.searchParams.set('class',classId);if(view==='gradebook')url.searchParams.set('assessment','gradebook');else url.searchParams.delete('assessment');
+    const url=new URL(location.href);url.searchParams.set('class',classId);url.searchParams.set('assessment',view==='standards'?'standards':view==='gradebook'?'gradebook':'evidence');if(getClassId){url.searchParams.set('view','classes');url.searchParams.set('tab','assessment');}
     if(learnerId){url.searchParams.set('learner',learnerId);url.searchParams.set('subject',profileScope);}else{url.searchParams.delete('learner');url.searchParams.delete('subject');}
     if(isAssessmentDemo(classId))url.searchParams.set('demo',classId);else url.searchParams.delete('demo');
     history[push?'pushState':'replaceState'](null,'',url);
@@ -74,26 +96,15 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     return `<div class="assessment-course-standards">${selected.map(row=>{const pack=packById(row.id);return `<span>${escape(pack.name)} · ${escape(pack.scopes.find(s=>s.id===row.scope)?.label || row.scope)}</span>`;}).join('')}${courseAssessment.judgmentScale==='b-m-plus'?'<span>B → M+ · school scale</span>':''}${selected.some(row=>['ib-pyp','ipc'].includes(row.id))?'<small>Knowledge &amp; Skills · Understanding: evidence profile</small>':''}</div>`;
   }
   function renderStandards(){
-    const pack=packById(libraryPack) || standardsPacks[0];
-    $('[data-assessment-body]').innerHTML=`${courseStandardsHTML()}<section class="assessment-card assessment-library"><div class="assessment-card-heading"><div><p class="assessment-eyebrow">STANDARDS LIBRARY</p><h2>${escape(pack.name)}</h2><p>${escape(pack.publisher)} · ${escape(pack.edition)}</p></div><label class="assessment-framework">Framework<select data-library-pack>${standardsPacks.map(p=>`<option value="${p.id}" ${p.id===pack.id?'selected':''}>${escape(p.name)}</option>`).join('')}</select></label></div><p class="assessment-library-coverage">${escape(pack.coverage)}</p><div class="assessment-library-tools"><a href="${escape(pack.source)}" target="_blank" rel="noopener noreferrer">Open source ↗</a><label class="assessment-search">Find a criterion<input type="search" data-library-search value="${escape(librarySearch)}" placeholder="Search reference areas or codes"></label></div><div class="assessment-reference-grid" data-library-criteria></div>${pack.notice?`<p class="assessment-library-notice">${escape(pack.notice)}</p>`:''}${['ib-pyp','ipc'].includes(pack.id)?`<div class="assessment-school-scale"><h3>School progress scale · Knowledge &amp; Skills</h3><div>${schoolProgressScale.map(level=>`<span><strong>${level.code}</strong>${escape(level.label)}</span>`).join('')}</div><p>Understanding is documented through evidence and reflection against planned enduring understandings, not converted into this scale.</p></div>`:''}<details class="assessment-reference-notes"><summary>Reference details</summary><p>${escape(pack.codeType)}. Checked ${pack.checked}. ${escape(pack.license || 'Public overview summaries; publisher task descriptors remain in the source materials.')}</p><p>Selections and school criteria are saved with the course. Selecting a framework does not create a validated mapping from existing quiz results.</p></details></section>`;
-    renderStandardsCriteria();
+    standardsWorkspace=createStandardsProgress({root:$('[data-assessment-body]'),students,assessment:courseAssessment,activities:gradebookData.activities||[],records:skillRecords,catalogue,boards:boardEvidence,unavailable:teacherUnavailable,onStudent:id=>openProfile(id),onAssess:(standard,person)=>startAssessment(standard,person)});
   }
-  function renderStandardsCriteria(){
-    const pack=packById(libraryPack) || standardsPacks[0],query=librarySearch.trim().toLocaleLowerCase();
-    const criteria=pack.criteria.filter(c=>!query||[c.code,c.title,c.description].join(' ').toLocaleLowerCase().includes(query));
-    $('[data-library-criteria]').innerHTML=criteria.length?criteria.map(c=>`<article><span class="assessment-reference-code">${escape(c.code)}</span><h3>${escape(c.title)}</h3><p>${escape(c.description)}</p></article>`).join(''):'<p>No criteria match this search.</p>';
+  function startAssessment(standard,person=''){
+    if(isAssessmentDemo(classId)){view='evidence';layout='students';render();$('[data-assessment-status]').textContent='Install the demo class to record assessments.';return;}
+    view='gradebook';learnerId='';layout='activities';pendingStandard=standard||{code:'',description:''};pendingLearner=person;writeRoute();render();
   }
-  function renderCatalogue(){
-    $('[data-assessment-body]').innerHTML=`<section class="assessment-card assessment-catalogue"><div class="assessment-card-heading"><div><p class="assessment-eyebrow">EDUCADE CATALOGUE</p><h2>${escape(catalogue.title)}</h2><p>${catalogue.groups.flatMap(group=>group.skills).length} skills · Reading, writing, grammar and vocabulary</p></div><label class="assessment-framework">Curriculum<select data-assessment-framework>${Object.entries(curricula.frameworks).map(([id,f])=>`<option value="${id}" ${id===framework?'selected':''}>${escape(f.name)}</option>`).join('')}</select></label></div><div class="assessment-catalogue-tools"><div class="assessment-domains" role="group" aria-label="Skill area">${[['all','All skills'],...Object.entries(catalogue.domains).map(([id,d])=>[id,d.name])].map(([id,name])=>`<button type="button" data-assessment-domain="${id}" aria-pressed="${id===domain}">${escape(name)}</button>`).join('')}</div><label class="assessment-search">Find a skill or standard<input type="search" data-assessment-search placeholder="Search skills or curriculum codes" value="${escape(search)}"></label></div><p class="assessment-catalogue-note">${escape(curricula.frameworks[framework].band)} · ${Object.keys(curricula.alignments[framework]).length} candidate links. Open a skill to see its reference and review status.</p><div data-assessment-skills></div><details class="assessment-levels"><summary>Teacher achievement descriptors</summary><p>EDUCADE’s teacher-review scale. Practice percentages do not assign these levels.</p>${Object.values(achievementLevels).map(level=>`<div><strong>${level.name}</strong><p>${escape(level.description)}</p></div>`).join('')}</details></section>`;
-    renderSkills();
-  }
-  function renderSkills(){
-    const query=search.trim().toLocaleLowerCase();
-    const groups=catalogue.groups.filter(group=>domain==='all'||group.domain===domain).map(group=>({...group,skills:group.skills.filter(skill=>!query||[group.name,skill.name,skill.id,curricula.alignments[framework][skill.id]?.code].filter(Boolean).join(' ').toLocaleLowerCase().includes(query))})).filter(group=>group.skills.length);
-    $('[data-assessment-skills]').innerHTML=groups.length?groups.map(group=>`<div class="assessment-skill-group"><h3>${escape(group.name)} <small>${escape(catalogue.domains[group.domain].name)}</small></h3>${group.skills.map(skill=>{
-      const mapping=curricula.alignments[framework][skill.id],reference=curricula.frameworks[framework];
-      return `<details class="assessment-skill"><summary><span>${escape(skill.name)}</span><small>${mapping?escape(mapping.code?.replace('CCSS.ELA-LITERACY.','') || mapping.area):'No alignment reviewed'}</small></summary><p class="assessment-skill-id">${escape(skill.id)}</p>${mapping?`<p>${escape(mapping.objective)}</p><a href="${escape(framework==='ccss'?catalogue.mappings[skill.id].source:reference.source)}" target="_blank" rel="noopener noreferrer">${escape(mapping.code || reference.name)} ↗</a><p class="assessment-mapping-status">${escape(mapping.status)}${framework==='ccss'?' · Reference mirror checked '+escape(catalogue.mappings[skill.id].checked):''}. Covers part of the objective; no mastery judgment is implied.</p>`:'<p>No curriculum alignment has been reviewed for this skill.</p>'}</details>`;
-    }).join('')}</div>`).join(''):'<p class="assessment-empty">No skills match this search.</p>';
+  function teacherEvidenceHTML(person){
+    const rows=(gradebookData.activities||[]).flatMap(a=>(a.entries||[]).filter(r=>r.learnerId===person).map(r=>({a,...r}))).sort((a,b)=>(b.published?.at||b.draft?.at||0)-(a.published?.at||a.draft?.at||0));
+    return `<section class="assessment-card unified-teacher-evidence"><h2>Teacher assessments</h2>${rows.map(r=>`<details><summary>${escape(r.a.title)} · ${r.published?escape(gradeLabel(r.published,r.published.activity)):'Private draft'}</summary>${r.published?`<p>Published ${escape(new Date(r.published.at).toLocaleDateString())}</p><p>${escape(r.published.evidenceNote)}</p><p>${escape(r.published.feedback)}</p>${r.published.nextStep?`<p><strong>Next step:</strong> ${escape(r.published.nextStep)}</p>`:''}`:''}${r.draft&&r.draft.at!==r.published?.at?`<p class="gb-draft">Private draft · ${escape(gradeLabel(r.draft,r.draft.activity))}</p>`:''}<button type="button" class="teacher-button secondary" data-open-assessment="${escape(r.a.id)}" data-assessment-person="${escape(person)}">Record / review</button></details>`).join('')||'<p>No teacher assessments recorded yet.</p>'}</section>`;
   }
   async function installDemo(button){
     button.disabled=true;const originalKey=classId.replace('demo-educade-','');
@@ -106,8 +117,8 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     if(!classId){loading=false;render();return;}
     loading=true;render();
     try{
-      const [roster,timeline,boards]=isAssessmentDemo(classId)?await loadAssessmentDemo(classId).then(data=>[{students:data.students},data,{records:[]}]):await Promise.all([api('/api/enrollment/classes/'+classId+'/roster'),api('/api/lesson-feedback/classes/'+classId+'/timeline'),api('/api/class-boards/classes/'+classId+'/evidence').catch(()=>({records:[],unavailable:true}))]);
-      if(token!==epoch)return;boardEvidence=boards.records||[];boardEvidenceUnavailable=!!boards.unavailable;students=timeline.demoSource==='educade-v1'?roster.students.map(student=>({...student,demo:true,initials:student.name.split(' ').map(word=>word[0]).join('')})):roster.students;lessons=timeline.course?.lessons || [];courseAssessment=timeline.course?.assessment || null;enduringTargets=timeline.course?.enduringUnderstandings || '';skillRecords=Array.isArray(timeline.skillEvidence)?timeline.skillEvidence.filter(record=>students.some(student=>student.id===record.learnerId)&&catalogue.groups.some(group=>group.skills.some(skill=>skill.id===record.skillId))&&typeof record.correct==='boolean'):[];
+      const [roster,timeline,boards,grades]=isAssessmentDemo(classId)?await loadAssessmentDemo(classId).then(data=>[{students:data.students},data,{records:[]},{activities:[]}]):await Promise.all([api('/api/enrollment/classes/'+classId+'/roster'),api('/api/lesson-feedback/classes/'+classId+'/timeline'),api('/api/class-boards/classes/'+classId+'/evidence').catch(()=>({records:[],unavailable:true})),api('/api/gradebook/classes/'+classId).catch(()=>({activities:[],unavailable:true}))]);
+      if(token!==epoch)return;gradebookData=grades;teacherUnavailable=!!grades.unavailable;boardEvidence=boards.records||[];boardEvidenceUnavailable=!!boards.unavailable;students=timeline.demoSource==='educade-v1'?roster.students.map(student=>({...student,demo:true,initials:student.name.split(' ').map(word=>word[0]).join('')})):roster.students;lessons=timeline.course?.lessons || [];courseAssessment=timeline.course?.assessment || null;enduringTargets=timeline.course?.enduringUnderstandings || '';skillRecords=Array.isArray(timeline.skillEvidence)?timeline.skillEvidence.filter(record=>students.some(student=>student.id===record.learnerId)&&catalogue.groups.some(group=>group.skills.some(skill=>skill.id===record.skillId))&&typeof record.correct==='boolean'):[];
       const preferred=courseAssessment?.frameworks?.[0]?.id;if(preferred)libraryPack=preferred;
 
     }catch(e){if(token!==epoch)return;error=e.message;}
@@ -115,15 +126,19 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
   }
   root.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
-    if(button.dataset.assessmentView){view=button.dataset.assessmentView;learnerId='';writeRoute();render();}
-    if(button.dataset.assessmentDomain){domain=button.dataset.assessmentDomain;renderCatalogue();}
+    if(button.dataset.assessmentView){if(reportingGradebook&&!reportingGradebook.canLeave())return;view=button.dataset.assessmentView;layout=view==='gradebook'?'reporting':'students';learnerId='';writeRoute();render();}
+    if(button.dataset.evidenceSource){source=button.dataset.evidenceSource;render();}
+    if(button.dataset.evidenceLayout){layout=button.dataset.evidenceLayout;writeRoute();render();}
+    if(button.matches('[data-new-assessment]'))startAssessment();
+    if(button.dataset.assessLearner){const skill=catalogue.groups.flatMap(g=>g.skills).find(s=>s.id===button.dataset.assessSkill);startAssessment({code:button.dataset.assessCode||skill?.id||'',description:skill?.name||'Learning evidence'},button.dataset.assessLearner);}
+    if(button.dataset.openAssessment){const id=button.dataset.openAssessment,person=button.dataset.assessmentPerson,a=gradebookData.activities.find(a=>a.id===id);learnerId='';view='gradebook';if(a?.reporting){layout='reporting';pendingReportingCell={learner:person,code:a.reporting.code};const url=new URL(location.href);url.searchParams.set('reportingPlan',a.reporting.planId);history.replaceState(null,'',url);writeRoute();render();}else{layout='activities';render();gradebook?.openRecord(id,person);}}
     if(button.dataset.expandLearner){const id=button.dataset.expandLearner;expandedLearner=expandedLearner===id?'':id;refreshRows();Array.from(root.querySelectorAll('[data-expand-learner]')).find(toggle=>toggle.dataset.expandLearner===id)?.focus({preventScroll:true});}
     if(button.dataset.assessmentLearner)openProfile(button.dataset.assessmentLearner,button);
     if(button.dataset.classLearner)openProfile(button.dataset.classLearner,button,button.dataset.classEvidence);
     if(button.dataset.classScope){classScope=button.dataset.classScope;render();$(`[data-class-scope="${classScope}"]`)?.focus({preventScroll:true});}
     if(button.dataset.classMode){classMode=button.dataset.classMode;render();}
     if(button.dataset.classAxis){const id=button.dataset.classAxis;expandedAxis=expandedAxis===id?'':id;refreshRows();root.querySelectorAll('[data-class-axis]').forEach(toggle=>{const open=expandedAxis===toggle.dataset.classAxis;toggle.setAttribute('aria-expanded',String(open));toggle.querySelector('span').textContent=open?'− Hide evidence':'+ Show evidence';});}
-    if(button.matches('[data-assessment-refresh],[data-assessment-retry]'))load();
+    if(button.matches('[data-assessment-refresh],[data-assessment-retry]')&&(!reportingGradebook||reportingGradebook.canLeave()))load();
     if(button.matches('[data-assessment-standards]')&&!isAssessmentDemo(classId))openStandards?.(classId,button);
     if(button.matches('[data-install-assessment-demo]'))installDemo(button);
     if(button.matches('[data-assessment-timeline]'))openTimeline(classId,button);
@@ -132,12 +147,13 @@ export function createAssessmentWorkspace({root,getClasses,openTimeline,openStan
     if(button.dataset.studentMode){studentMode=button.dataset.studentMode;renderStudent();}
     if(button.dataset.profileEvidence){selectedSkill=button.dataset.profileEvidence;renderStudent();$('#student-response-evidence')?.focus();}
   });
-  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();$('[data-switch-learner]')?.focus({preventScroll:true});}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}if(event.target.matches('[data-library-pack]')){libraryPack=event.target.value;renderStandards();}
-    if(event.target.matches('[data-assessment-framework]')){framework=event.target.value;renderCatalogue();$('[data-assessment-framework]').focus({preventScroll:true});}});
-  root.addEventListener('input',event=>{if(event.target.matches('[data-class-search]')){learnerSearch=event.target.value;refreshRows();}if(event.target.matches('[data-library-search]')){librarySearch=event.target.value;renderStandardsCriteria();}if(event.target.matches('[data-assessment-search]')){search=event.target.value;renderSkills();}});
+  root.addEventListener('change',event=>{if(event.target.matches('[data-switch-learner]')){learnerId=event.target.value;selectedSkill='';writeRoute(true);renderStudent();$('[data-switch-learner]')?.focus({preventScroll:true});}if(event.target.matches('[data-class-sort]')){learnerSort=event.target.value;refreshRows();}if(event.target.matches('[data-class-portrait]')){portrait=event.target.value;refreshRows();}if(event.target.matches('[data-assessment-class]')){if(reportingGradebook&&!reportingGradebook.canLeave()){event.target.value=classId;return;}classId=event.target.value;learnerId='';expandedLearner='';expandedAxis='';expandedDetails.clear();syncDemoURL();load();}
+});
+  root.addEventListener('input',event=>{if(event.target.matches('[data-class-search]')){learnerSearch=event.target.value;refreshRows();}});
   for(const type of ['inkwire:quiz-changed','inkwire:feedback-published','inkwire:board-assessment-published'])document.addEventListener(type,event=>{if(event.detail?.classId===classId&&!root.hidden)load();});
   root.addEventListener('error',event=>{if(event.target.matches('.educade-avatar img'))event.target.hidden=true;},true);
   root.addEventListener('keydown',event=>{const tab=event.target.closest('[data-class-scope],[data-profile-scope][role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const profile=Boolean(tab.dataset.profileScope),ids=Object.keys(learningTabs),index=ids.indexOf(profile?profileScope:classScope),next=ids[event.key==='Home'?0:event.key==='End'?ids.length-1:(index+(event.key==='ArrowRight'?1:-1)+ids.length)%ids.length];if(profile){profileScope=next;selectedSkill='';writeRoute();renderStudent();$(`[data-profile-scope="${next}"]`).focus({preventScroll:true});}else{classScope=next;render();$(`[data-class-scope="${next}"]`).focus({preventScroll:true});}});
-  window.addEventListener('popstate',()=>{const query=new URLSearchParams(location.search);if(query.get('view')!=='assessment')return;const next=query.get('class')||classId,changed=next!==classId;classId=next;learnerId=query.get('learner')||'';profileScope=Object.hasOwn(learningTabs,query.get('subject'))?query.get('subject'):'overall';selectedSkill='';view=query.get('assessment')==='gradebook'?'gradebook':'evidence';if(changed)load();else render();});
-  return {refresh:load,clear(){gradebook?.clear();gradebook=null;epoch++;students=[];lessons=[];$('[data-assessment-body]').replaceChildren();}};
+  window.addEventListener('popstate',()=>{const query=new URLSearchParams(location.search);if(query.get('view')!=='assessment')return;const next=query.get('class')||classId,changed=next!==classId;classId=next;learnerId=query.get('learner')||'';profileScope=Object.hasOwn(learningTabs,query.get('subject'))?query.get('subject'):'overall';selectedSkill='';view=['standards','catalogue','skills'].includes(query.get('assessment'))?'standards':query.get('assessment')==='gradebook'?'gradebook':'evidence';layout=query.get('assessment')==='gradebook'?'reporting':'students';if(changed)load();else render();});
+  window.addEventListener('beforeunload',event=>{if(reportingGradebook?.hasChanges()){event.preventDefault();event.returnValue='';}});
+  return {canLeave:()=>!reportingGradebook||reportingGradebook.canLeave(),refresh:load,clear(){reportingGradebook?.clear();reportingGradebook=null;disconnectEvidence();standardsWorkspace?.clear();standardsWorkspace=null;gradebook?.clear();gradebook=null;epoch++;students=[];lessons=[];$('[data-assessment-body]').replaceChildren();}};
 }

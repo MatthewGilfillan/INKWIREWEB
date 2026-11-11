@@ -1,0 +1,34 @@
+Unit reporting and evidence review — 11 November 2026
+
+Teacher workflow
+Classes > Course overview > Standards & reporting opens unit reporting choices. Keep multiple named reporting units/periods in a class. Choose the framework and grade, then independently select Teach / practise, Collect evidence and Report on. Reporting implies evidence collection and teaching. Up to twelve reporting outcomes can be selected; six is a starting point, not a curriculum rule. The Common Core selector uses the complete grade-specific official ELA list and excludes not-applicable statements. School / other framework supports teacher-entered exact targets. Teacher labels, rubric descriptors, evidence dates and grading formats are explicit.
+
+Classes > Assessment now contains Learning evidence, Standards progress and Gradebook. Learning evidence opens the student matrix; Standards progress keeps students as rows and expands RL, RI and other strands horizontally into their official groups. Individual standard chips open evidence. Coverage totals and mixed levels do not imply a single strand grade. Candidate practice mappings and private drafts do not automatically establish attainment.
+
+The Gradebook defaults to unit reporting columns. Points, percentages, letters and standards levels retain their own scales. Click a learner/outcome to review sources, record or modify a teacher draft, feedback and next steps. Activity records retains the prior formative/summative grade-entry, observations, follow-up queue and assessment history. Reporting records share that gradebook storage and family publication projection; they cannot be reinterpreted through the old activity editor.
+
+Publishing
+Accept as draft saves a private teacher record. Accept all as drafts fills empty cells with sufficient-evidence suggestions; existing teacher records and insufficient evidence are left for individual review. Review & publish shows an explicit checklist. Only selected saved teacher drafts are published. Subsequent drafts leave the last published result unchanged for students and linked parents. Withdraw removes the official result without destroying history. Missing evidence is not zero. Conflicting edits and stale suggestions are rejected. Batch operations retain successful earlier writes and report failures; they are not an atomic class-wide transaction.
+
+Shared planning
+Class teachers share a reporting plan. The class owner can manage/lock reporting choices while invited class teachers continue to assess learners. Teachers can copy the latest reporting choices/rubric from another class they teach; private evidence links are not copied across classes. This release uses existing class owner/teacher permissions. Organization-wide administrator, department-head and year-team role management remains a later staff administration feature. Once recording begins, reported standards/rubrics/scales are protected; copy to a new reporting period to change them.
+
+AI
+The existing server-side OpenAI configuration controls availability. Suggest from unit plan proposes up to six applicable Common Core targets from saved lesson goals/evidence for teacher review. Suggest grades processes up to five learners per provider request and presents suggestions only. Student names/account identifiers are omitted from the provider roster; relevant source text can contain names. store:false is sent. No new student data was sent to a live provider during implementation verification: provider responses were simulated against fictional data.
+
+Grade suggestions use server-scoped, standard-aligned teacher assessment notes and products, explicitly linked quizzes, submitted assignment text snapshots, individual notebook text, and published Live Board evidence. Private gradebook notes, attendance/effort ratings and source planning notes are excluded. Original assignment snapshots are used rather than teacher-marked copies. Live pages may include prompts or teacher edits; source limitations are displayed. Handwriting, PDF content and images are not evaluated; add a teacher observation for these. Repeated work is identified by origin where available; quiz attempts and team work are flagged rather than treated as independent proof. A whole quiz score alone cannot establish an outcome grade. Evidence is capped at 100 items per learner and source text is length-bounded. No cross-scale average or practice-percentage conversion is performed. AI can abstain and suggest the next evidence opportunity.
+
+Every suggested judgment cites verified evidence IDs belonging to that learner and target. Accepted drafts retain the original AI proposal, model, evidence snapshot, limitations and reviewing teacher in private audit data. Families receive only the teacher-published result and feedback. Reporting judgments are excluded as AI source evidence to prevent circular regrading. A teacher edit after generation blocks stale acceptance; changing plan selections invalidates earlier suggestions. No automatic publication or overwrite of teacher grades occurs.
+
+Storage and limits
+Teacher-only /api/reporting/classes/{classId}/plans with optional /{planId}/evidence, /suggestions or /entries. R2 stores reporting plans and private suggestion runs; reporting results are deterministic per-plan/per-standard gradebook activities. Existing D1 and R2 bindings are reused, with no migration. CSRF/account/class checks, conditional writes, idempotent requests, current-roster filtering and the existing 200-observation/8-MiB gradebook limits remain enforced. Reporting saves allow 1200 actions per teacher per 15 minutes; AI allows 40 provider requests per teacher and 300 per site per UTC day. Suggestions remain teacher-only.
+
+Research
+NESA reporting and professional judgments:
+https://curriculum.nsw.edu.au/assessment-and-reporting/reporting-and-using-grades
+NSW selected reporting outcomes (3–5 per subject is contextual Years 7–12 advice, not a universal requirement):
+https://education.nsw.gov.au/teaching-and-learning/curriculum/reporting-to-parents/reporting-advice
+NESA formative assessment:
+https://curriculum.nsw.edu.au/assessment-and-reporting/formative-assessment
+OECD human oversight of AI assessment:
+https://www.oecd.org/en/publications/reimagining-teaching-in-an-accelerating-world_d0edfe8c-en/full-report/component-6.html
