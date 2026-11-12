@@ -237,7 +237,7 @@ async function insertNotebookBoard(){
   if(book!==targetBook||selection?.sectionId!==targetSection.id||selection?.pageId!==currentPage)return;
   boardInsertBusy=true;boardsButton.disabled=true;clearProblem();
   let page=choice?data.pages.find(p=>p.id===choice.boardId):null;
-  if(!choice){const id=requestId(),definition=templateById(template);await request('/api/class-boards/classes/'+targetBook.classId,{action:'create',template,title:definition?.name||'Untitled board',prompt:definition?.prompt||'',requestId:id});choice={boardId:id,snapshotId:''};page={title:definition?.name||'Untitled board'};}
+  if(!choice){const id=requestId();await request('/api/class-boards/classes/'+targetBook.classId,{action:'create',...template,requestId:id});choice={boardId:id,snapshotId:''};page={title:template.title};}
   if(!active){const id=requestId();await adapter.create(targetBook.id,{id,title:page.title,sectionId:targetSection.id});const updated=await adapter.book(targetBook.id);selection={...updated,sectionId:targetSection.id};boardInsertBusy=false;await openPage(id);boardInsertBusy=true;}
   if(!active||active.readOnly||book!==targetBook)throw Error('Open an editable notebook page to insert this board.');
   const current=active;if(!window.InkWireEditor.insertLiveBoard({classId:targetBook.classId,boardId:choice.boardId,snapshotId:choice.snapshotId,title:page.title,width:Math.max(320,Math.min(880,$('#note-body').clientWidth-48))}))throw Error('The board could not be inserted. Try again.');await flush(current);
@@ -247,7 +247,7 @@ async function insertNotebookBoard(){
 
 $('#add-page').onclick=async()=>{
  if(!mayNavigate()||!book||library.role!=='teacher'||!selection?.sectionId)return;
- const button=$('#add-page');button.disabled=true;const id=requestId();if(book.classBoards){try{const template=await chooseLiveBoardTemplate();if(!template)return;await request('/api/class-boards/classes/'+book.classId,{action:'create',template,title:templateById(template)?.name||'Untitled board',prompt:templateById(template)?.prompt||'',requestId:id});const data=await adapter.book(book.id);selection={...data,sectionId:'boards'};renderLists();await openPage(id);}catch(error){problem(error);}finally{button.disabled=false;}return;}
+ const button=$('#add-page');button.disabled=true;const id=requestId();if(book.classBoards){try{const template=await chooseLiveBoardTemplate();if(!template)return;await request('/api/class-boards/classes/'+book.classId,{action:'create',...template,requestId:id});const data=await adapter.book(book.id);selection={...data,sectionId:'boards'};renderLists();await openPage(id);}catch(error){problem(error);}finally{button.disabled=false;}return;}
  try{await adapter.create(book.id,{id,title:'Untitled page',sectionId:selection.sectionId});const data=await adapter.book(book.id);selection={...data,sectionId:selection.sectionId};renderLists();await openPage(id);titleField.focus();titleField.select();}
  catch(error){problem(error);}finally{button.disabled=false;}
 };

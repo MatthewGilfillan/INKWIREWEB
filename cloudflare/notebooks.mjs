@@ -1,3 +1,4 @@
+import {reconcileNotebookBoards} from './live-board-placement.mjs';
 import {handleClassBoards} from './class-boards.mjs';
 import {handleNotebookFile} from './notebook-files.mjs';
 import {notebookContext,notebookPrepare,handleNotebookOrganization,notebookVersion,notebookTemplate} from './notebook-organization.mjs';
@@ -40,7 +41,7 @@ export async function handleNotebooks(request,env,user) {
   if(!learner)return fail('Notebook not found.',404,'NOT_FOUND');
   if(!await env.DB.prepare('SELECT id FROM classes WHERE id=? AND deleted_at IS NULL').bind(classId).first())return fail('Notebook not found.',404,'NOT_FOUND');
   const scope=[classId,learnerId],prepare=notebookPrepare(env,learnerId);
-  let context;try{context=await notebookContext(env,user,classId,learnerId);if(kind==='pages'&&ID.test(id||''))context.pageUnlocked(id);}catch(e){return fail(e.message,e.status||400,e.code);}
+  let context;try{if(parts.length===2&&request.method==='GET'&&!teacherBook){try{await reconcileNotebookBoards(env,user,classId,learnerId);}catch{/* Notebook writing remains available if board storage is temporarily offline. */}}context=await notebookContext(env,user,classId,learnerId);if(kind==='pages'&&ID.test(id||''))context.pageUnlocked(id);}catch(e){return fail(e.message,e.status||400,e.code);}
   const extra=await handleNotebookOrganization(context,request,kind,id);if(extra)return extra;
   if(kind==='pages'&&ID.test(id||'')&&parts[4]==='assets'&&ID.test(parts[5]||'')&&parts.length===6)return handleNotebookFile(request,env,user,context,id,parts[5]);
   // PDF assets belong to a particular notebook page, never to a separate class library.

@@ -1,0 +1,36 @@
+Live Board classroom flow — 12 November 2026
+
+Insert live board opens the activity library, followed by a setup screen for the
+title, instructions, visual layout, background, replies and reactions. The board
+is created as a teacher draft. Supported shared layouts are Wall, Grid, Rows and
+Timeline; structured activities also offer Columns and their graphic organizer.
+Ranking activities retain their individual student columns.
+
+Open to class publishes one shared board and places a reference page in each
+enrolled student's notebook, in the matching section of the teacher notebook.
+Custom sections are created if needed. A standalone board without a notebook
+placement or lesson link goes into Notes. Teacher notes, files and assessments
+on the source page are not copied. Existing student writing is never replaced.
+
+Already-distributed references count as placed. Deterministic page IDs prevent
+duplicates during retries or reopening. Deleted copies are not resurrected.
+Protected sections are respected; a separate shared section is used if needed.
+Students joining later receive published activities when their notebook opens
+or polls. Legacy published boards gain placements when a teacher opens them.
+Staff planning boards remain staff-only and do not create student pages.
+
+The live classroom canvas is shared by teacher and student. Teacher controls
+are in a cog drawer: posting state, appearance, layouts, teams, standards,
+assessment, snapshots, archival and a retryable Sync student notebooks action.
+Per-post moderation actions are in an ellipsis menu. Students cannot change
+board settings or distribute boards. Existing class authorization remains in
+force for board data, images, snapshots and contributions.
+
+Notebook page, section and storage limits still apply. A partial delivery is
+reported in the settings drawer and may be retried. Board delivery failures
+do not prevent students opening or editing their other notebook work.
+
+Validation: automated placement, retry, legacy migration, late enrolment,
+permissions, private-content isolation, layout persistence and existing board
+tests; fictional teacher/student browser walkthrough; desktop, tablet and
+dark-mode visual checks. No actual classroom records were changed for testing.
