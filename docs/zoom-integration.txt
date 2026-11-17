@@ -6,7 +6,13 @@ app packaging. Windows is deferred. The first pilot uses the teacher's personal
 paid Zoom account. The pilot class now has separate Friday and Saturday links;
 real meeting credentials are stored only in the application database.
 
-Current implementation (deployed foundation; Zoom OAuth not yet configured)
+Current implementation (deployed; personal pilot account connected)
+On 17 November 2026, the owner's personal Zoom account completed the General
+App development OAuth flow. Ink Wire meeting settings show the connected host.
+The four required Zoom secrets are configured on Cloudflare. A signed webhook
+validation challenge passed, while an unsigned request was rejected. Real
+meeting/recording/transcript acceptance remains outstanding as described below.
+
 Teacher-authorized Zoom General App OAuth; state bound to the current Ink Wire
 teacher, ten-minute expiry and one-time consumption; encrypted server-side token
 storage and serialized refresh-token rotation. A user reconnects/disconnects their
@@ -43,8 +49,9 @@ An existing meeting pasted as a link does not automatically grant access to its
 transcript. First automatic workflow uses a lesson-specific meeting created by
 the connected host. Recurring/PMI meeting-instance reconciliation and syncing
 later Zoom schedule edits back into the course need a subsequent pass. No video
-or audio is captured by Ink Wire itself. Real OAuth, Zoom hosting and recording
-acceptance must be completed with the actual account before claiming this live.
+or audio is captured by Ink Wire itself. Real OAuth is verified. A live Zoom
+hosting, recording and recap test must still be completed before claiming the
+entire automatic recap workflow is verified.
 
 Activation checklist (site owner)
 1. Production migrations 0019_zoom.sql and 0020_zoom_weekly.sql are applied.
@@ -63,8 +70,8 @@ Activation checklist (site owner)
    ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_WEBHOOK_SECRET,
    ZOOM_TOKEN_KEY (32 random bytes as 64 hexadecimal characters).
    Keep that encryption key stable; losing it requires reconnecting accounts.
-   ZOOM_ENABLED=true is deployed for manual/weekly links. OAuth remains inactive
-   until the additional secrets are configured.
+   ZOOM_ENABLED=true and the four secrets are now configured in production.
+   OAuth is active for the personal-account development pilot.
 5. Deploy the candidate with the scheduled trigger and existing OpenAI settings.
    Connect Zoom in the teacher timeline's Meeting settings. Test teacher and
    student visibility, waiting room, explicit End lesson, recording/transcript
@@ -73,10 +80,21 @@ Activation checklist (site owner)
    experience. Publish/release only after these live acceptance checks pass.
 
 Verification
+The first real callback exposed a Cloudflare runtime incompatibility with
+fetch redirect:'error'. All authenticated Zoom calls now use redirect:'manual'
+and reject non-OK responses, so they do not forward credentials to a redirect
+destination. The fix is deployed as Worker version
+513ff471-a323-46cf-aab6-2399d8924cb6. The 13 Zoom checks pass, including explicit
+redirect rejection for token exchange, profile lookup, API calls, revocation
+and transcript download. A separate test in the actual Workers runtime passed
+both successful token exchange and redirect rejection. The real OAuth callback
+then succeeded and the signed-in teacher UI showed the connected account.
+
 309 unit/API checks pass; 22 browser workflows cover the release. A final targeted browser pass
 also covers teacher recap corrections. Build and worker dry run pass. These use
-fictional accounts and mocked Zoom/OpenAI responses; they do not establish real
-account authorization or a successful live cloud recording. The Worker and both
+fictional accounts and mocked Zoom/OpenAI responses; they do not establish a
+successful live cloud recording. Real account authorization is now verified.
+The Worker and both
 Zoom migrations are deployed; the signed-in teacher timeline and updated board
 picker were verified in production. Native app OAuth acceptance
 is deferred with the Mac packaging milestone.
@@ -87,3 +105,4 @@ https://developers.zoom.us/docs/api/meetings/
 https://developers.zoom.us/docs/api/meetings/events/
 https://developers.zoom.us/docs/api/webhooks/
 https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064927
+https://developers.cloudflare.com/workers/runtime-apis/request/

@@ -37,7 +37,7 @@ export async function handleZoomWebhook(request,env){
 function encodedMeetingUUID(uuid){const encoded=encodeURIComponent(uuid);return uuid.startsWith('/')||uuid.includes('//')?encodeURIComponent(encoded):encoded;}
 async function downloadTranscript(url,token){
  const target=new URL(url);if(target.protocol!=='https:'||target.username||target.password||target.port||!/(^|\.)zoom\.(us|com)$/.test(target.hostname))throw Error('Invalid transcript download host.');
- const response=await fetch(target.href,{redirect:'error',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token}});if(!response.ok)throw Error('Transcript download unavailable.');const text=await bodyText(response,524288);if(encoder.encode(text).length<30)throw Error('Transcript is incomplete.');return text;
+ const response=await fetch(target.href,{redirect:'manual',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token}});if(!response.ok){await response.body?.cancel();throw Error('Transcript download unavailable.');}const text=await bodyText(response,524288);if(encoder.encode(text).length<30)throw Error('Transcript is incomplete.');return text;
 }
 export async function processZoomRecaps(env){
  if(!zoomConfigured(env)||!planningAvailable(env))return;
