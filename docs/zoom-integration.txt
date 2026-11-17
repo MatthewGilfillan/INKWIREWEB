@@ -49,8 +49,10 @@ Recurring transcript and quiz update — deployed, 17 November 2026
 Migration 0021_zoom_recurring_transcripts.sql is applied in production. The
 Worker/UI release is 8a112c4f-09a6-4e1a-b5eb-c12ffa841b73, with the existing
 five-minute scheduled trigger. The signed-in production timeline shows the new
-weekly recap and private quiz options. Both remain off for the pilot until the
-additional transcript permission is approved and the connection is refreshed.
+weekly recap and private quiz options. The owner approved the additional
+transcript permission and completed reconnection on 17 November 2026. Both
+Friday and Saturday weekly meetings now have recap and private quiz drafts
+enabled, after the backend verified they belong to the connected Zoom host.
 The pilot's assigned eight-question next-lesson quiz remains visible unchanged.
 
 The new Weekly Zoom links options verify that the meeting is hosted by the
@@ -74,16 +76,17 @@ accounts/course while AI is running. Teacher corrections and manual assessments
 remain separate. Quiz status appears only in the teacher view. Teachers must
 review and assign the draft before it appears to students.
 
-Activation still needed for the new transcript source
-- Add the user-level cloud_recording:read:meeting_transcript permission to the
-  Zoom General App, then reconnect the pilot host. This scope is not part of the
-  original cloud-recording consent. Additional-access approval is pending.
+Transcript source activation and remaining acceptance
+- The user-level cloud_recording:read:meeting_transcript permission was added
+  with the owner's explicit approval. Reconnection succeeded, with the optional
+  shared-access permission left unchecked. OAuth and hosted-meeting API access
+  are verified; actual retained-transcript retrieval is not yet verified.
 - The existing meeting.ended subscription is sufficient for delayed checks.
   meeting.aic_transcript_completed is also supported by code, but is optional;
   it needs meeting:read:summary and is NOT requested for this pilot.
-- Opt the verified Friday/Saturday weekly meeting settings into the desired
-  automation. This affects future occurrence bindings; already-bound lessons
-  keep their individual settings.
+- Both verified Friday/Saturday weekly meeting settings are opted into recaps
+  and private quiz drafts. The saved values were reloaded and checked. This
+  affects future occurrence bindings; already-bound lessons keep their settings.
 - Complete a real non-student meeting → retained transcript → End lesson →
   recap/private quiz test. Fixture tests do not establish live provider success.
 
@@ -155,5 +158,6 @@ pass: weekly transcript/quiz options and teacher/student permissions, explicit
 lesson closure with board snapshots, and private AI quiz review/assignment.
 Website build, Worker dry run and production deployment pass. The production
 weekly options and preservation of the assigned quiz were verified in Chrome.
-Additional-scope consent, pilot opt-in and real retained-transcript acceptance
-remain outstanding; the mocked checks do not establish provider success.
+Additional-scope consent, reconnection and both pilot weekly opt-ins are verified.
+Real retained-transcript acceptance remains outstanding; the mocked checks and
+successful consent do not establish live transcript download or AI processing.
