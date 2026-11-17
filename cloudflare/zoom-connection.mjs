@@ -27,7 +27,7 @@ export async function zoomAccessToken(env,userId){
 }
 export async function zoomAPI(env,userId,path,{method='GET',body}={}){
  const token=await zoomAccessToken(env,userId),response=await fetch('https://api.zoom.us/v2'+path,{method,redirect:'manual',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
- if(!response.ok){await response.body?.cancel();zoomError(response.status===401?'Your Zoom authorization expired. Reconnect Zoom.':response.status===429?'Zoom is busy. Wait a moment and try again.':'Zoom could not complete this request. Check the meeting and account permissions.',response.status===429?429:502);}
+ if(!response.ok){await response.body?.cancel();throw Object.assign(Error(response.status===401?'Your Zoom authorization expired. Reconnect Zoom.':response.status===429?'Zoom is busy. Wait a moment and try again.':'Zoom could not complete this request. Check the meeting and account permissions.'),{status:response.status===429?429:502,zoomStatus:response.status});}
  return response.status===204?null:response.json();
 }
 export async function handleZoomConnection(request,env,user,{readJSON}){try{

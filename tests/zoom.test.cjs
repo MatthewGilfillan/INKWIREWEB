@@ -83,3 +83,97 @@ test('weekly Zoom meetings follow scheduled weekdays, respect overrides and isol
  f.db.prepare('INSERT INTO zoom_lessons(class_id,lesson_id,meeting_id,join_url,passcode,updated_by,updated_at) VALUES(?,?,?,?,?,?,0)').run(f.classId,'sat','11111111111','https://zoom.us/j/11111111111','override','teacher');map=await zoomLessonMap(f.env,f.classId,false,lessons);assert.equal(map.get('sat').passcode,'override');assert.equal(map.get('sat').inherited,undefined);
  await weekly('teacher',{action:'remove',weekday:5,revision:1});assert.equal((await weekly('teacher')).meetings.length,1);
 }finally{f.db.close();}});
+
+async function weeklyAutomation(f,{weekday=5,autoQuiz=true}={}){
+ const {handleWeeklyZoom}=await import('../cloudflare/zoom-weekly.mjs');
+ return handleWeeklyZoom(f.req(`/api/zoom/classes/${f.classId}/weekly`,{expectedUserId:'teacher',action:'save',revision:0,weekday,meetingId:'12345678901',autoRecap:true,autoQuiz}),f.env,f.users.teacher,helpers);
+}
+function scheduleFriday(f,date='2030-01-04'){
+ f.course.timeZone='Asia/Shanghai';f.course.lessons=[{...f.course.lessons[0],date,startTime:'17:45',lessonMinutes:60}];
+ f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),f.classId);
+}
+test('weekly automation verifies the connected host before opting a recurring meeting in',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  assert.equal((await weeklyAutomation(f)).status,409);await f.credentials();
+  global.fetch=async()=>Response.json({id:'12345678901',host_id:'someone-else'});assert.equal((await weeklyAutomation(f)).status,409);
+  global.fetch=async()=>Response.json({id:'12345678901',host_id:'zoom-host'});const response=await weeklyAutomation(f);assert.equal(response.status,200);const value=await response.json();assert.equal(value.meetings[0].autoQuiz,true);assert.equal(value.meetings[0].autoRecap,true);assert.ok(!JSON.stringify(value).includes('connection_user_id'));
+ }finally{global.fetch=original;f.db.close();}
+});
+test('recurring webhooks bind distinct instances to the correct class timezone without marking lessons taught',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  scheduleFriday(f);f.course.lessons.push({...f.course.lessons[0],id:'next-friday',date:'2030-01-11'});f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),f.classId);
+  await f.credentials();global.fetch=async()=>Response.json({id:'12345678901',host_id:'zoom-host'});await weeklyAutomation(f);
+  await f.webhook('meeting.started',{uuid:'jan4',start_time:'2030-01-04T09:45:00Z'}, {account_id:'wrong-account'});assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_lessons').get().n,0);
+  await f.webhook('meeting.started',{uuid:'jan4',start_time:'2030-01-04T09:45:00Z'});await f.webhook('meeting.ended',{uuid:'jan4',start_time:'2030-01-04T09:45:00Z'});
+  await f.webhook('meeting.started',{uuid:'jan11',start_time:'2030-01-11T09:45:00Z'});
+  const rows=f.db.prepare('SELECT lesson_id,meeting_uuid,meeting_state FROM zoom_lessons ORDER BY lesson_id').all();assert.deepEqual(rows.map(r=>({...r})),[{lesson_id:'lesson-one',meeting_uuid:'jan4',meeting_state:'ended'},{lesson_id:'next-friday',meeting_uuid:'jan11',meeting_state:'live'}]);
+  assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_recap_jobs').get().n,1);assert.equal(f.objects.has(`lesson-sessions/${f.classId}/lesson-one.json`),false);
+  await f.webhook('meeting.started',{uuid:'jan4-late',start_time:'2030-01-04T09:45:00Z'});assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_lessons').get().n,2);
+ }finally{global.fetch=original;f.db.close();}
+});
+test('unclear recurring times and explicit overrides do not receive another lesson’s transcript',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  scheduleFriday(f);await f.credentials();global.fetch=async()=>Response.json({id:'12345678901',host_id:'zoom-host'});await weeklyAutomation(f);
+  for(const start_time of [undefined,'invalid','2030-01-04T21:45:00Z'])await f.webhook('meeting.started',{uuid:'unmatched',start_time});assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_lessons').get().n,0);
+  f.course.lessons.push({...f.course.lessons[0],id:'ambiguous'});f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),f.classId);
+  await f.webhook('meeting.started',{uuid:'unclear',start_time:'2030-01-04T09:45:00Z'});assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_lessons').get().n,0);
+  f.course.lessons.pop();f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),f.classId);await f.meeting('teacher',{action:'save',meetingId:'98765432100'});
+  await f.webhook('meeting.started',{uuid:'overridden',start_time:'2030-01-04T09:45:00Z'});assert.equal(f.db.prepare('SELECT meeting_id FROM zoom_lessons').get().meeting_id,'98765432100');assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_recap_jobs').get().n,0);
+ }finally{global.fetch=original;f.db.close();}
+});
+test('retained transcript events use their own payload fields and revive a late failed job once',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  scheduleFriday(f);await f.credentials();global.fetch=async()=>Response.json({id:'12345678901',host_id:'zoom-host'});await weeklyAutomation(f);
+  const object={meeting_id:12345678901,meeting_uuid:'retained-occurrence',meeting_start_time:'2030-01-04T09:45:00Z',attach_type:'durable_transcript'};
+  await f.webhook('meeting.aic_transcript_completed',object);assert.equal(f.db.prepare('SELECT meeting_uuid FROM zoom_lessons').get().meeting_uuid,'retained-occurrence');
+  f.db.prepare("UPDATE zoom_recap_jobs SET status='failed',attempts=12").run();await f.webhook('meeting.aic_transcript_completed',object);assert.equal(f.db.prepare('SELECT status FROM zoom_recap_jobs').get().status,'pending');
+  f.db.prepare("UPDATE zoom_recap_jobs SET status='done'").run();await f.webhook('meeting.aic_transcript_completed',object);assert.equal(f.db.prepare('SELECT count(*) n FROM zoom_recap_jobs').get().n,1);assert.equal(f.db.prepare('SELECT status FROM zoom_recap_jobs').get().status,'done');
+ }finally{global.fetch=original;f.db.close();}
+});
+const generatedQuiz={quiz:{title:'Reading recap',reflectionPrompt:'',questions:[{prompt:'What makes an inference convincing?',options:['Evidence from the text','A guess with no support'],correctIndex:0,explanation:'Textual evidence supports an inference.'}]},reviewNotes:'Check against the class text.',sources:['Transcript: discussion of supporting an inference with evidence.']};
+async function quizPipeline(f){
+ f.course.lessons.push({...f.course.lessons[0],id:'lesson-two',date:'2030-01-14'});f.db.prepare('UPDATE course_overviews SET content=? WHERE class_id=?').run(JSON.stringify(f.course),f.classId);
+ await f.create();f.db.prepare("UPDATE zoom_lessons SET auto_quiz=1,quiz_status='waiting'").run();await f.webhook('recording.transcript_completed');Object.assign(f.env,{OPENAI_PLANNING_ENABLED:'true',OPENAI_API_KEY:'fake-key'});await f.env.WORKSHEETS.put(`lesson-sessions/${f.classId}/lesson-one.json`,JSON.stringify({phase:'ended'}));
+}
+function pipelineFetch(onAI=()=>{}){return async(url,options)=>{
+ const value=String(url);if(!value.includes('api.openai.com'))assert.equal(options.redirect,'manual');
+ if(value.endsWith('/recordings'))return Response.json({uuid:'exact-instance',recording_files:[{recording_type:'audio_transcript',status:'completed',download_url:'https://zoom.us/rec/download/transcript'}]});
+ if(value.includes('/rec/download/'))return new Response('WEBVTT\n\n00:00:01.000 --> 00:00:05.000\nTeacher: We supported our inferences with evidence from the text.');
+ if(value.includes('api.openai.com')){await onAI(options);return Response.json({status:'completed',model:'test',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({summary:'We practised supporting inferences with textual evidence.',homework:null,students:[],nextQuiz:generatedQuiz})}]}]});}throw Error('Unexpected URL '+url);
+};}
+test('automatic quiz is saved privately for the next scheduled lesson and replay cannot replace it',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  await quizPipeline(f);let count=0;global.fetch=pipelineFetch(()=>count++);await f.events.processZoomRecaps(f.env);
+  const draft=f.db.prepare('SELECT * FROM quiz_drafts').get();assert.equal(draft.lesson_id,'lesson-two');assert.equal(JSON.parse(draft.content).quiz.title,'Reading recap');assert.equal(f.db.prepare('SELECT count(*) n FROM lesson_quizzes').get().n,0);
+  assert.equal((await f.meeting()).meeting.quizStatus,'draft_ready');assert.equal((await f.meeting('student')).meeting.quizStatus,undefined);assert.equal((await f.meeting('parent')).meeting.autoQuiz,undefined);
+  await f.webhook('recording.transcript_completed');await f.events.processZoomRecaps(f.env);assert.equal(count,1);assert.equal(f.db.prepare('SELECT revision FROM quiz_drafts').get().revision,1);
+ }finally{global.fetch=original;f.db.close();}
+});
+test('teacher work, started lessons and opt-outs made during AI processing are preserved',async()=>{
+ for(const mode of ['assigned','draft','started','opt-out','account-change','course-change']){
+  const f=await fixture(),original=global.fetch;try{
+   await quizPipeline(f);global.fetch=pipelineFetch(async()=>{
+    if(mode==='assigned')f.db.prepare('INSERT INTO lesson_quizzes(class_id,lesson_id,title,questions,updated_by,updated_at) VALUES(?,?,?,?,?,0)').run(f.classId,'lesson-two','Teacher quiz','[]','teacher');
+    if(mode==='draft')f.db.prepare('INSERT INTO quiz_drafts VALUES(?,?,1,1,0,?,?,?,?,0)').run(f.classId,'lesson-two',JSON.stringify(generatedQuiz),'Reviewed','Teacher draft','teacher');
+    if(mode==='started')await f.env.WORKSHEETS.put(`lesson-sessions/${f.classId}/lesson-two.json`,JSON.stringify({phase:'running'}));
+    if(mode==='opt-out')f.db.prepare('UPDATE zoom_lessons SET auto_recap=0,auto_quiz=0,revision=revision+1').run();
+    if(mode==='account-change')f.db.prepare("UPDATE zoom_connections SET zoom_user_id='new-host'").run();
+    if(mode==='course-change')f.db.prepare('UPDATE course_overviews SET revision=revision+1').run();
+   });await f.events.processZoomRecaps(f.env);
+   assert.equal(f.db.prepare('SELECT count(*) n FROM quiz_drafts').get().n,mode==='draft'?1:0,mode);
+   if(mode==='assigned')assert.equal(f.db.prepare('SELECT title FROM lesson_quizzes').get().title,'Teacher quiz');
+   if(mode==='draft')assert.equal(f.db.prepare('SELECT source FROM quiz_drafts').get().source,'Teacher draft');
+   if(['opt-out','account-change','course-change'].includes(mode))assert.equal(f.db.prepare('SELECT recap_summary FROM zoom_lessons').get().recap_summary,'');
+  }finally{global.fetch=original;f.db.close();}
+ }
+});
+test('retained transcript API is an exact-occurrence fallback with strict download and identity checks',async()=>{
+ const f=await fixture(),original=global.fetch;try{
+  await f.credentials();const {fetchZoomTranscript}=await import('../cloudflare/zoom-transcripts.mjs'),meeting={connection_user_id:'teacher',meeting_uuid:'a/b==',zoom_user_id:'zoom-host',account_id:'zoom-account'};
+  for(const failure of ['', 'uuid','host','account','download','redirect']){
+   const calls=[];global.fetch=async(url,options)=>{assert.equal(options.redirect,'manual');calls.push(String(url));if(String(url).endsWith('/recordings'))return new Response('',{status:404});if(String(url).endsWith('/transcript'))return Response.json({meeting_id:failure==='uuid'?'wrong':meeting.meeting_uuid,host_id:failure==='host'?'wrong':'zoom-host',account_id:failure==='account'?'wrong':'zoom-account',can_download:true,download_url:failure==='download'?'https://untrusted.test/file':'https://zoom.us/rec/download/file'});return failure==='redirect'?new Response(null,{status:302,headers:{Location:'https://untrusted.test/file'}}):new Response('WEBVTT\nTeacher: We discussed the character and evidence.');};
+   if(failure)await assert.rejects(()=>fetchZoomTranscript(f.env,meeting));else assert.equal((await fetchZoomTranscript(f.env,meeting)).source,'meeting');
+   assert.equal(calls[1],'https://api.zoom.us/v2/meetings/a%252Fb%253D%253D/transcript');assert.ok(calls.every(url=>!url.includes('untrusted.test')));
+  }
+ }finally{global.fetch=original;f.db.close();}
+});

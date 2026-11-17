@@ -23,14 +23,14 @@ export const readQuizDraft=async(env,classId,lessonId)=>{
   const row=await env.DB.prepare('SELECT * FROM quiz_drafts WHERE class_id=? AND lesson_id=?').bind(classId,lessonId).first();
   return row?{revision:row.revision,courseRevision:row.course_revision,quizRevision:row.quiz_revision,...JSON.parse(row.content),source:row.source,createdAt:row.updated_at}:null;
 };
-export async function saveQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,draft,source){
-  return persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,validateAIDraft(draft),source);
+export async function saveQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,draft,source,zoomGuard=null){
+  return persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,validateAIDraft(draft),source,zoomGuard);
 }
 export async function saveTeacherQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,quiz){
   const safe=validateQuiz(quiz,{draft:true});
   return persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,{quiz:safe,reviewNotes:'Check the questions and answer key before assigning.',sources:safe.questions.map(()=> 'Teacher-created or imported question.')},'Teacher draft');
 }
-async function persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,safe,source){
+async function persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRevision,draftRevision,safe,source,zoomGuard=null){
   const now=Date.now();
   const saved=await env.DB.prepare(`INSERT INTO quiz_drafts(class_id,lesson_id,revision,course_revision,quiz_revision,content,review_notes,source,updated_by,updated_at)
     SELECT ?,?,1,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM course_overviews WHERE class_id=? AND revision=?)
@@ -38,8 +38,9 @@ async function persistQuizDraft(env,user,classId,lessonId,courseRevision,quizRev
     AND COALESCE((SELECT revision FROM lesson_quizzes WHERE class_id=? AND lesson_id=?),0)=?
     AND NOT EXISTS(SELECT 1 FROM quiz_attempts WHERE class_id=? AND lesson_id=?)
     AND (?=0 OR EXISTS(SELECT 1 FROM quiz_drafts WHERE class_id=? AND lesson_id=?))
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM zoom_lessons z JOIN zoom_connections c ON c.user_id=z.connection_user_id WHERE z.class_id=? AND z.lesson_id=? AND z.meeting_uuid=? AND z.revision=? AND z.auto_quiz=1 AND z.auto_recap=1 AND z.connection_user_id=? AND c.zoom_user_id=? AND c.account_id=?))
     ON CONFLICT(class_id,lesson_id) DO UPDATE SET revision=quiz_drafts.revision+1,course_revision=excluded.course_revision,quiz_revision=excluded.quiz_revision,content=excluded.content,review_notes=excluded.review_notes,source=excluded.source,updated_by=excluded.updated_by,updated_at=excluded.updated_at WHERE quiz_drafts.revision=? AND ?>=0 RETURNING revision`)
-    .bind(classId,lessonId,courseRevision,quizRevision,JSON.stringify(safe),safe.reviewNotes,source,user.id,now,classId,courseRevision,classId,user.id,user.id,classId,lessonId,quizRevision,classId,lessonId,Math.max(0,draftRevision),classId,lessonId,draftRevision,draftRevision).first();
+    .bind(classId,lessonId,courseRevision,quizRevision,JSON.stringify(safe),safe.reviewNotes,source,user.id,now,classId,courseRevision,classId,user.id,user.id,classId,lessonId,quizRevision,classId,lessonId,Math.max(0,draftRevision),classId,lessonId,zoomGuard?.uuid??null,classId,zoomGuard?.lessonId??null,zoomGuard?.uuid??null,zoomGuard?.revision??null,user.id,zoomGuard?.host??null,zoomGuard?.account??null,draftRevision,draftRevision).first();
   return Boolean(saved);
 }
 export async function handleQuizAssistant(request,env,user,{json,fail,readJSON}){

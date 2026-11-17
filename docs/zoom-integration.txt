@@ -6,7 +6,7 @@ app packaging. Windows is deferred. The first pilot uses the teacher's personal
 paid Zoom account. The pilot class now has separate Friday and Saturday links;
 real meeting credentials are stored only in the application database.
 
-Current implementation (deployed; personal pilot account connected)
+Previously deployed baseline (personal pilot account connected)
 On 17 November 2026, the owner's personal Zoom account completed the General
 App development OAuth flow. Ink Wire meeting settings show the connected host.
 The four required Zoom secrets are configured on Cloudflare. A signed webhook
@@ -44,16 +44,58 @@ only for processing and are not saved by Ink Wire. Existing private ratings,
 teacher feedback, grades and homework are not overwritten. The shared AI recap
 has its own timeline section and a clear label. A failed job can be retried.
 
-Current limits
-An existing meeting pasted as a link does not automatically grant access to its
-transcript. First automatic workflow uses a lesson-specific meeting created by
-the connected host. Recurring/PMI meeting-instance reconciliation and syncing
-later Zoom schedule edits back into the course need a subsequent pass. No video
-or audio is captured by Ink Wire itself. Real OAuth is verified. A live Zoom
-hosting, recording and recap test must still be completed before claiming the
-entire automatic recap workflow is verified.
+Recurring transcript and quiz update — deployed, 17 November 2026
 
-Activation checklist (site owner)
+Migration 0021_zoom_recurring_transcripts.sql is applied in production. The
+Worker/UI release is 8a112c4f-09a6-4e1a-b5eb-c12ffa841b73, with the existing
+five-minute scheduled trigger. The signed-in production timeline shows the new
+weekly recap and private quiz options. Both remain off for the pilot until the
+additional transcript permission is approved and the connection is refreshed.
+The pilot's assigned eight-question next-lesson quiz remains visible unchanged.
+
+The new Weekly Zoom links options verify that the meeting is hosted by the
+connected teacher before opting future lessons into automatic recaps and optional
+private quiz drafts. Signed events bind each actual Zoom occurrence UUID to one
+non-cancelled lesson within 90 minutes of its scheduled start, using the course
+time zone. Ambiguous dates, wrong hosts/accounts and explicit lesson overrides
+are not guessed. A recurring meeting ID can now serve multiple distinct lessons.
+
+meeting.ended queues a durable transcript check, while transcript-completed
+events accelerate it. Processing still waits for explicit Ink Wire End lesson.
+The recording transcript API is tried first. If no cloud transcript is available,
+the retained meeting transcript API is used with the exact occurrence UUID, host
+and account; bare numeric meeting IDs are never used to retrieve transcripts.
+Download host, redirects and total size are checked. No raw transcript is stored.
+
+If enabled, the same backend AI call drafts a quiz for the next scheduled future
+lesson. It stays teacher-private. The job cannot overwrite an existing draft,
+assigned quiz or student attempt, or write after the teacher opts out or changes
+accounts/course while AI is running. Teacher corrections and manual assessments
+remain separate. Quiz status appears only in the teacher view. Teachers must
+review and assign the draft before it appears to students.
+
+Activation still needed for the new transcript source
+- Add the user-level cloud_recording:read:meeting_transcript permission to the
+  Zoom General App, then reconnect the pilot host. This scope is not part of the
+  original cloud-recording consent. Additional-access approval is pending.
+- The existing meeting.ended subscription is sufficient for delayed checks.
+  meeting.aic_transcript_completed is also supported by code, but is optional;
+  it needs meeting:read:summary and is NOT requested for this pilot.
+- Opt the verified Friday/Saturday weekly meeting settings into the desired
+  automation. This affects future occurrence bindings; already-bound lessons
+  keep their individual settings.
+- Complete a real non-student meeting → retained transcript → End lesson →
+  recap/private quiz test. Fixture tests do not establish live provider success.
+
+Current limits
+An unverified pasted individual meeting link is join-only. Matching an old,
+unscheduled or ambiguous recurring occurrence still requires manual transcript
+upload. Zoom schedule edits do not update the course. Ink Wire captures no audio
+or video. The pilot's existing eight-question quiz for 20 November remains
+assigned; automation must preserve it. Only that Friday's time was corrected
+to 17:45 Asia/Shanghai (16:45 Bangkok); later schedule times still need review.
+
+Original connection checklist (completed except live acceptance)
 1. Production migrations 0019_zoom.sql and 0020_zoom_weekly.sql are applied.
 2. Create a user-managed General App in Zoom Marketplace for Ink Wire LMS.
    Use the development app/local test for the initial personal-account pilot.
@@ -72,14 +114,14 @@ Activation checklist (site owner)
    Keep that encryption key stable; losing it requires reconnecting accounts.
    ZOOM_ENABLED=true and the four secrets are now configured in production.
    OAuth is active for the personal-account development pilot.
-5. Deploy the candidate with the scheduled trigger and existing OpenAI settings.
+5. Deploy with the scheduled trigger and existing OpenAI settings.
    Connect Zoom in the teacher timeline's Meeting settings. Test teacher and
    student visibility, waiting room, explicit End lesson, recording/transcript
    callbacks, AI recap, retry, and disconnect using a non-student test meeting.
-6. The first pilot’s Friday and Saturday links are entered. Verify the actual teacher/student
-   experience. Publish/release only after these live acceptance checks pass.
+6. The first pilot’s Friday and Saturday links are entered. Verify the actual
+   teacher/student experience before describing the full automation as ready.
 
-Verification
+Earlier baseline verification
 The first real callback exposed a Cloudflare runtime incompatibility with
 fetch redirect:'error'. All authenticated Zoom calls now use redirect:'manual'
 and reject non-OK responses, so they do not forward credentials to a redirect
@@ -106,3 +148,12 @@ https://developers.zoom.us/docs/api/meetings/events/
 https://developers.zoom.us/docs/api/webhooks/
 https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064927
 https://developers.cloudflare.com/workers/runtime-apis/request/
+
+Current release verification
+324 unit/API checks pass (20 Zoom cases); three focused Chrome browser workflows
+pass: weekly transcript/quiz options and teacher/student permissions, explicit
+lesson closure with board snapshots, and private AI quiz review/assignment.
+Website build, Worker dry run and production deployment pass. The production
+weekly options and preservation of the assigned quiz were verified in Chrome.
+Additional-scope consent, pilot opt-in and real retained-transcript acceptance
+remain outstanding; the mocked checks do not establish provider success.
