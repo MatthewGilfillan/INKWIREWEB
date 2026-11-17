@@ -1,4 +1,14 @@
-# Ink Wire Learning Studio
+# Ink Wire LMS
+
+Current classroom candidate: see [release status](docs/classroom-release.txt),
+[macOS build](desktop/macos/README.txt), and [Live Board behavior](docs/live-board-classroom.txt).
+The website and macOS app share the same authenticated backend. Windows is deferred.
+Zoom integration is the next milestone before Mac packaging; see the
+[integration candidate and activation steps](docs/zoom-integration.txt).
+This candidate is locally verified; its source commit and production deployment
+status must be distinguished. Historical prototype notes below describe earlier
+iterations and are not the current authentication or deployment status.
+
 
 Landing page and interactive learning-studio prototype for Ink Wire Education.
 

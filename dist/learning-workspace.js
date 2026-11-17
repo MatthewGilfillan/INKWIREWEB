@@ -1,3 +1,4 @@
+import {lessonStatus} from './lesson-session.js';
 import {escape} from './workspace-shared.js';
 import {courseIcon} from './course-overview.js';
 import {unitPosition} from './unit-position.mjs';
@@ -9,7 +10,7 @@ export function unitMeter(course,now) {
 
 export function learningWorkspace(data,notebookURL) {
   const c=data.course,p=unitPosition(c,data.serverNow),current=p.current<0?0:p.current;
-  const state=l=>l.status==='cancelled'?'Cancelled':l.endsAt!==null && Number.isFinite(l.endsAt) && l.endsAt<=data.serverNow?'Lesson held':'Upcoming';
+  const state=lessonStatus;
   const date=l=>l.date?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(l.date+'T12:00:00Z')):'Date to be set';
   return `<div class="learning-course-intro"><div><span class="lms-kicker">${escape(data.className)}</span>${c.description?`<p>${escape(c.description)}</p>`:''}</div>${unitMeter(c,data.serverNow)}</div>
     <div class="learning-layout"><aside class="learning-rail"><h3>Lesson plan <span>${c.lessons.length}</span></h3><label class="learning-lesson-picker"><span>Lesson</span><select data-learning-picker aria-label="Choose a lesson">${c.lessons.map((l,i)=>`<option value="${i}" ${i===current?'selected':''}>${l.number || i+1}. ${escape(l.title)}</option>`).join('')}</select></label><nav aria-label="Course lessons">${c.lessons.map((l,i)=>`<button type="button" class="learning-step" data-learning-step="${i}" aria-controls="learning-lesson-${i}" ${i===current?'aria-current="step"':''}><span class="learning-step-number">${String(l.number || i+1).padStart(2,'0')}</span><span><strong>${escape(l.title)}</strong><small>${escape(state(l))}${l.date?' · '+escape(date(l)):''}</small></span></button>`).join('')}</nav><a class="learning-notebook-shortcut" href="${escape(notebookURL)}">${courseIcon('book')}<span>${data.canTakeQuiz?'My notebook':'Live notebook'}</span><span aria-hidden="true">↗</span></a></aside>

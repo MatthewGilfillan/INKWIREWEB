@@ -1,3 +1,4 @@
+import {createTranscriptSummary} from './transcript-summary.js';
 import {createAssignments} from './assignments-workspace.js?v=20261110-gradebook';
 import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261111-unified';
 import {createClassSetup} from './class-setup.js?v=20261103-standards';
@@ -241,3 +242,5 @@ showView(['classes','calendar','trash','assessment'].includes(entryView)?entryVi
 if(entryQuery.get('join')==='1'){document.querySelector('[data-open="join-class"]').click();const url=new URL(location.href);url.searchParams.delete('join');history.replaceState(null,'',url);}
 
 window.addEventListener('popstate',()=>{const view=new URLSearchParams(location.search).get('view');showView(['classes','calendar','trash','assessment'].includes(view)?view:'today');});
+
+const teacherTools=document.createElement('details');teacherTools.innerHTML='<summary>Teacher tools</summary><div data-transcript-tool></div>';document.querySelector('.lms-heading-tools').append(teacherTools);createTranscriptSummary({root:teacherTools.querySelector('[data-transcript-tool]')});

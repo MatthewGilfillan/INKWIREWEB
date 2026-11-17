@@ -1,0 +1,34 @@
+Lesson assessment and optional transcripts — 12 November 2026
+
+The course outline and class timeline offer separate Assess students and
+Transcript & recap entry points. They open the corresponding panel in the
+lesson feedback workspace.
+
+Student assessment opens at the scheduled start of a non-cancelled lesson.
+Teachers can save a private draft or explicitly publish manual observations
+without a transcript, AI connection, or AI quota usage. A homework completion
+selector records Completed, Partly completed, Not completed, or Not assigned;
+leaving it untouched means Not recorded. Unassessed rating categories remain
+null and display Not assessed, never zero or an invented score. Absence clears
+star ratings. Homework completion is observational metadata, not a grade.
+
+The optional transcript flow remains gated to the scheduled end of the lesson.
+It retains its existing speaker attribution, transcript validation, AI quota,
+supported quote/homework checks, and explicit publication. Transcript generation
+does not require all rating categories to be filled. The screen states that
+publishing the lesson report includes the current assessments.
+
+Manual assessment publication preserves an existing recap and homework. When
+there is no recap it leaves the summary blank and keeps planned homework intact.
+Manual publication is retry-safe and revision checked. A concurrent AI job or
+another teacher's change cannot be silently overwritten.
+
+Published views retain the existing per-child projection. Students and parents
+see only the linked child's assessment; parent notes remain parent-only. Teacher
+drafts and transcript speaker labels are not projected to families. Drafts are
+not made visible simply by saving.
+
+The existing JSON storage accepts the optional homework status; no schema
+migration is needed. Tests cover during-class boundaries, unavailable AI,
+partial assessment, family privacy, preservation of an existing report, retries,
+and the actual teacher UI on narrow screens.

@@ -1,3 +1,4 @@
+const {setWheel}=require('../helpers/browser-actions.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{chromium}=require('playwright');
 const {classSetupFixture,users,origin}=require('../helpers/class-setup-fixture.cjs');
 test('create timetable, cross out two weeks, preserve session details, share a file and view mobile calendar',async()=>{
@@ -27,8 +28,8 @@ test('create timetable, cross out two weeks, preserve session details, share a f
     }catch(e){errors.push(e.stack);await route.fulfill({status:500,json:{message:e.message}});}
   });
   try{
-    await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('button',{name:'+ Create class',exact:true}).click();
-    const form=page.locator('#create-form');await form.getByLabel('Class name',{exact:true}).fill('Calendar trial');
+    await page.goto('http://127.0.0.1:8788/teacher.html?view=classes');await page.getByRole('button',{name:'+ Create class',exact:true}).click();
+    const form=page.locator('#create-form');await form.locator('[data-standards-primary]').selectOption('later');await form.getByLabel('Class name',{exact:true}).fill('Calendar trial');
     for(const el of await form.locator('[data-day]').all())await el.uncheck();await form.locator('[data-day="1"]').check();
     await form.locator('[data-setup="startDate"]').fill('2027-01-04');await form.locator('[data-setup="endDate"]').fill('2027-04-26');
     await form.getByRole('button',{name:'Review calendar',exact:true}).click();assert.match(await form.locator('[data-setup-count]').innerText(),/17 of 15.*Cross out 2/);assert.equal(await form.locator('[type=submit]').isEnabled(),false);
@@ -38,7 +39,7 @@ test('create timetable, cross out two weeks, preserve session details, share a f
     const row=f.db.prepare('SELECT id FROM classes WHERE name=?').get('Calendar trial');let saved=JSON.parse(f.db.prepare('SELECT content FROM course_overviews WHERE class_id=?').get(row.id).content);assert.equal(saved.lessons.length,15);assert.equal(saved.lessons[4].date,'2027-02-15');assert.equal(saved.lessons[0].title,'Week 1');
     await page.getByRole('button',{name:'Edit lesson 1',exact:true}).click();await page.locator('#lesson-0-goal').fill('Explore the author’s background.');await page.getByRole('button',{name:'Save course overview',exact:true}).click();await page.locator('[data-course-overview]').waitFor({state:'visible'});await page.locator('[data-course-overview]').getByText('Explore the author’s background.',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Edit timetable',exact:true}).click();await page.locator('[data-class-setup] [data-day="5"]').check();await page.locator('[data-class-setup] [data-day="1"]').uncheck();await page.locator('[data-class-setup] [data-day="6"]').check();
-    const setup=page.locator('[data-class-setup]');await setup.locator('[data-setup="lessonCount"]').fill('8');await setup.locator('[data-setup="startDate"]').fill('2027-01-01');await setup.locator('[data-setup="endDate"]').fill('2027-01-30');await setup.locator('[data-setup-day="5"] [data-day-time]').fill('18:00');await setup.locator('[data-setup-day="6"] [data-day-time]').fill('10:00');await setup.locator('[data-setup-day="6"] [data-day-minutes]').fill('60');
+    const setup=page.locator('[data-class-setup]');await setup.locator('[data-setup="lessonCount"]').fill('8');await setup.locator('[data-setup="startDate"]').fill('2027-01-01');await setup.locator('[data-setup="endDate"]').fill('2027-01-30');await setWheel(setup.locator('[data-setup-day="5"] [data-day-time]'),'18:00');await setWheel(setup.locator('[data-setup-day="6"] [data-day-time]'),'10:00');await setWheel(setup.locator('[data-setup-day="6"] [data-day-minutes]'),'60');
     await setup.getByRole('button',{name:'Review calendar',exact:true}).click();await setup.getByRole('button',{name:'Skip week of 2027-01-04',exact:true}).click();
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:'/tmp/inkwire-setup-mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Save timetable',exact:true}).click();await page.locator('[data-course-overview]').waitFor({state:'visible'});

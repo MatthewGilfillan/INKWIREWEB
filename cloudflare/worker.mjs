@@ -1,3 +1,8 @@
+import {handleLessonSessions} from './lesson-sessions.mjs';
+import {handleZoomConnection} from './zoom-connection.mjs';
+import {handleZoomMeetings} from './zoom-meetings.mjs';
+import {handleWeeklyZoom} from './zoom-weekly.mjs';
+import {handleZoomWebhook,processZoomRecaps} from './zoom-events.mjs';
 import {handleGradebook} from './gradebook.mjs';
 import {handleReporting} from './reporting.mjs';
 import {handleClassBoards} from './class-boards.mjs';
@@ -85,6 +90,7 @@ async function authResult(response, action) {
 }
 
 export default {
+  async scheduled(controller,env,ctx){ctx.waitUntil(processZoomRecaps(env));},
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
@@ -174,10 +180,12 @@ export default {
       return json({ accountsReady: url.origin === env.APP_ORIGIN && await ready(env) });
     }
     if (url.origin !== env.APP_ORIGIN) return fail('Invalid origin.', 403, 'INVALID_ORIGIN');
+    if(url.pathname==='/api/zoom/webhook')return handleZoomWebhook(request,env);
     if (!await ready(env)) return unavailable();
     try {
       const delivery = {};
       const auth = createAuth(env, delivery);
+      if(url.pathname.startsWith('/api/zoom/')){const session=await auth.api.getSession({headers:request.headers});const handler=url.pathname.endsWith('/weekly')?handleWeeklyZoom:url.pathname.startsWith('/api/zoom/classes/')?handleZoomMeetings:handleZoomConnection;return await handler(request,env,session?.user,{readJSON});}
       if (url.pathname.startsWith('/api/class-files/')) {
         const session=await auth.api.getSession({headers:request.headers});
         return await handleClassFiles(request,env,session?.user,{json,fail,readJSON});
@@ -188,6 +196,7 @@ export default {
       }
       if(url.pathname.startsWith('/api/gradebook/')){const session=await auth.api.getSession({headers:request.headers});return await handleGradebook(request,env,session?.user,{readJSON});}
       if(url.pathname.startsWith('/api/reporting/')){const session=await auth.api.getSession({headers:request.headers});return await handleReporting(request,env,session?.user,{readJSON});}
+      if(url.pathname.startsWith('/api/lesson-sessions/')){const session=await auth.api.getSession({headers:request.headers});return await handleLessonSessions(request,env,session?.user);}
       if(url.pathname.startsWith('/api/class-boards/')){const session=await auth.api.getSession({headers:request.headers});return await handleClassBoards(request,env,session?.user);}
       if(url.pathname==='/api/assignments'||url.pathname.startsWith('/api/assignments/')){const session=await auth.api.getSession({headers:request.headers});return await handleAssignments(request,env,session?.user,{readJSON});}
       if(url.pathname==='/api/notebooks'||url.pathname.startsWith('/api/notebooks/')){const session=await auth.api.getSession({headers:request.headers});return await handleNotebooks(request,env,session?.user);}

@@ -1,0 +1,89 @@
+Zoom integration release — 17 November 2026
+
+Priority
+Zoom is now the next milestone. Website/classroom integration comes before Mac
+app packaging. Windows is deferred. The first pilot uses the teacher's personal
+paid Zoom account. The pilot class now has separate Friday and Saturday links;
+real meeting credentials are stored only in the application database.
+
+Current implementation (deployed foundation; Zoom OAuth not yet configured)
+Teacher-authorized Zoom General App OAuth; state bound to the current Ink Wire
+teacher, ten-minute expiry and one-time consumption; encrypted server-side token
+storage and serialized refresh-token rotation. A user reconnects/disconnects their
+own account. Students/families never receive OAuth tokens or host start URLs.
+
+The class timeline also has Weekly Zoom links: one participant link/ID/passcode
+per weekday, inherited by matching scheduled lesson dates. Rescheduling to a
+different weekday follows that day’s meeting; explicit lesson overrides take
+priority. Cancelled lessons do not inherit a regular meeting.
+
+Timeline meeting settings accept an existing participant meeting URL, ID,
+passcode and optional recording sharing URL. Alternatively, a connected teacher
+can create a single lesson-specific meeting from its saved date/time/time zone.
+Creation claims the lesson before contacting Zoom. A network failure requires
+checking Zoom before removing the claim and retrying, avoiding silent duplicates.
+Waiting room is enabled; join-before-host and automatic recording are disabled.
+
+End lesson has an explicit option to end the connected Zoom meeting. Zoom end
+failure is visible and leaves classroom end retryable; the teacher can untick
+that option and end the meeting directly in Zoom. Zoom events do not fabricate
+actual Ink Wire teaching status. Start lesson / End lesson remain explicit.
+
+Automatic recaps are opt-in when creating a meeting. The teacher must enable
+cloud recording and Create audio transcript in Zoom. A signed, timestamp-checked
+transcript-completed webhook queues processing for the exact meeting UUID and
+authorized host/account. AI runs after Ink Wire End lesson through a durable
+five-minute scheduled job, with leases and retries. Raw transcripts are fetched
+only for processing and are not saved by Ink Wire. Existing private ratings,
+teacher feedback, grades and homework are not overwritten. The shared AI recap
+has its own timeline section and a clear label. A failed job can be retried.
+
+Current limits
+An existing meeting pasted as a link does not automatically grant access to its
+transcript. First automatic workflow uses a lesson-specific meeting created by
+the connected host. Recurring/PMI meeting-instance reconciliation and syncing
+later Zoom schedule edits back into the course need a subsequent pass. No video
+or audio is captured by Ink Wire itself. Real OAuth, Zoom hosting and recording
+acceptance must be completed with the actual account before claiming this live.
+
+Activation checklist (site owner)
+1. Production migrations 0019_zoom.sql and 0020_zoom_weekly.sql are applied.
+2. Create a user-managed General App in Zoom Marketplace for Ink Wire LMS.
+   Use the development app/local test for the initial personal-account pilot.
+   Redirect URI: https://inkwire-education.com/api/zoom/callback
+   Webhook: https://inkwire-education.com/api/zoom/webhook
+   Subscribe: meeting.started, meeting.ended, recording.completed,
+   recording.transcript_completed. Validate the endpoint after deployment.
+3. Required user-level granular scopes: user:read:user,
+   meeting:write:meeting, meeting:read:meeting, meeting:update:status,
+   cloud_recording:read:list_recording_files for the recording files API, and
+   cloud_recording:read:recording for the subscribed recording events.
+   Confirm the current Marketplace scope requirements when creating the app.
+4. Set server secrets through Cloudflare's secrets UI/CLI, never in chat or Git:
+   ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_WEBHOOK_SECRET,
+   ZOOM_TOKEN_KEY (32 random bytes as 64 hexadecimal characters).
+   Keep that encryption key stable; losing it requires reconnecting accounts.
+   ZOOM_ENABLED=true is deployed for manual/weekly links. OAuth remains inactive
+   until the additional secrets are configured.
+5. Deploy the candidate with the scheduled trigger and existing OpenAI settings.
+   Connect Zoom in the teacher timeline's Meeting settings. Test teacher and
+   student visibility, waiting room, explicit End lesson, recording/transcript
+   callbacks, AI recap, retry, and disconnect using a non-student test meeting.
+6. The first pilot’s Friday and Saturday links are entered. Verify the actual teacher/student
+   experience. Publish/release only after these live acceptance checks pass.
+
+Verification
+309 unit/API checks pass; 22 browser workflows cover the release. A final targeted browser pass
+also covers teacher recap corrections. Build and worker dry run pass. These use
+fictional accounts and mocked Zoom/OpenAI responses; they do not establish real
+account authorization or a successful live cloud recording. The Worker and both
+Zoom migrations are deployed; the signed-in teacher timeline and updated board
+picker were verified in production. Native app OAuth acceptance
+is deferred with the Mac packaging milestone.
+
+Primary references checked
+https://developers.zoom.us/docs/integrations/oauth/
+https://developers.zoom.us/docs/api/meetings/
+https://developers.zoom.us/docs/api/meetings/events/
+https://developers.zoom.us/docs/api/webhooks/
+https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064927

@@ -21,6 +21,25 @@ async function fixture(){
 }
 function provider(value=generated){return Response.json({status:'completed',model:'gpt-6-sol',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(value)}]}]},{headers:{'x-request-id':'req_fictional'}});}
 
+test('during-class assessment publishes partial observations and homework without a transcript or AI connection',async()=>{
+ const f=await fixture(),clock=Date.now,fetch=global.fetch;let calls=0;global.fetch=async()=>{calls++;throw Error('Must not use AI for teacher assessment');};
+ try{
+  Date.now=()=>end-120*60000-1;const body=f.body('publish-assessment');delete body.fileData;delete body.filename;body.draft.assessments[0].homeworkStatus='completed';body.draft.assessments[0].ratings.effort=null;body.draft.assessments[0].ratings.learning=null;
+  assert.equal((await f.request('lessons/legacy-1',body)).status,409);
+  Date.now=()=>end-60*60000;f.env.OPENAI_PLANNING_ENABLED='false';delete f.env.OPENAI_API_KEY;
+  assert.equal((await f.request('lessons/legacy-1',{...body,action:'save'})).status,200);
+  body.revision=1;const response=await f.request('lessons/legacy-1',body);assert.equal(response.status,200,await response.clone().text());const saved=await response.json();assert.equal(saved.published.students.a.homeworkStatus,'completed');assert.equal(saved.published.students.a.ratings.learning,null);assert.equal(saved.published.summary,'');assert.equal(saved.published.homework,null);assert.equal(calls,0);
+  assert.equal((await f.request('lessons/legacy-1',body)).status,200,'safe retry does not publish twice');
+  const student=await(await f.request('overview',undefined,teachers.student)).json(),parent=await(await f.request('overview?learnerId=a',undefined,teachers.parent)).json();assert.equal(student.course.lessons[0].report.assessment.homeworkStatus,'completed');assert.equal(student.course.lessons[0].report.assessment.parentComment,undefined);assert.equal(parent.course.lessons[0].report.assessment.parentComment,draft.assessments[0].parentNote);assert.equal(parent.course.lessons[0].homework,'Original planned homework');assert.ok(!JSON.stringify(student).includes('missed lesson'));
+  const bad={...body,revision:saved.revision,draft:structuredClone(body.draft),requestId:crypto.randomUUID()};bad.draft.assessments[0].homeworkStatus='forged';assert.equal((await f.request('lessons/legacy-1',bad)).status,400);
+ }finally{Date.now=clock;global.fetch=fetch;f.db.close();}
+});
+
+test('publishing a teacher assessment preserves an existing recap and homework without another AI request',async()=>{
+ const f=await fixture(),clock=Date.now,fetch=global.fetch;Date.now=()=>end;let calls=0;global.fetch=async()=>{calls++;return provider();};
+ try{const initial=await(await f.request('lessons/legacy-1',f.body())).json(),body=f.body('publish-assessment',initial.revision);delete body.fileData;delete body.filename;body.draft.assessments[0].ratings.prepared=2;const response=await f.request('lessons/legacy-1',body);assert.equal(response.status,200,await response.clone().text());const next=await response.json();assert.equal(calls,1);assert.equal(next.published.summary,initial.published.summary);assert.equal(next.published.homework,initial.published.homework);assert.equal(next.published.students.a.ratings.prepared,2);assert.equal(next.published.students.a.quote,initial.published.students.a.quote);}finally{Date.now=clock;global.fetch=fetch;f.db.close();}
+});
+
 test('Beijing end time is enforced on server at the exact boundary, with auth, origin and complete ratings',async()=>{
  const f=await fixture(),clock=Date.now,fetch=global.fetch;let calls=0;global.fetch=async()=>{calls++;return provider();};
  try{

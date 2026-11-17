@@ -1,0 +1,96 @@
+Timed writing — proposed notebook activity
+13 November 2026, Asia/Bangkok
+
+Status: design and integration review. Not implemented or deployed.
+Requested separately from the Live Board appearance work.
+
+Teacher workflow
+Create a timed writing task manually or suggest tasks from the saved unit plan.
+Suggestions retain their source lesson and source excerpt, distinguish extracted
+instructions from generated scaffolds, and remain editable teacher-only drafts.
+Teacher confirms prompt, optional paragraph guide/sentence frames, duration,
+focus monitoring, and target notebook section before distribution.
+Use lesson IDs and explicit section selection rather than guessing from titles.
+Distribute an activity reference to the corresponding teacher/student sections;
+student responses remain individual, visible only to authorized staff and that
+student. Publishing assessment remains a separate teacher action.
+
+Default student experience
+Prompt, optional collapsible writing guide, one writing area, shared countdown,
+word count, and accurate save status. No complex default form. Students see the
+prompt while waiting for the teacher to start; writing opens together on Start.
+Late joiners receive the remaining session time, not a fresh full duration.
+
+Session controls
+Start; pause/resume; add time for everyone; individual extra time; end activity.
+At zero, saved writing becomes read-only. Extending an expired session can reopen
+writing; ending is an explicit separate action. Teacher may intentionally reopen
+an ended task, preserving its original timed submission and the extension record.
+Teacher dashboard shows waiting/writing/submitted/time-up/disconnected/save-pending
+states, word counts, effective individual deadlines, and optional activity alerts.
+
+Shared timer and writing integrity
+Use a versioned authoritative server start/deadline/state, not per-tab decrement
+as authority. Display with server clock offset and monotonic elapsed time between
+resyncs. Enforce deadline and permissions server-side on every response mutation.
+Teacher changes use concurrency checks/idempotent requests; record extensions.
+Pause/extend/end/reload/reconnect must retain the same session and writing.
+Autosave during writing, with local recovery and a saved revision history.
+At expiry freeze the last server-accepted response. Preserve any unsynced local
+draft separately for teacher review; never silently discard it or merge late
+writing into the official timed submission. Show pending/failed saves honestly.
+Final timed work and later practice/revisions must be distinguishable.
+
+Confirmed lock scope — 16 November 2026
+Matthew selected: lock only the timed writing activity when time runs out.
+Other notebook pages and materials remain accessible. This is independent of
+the existing user-controlled password protection for notebook sections.
+Clarify "close notebooks" as an in-app end/lock state. A normal web page cannot
+reliably close arbitrary browser windows or prevent operating-system navigation.
+
+Optional focus monitoring
+Teacher enables monitoring before the activity; students see a clear notice.
+Record timestamped page-hidden/focus/fullscreen-exit/meaningful-resize events and
+time away where observable. Name events accurately rather than asserting which
+external tab/application a student visited. Do not claim to detect other devices,
+all extensions, all external applications, or the student's intent.
+Debounce/coalesce related signals to avoid duplicate alerts and resize storms.
+Allow accommodation exceptions; keyboard/orientation/assistive-tool resizing is
+not itself evidence of misconduct. Keep monitoring off outside the active task.
+Alerts do not automatically change grades, remove students, or erase their work.
+Browser events are best-effort, client-reported signals, not tamper-proof proof.
+No camera, microphone, screenshot capture, or other-tab-content collection.
+
+Integration inspected
+cloudflare/assignment-suggestions.mjs: existing teacher-reviewed unit-plan drafts.
+cloudflare/live-board-placement.mjs: reference-only per-lesson notebook placement.
+cloudflare/notebooks.mjs and notebook-organization.mjs: authenticated notebook
+access and mutation enforcement; whole-notebook locks would need enforcement
+across all relevant write endpoints, not only disabling the visible editor.
+src/notebooks.js / notebook-model.mjs / notebook-editor.js: reference node,
+independent response editor, autosave/recovery and read-only state integration.
+Timed writing should have its own session/response model; a class-shared live
+board post is not an appropriate store for private student writing.
+
+Checks needed before release
+Teacher/class/student authorization and student-response privacy; wrong-class
+references; clock skew; multi-tab refresh; late join; exact expiry; extension before
+and after zero; pause/resume; individual accommodations; explicit end/reopen;
+concurrent teacher commands; offline recovery; focus-event deduplication; scoped
+locking; notebook placement retries; safe unit-plan suggestions; keyboard/mobile
+accessibility. Use fictional data and simulated AI provider responses in tests.
+
+Research
+Wayground current Anti-Cheating Monitor guide (updated 8 January 2026):
+https://help.wayground.com/support/solutions/articles/158000411388-enable-anti-cheating-monitor-previously-focus-mode-during-a-session
+Documents tab switching, fullscreen exits, resizing and other alerts; tab alerts
+use an absence threshold above three seconds. This replaces the older Focus Mode
+description. These are Wayground's documented capabilities, not claims about ours.
+MDN Page Visibility API:
+https://developer.mozilla.org/en-US/docs/Web/API/Page_Visibility_API
+Visibility signals do not identify the destination; background timers throttle.
+MDN Fullscreen API:
+https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API
+Fullscreen entry needs user activation and users can leave fullscreen.
+MDN Window resize event:
+https://developer.mozilla.org/en-US/docs/Web/API/Window/resize_event

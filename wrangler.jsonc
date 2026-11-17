@@ -8,6 +8,7 @@
   ],
   "workers_dev": true,
   "preview_urls": false,
+  "triggers": { "crons": ["*/5 * * * *"] },
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
@@ -39,6 +40,7 @@
     "APP_ORIGIN": "https://inkwire-education.com",
     "ACCOUNT_EMAIL": "accounts@inkwire-education.com",
     "ACCOUNTS_ENABLED": "true",
+    "ZOOM_ENABLED": "true",
     "OPENAI_PLANNING_ENABLED": "true",
     "OPENAI_PLANNING_MODEL": "gpt-6-sol"
   },

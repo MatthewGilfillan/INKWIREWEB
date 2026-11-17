@@ -1,4 +1,4 @@
-node_modules/
+/node_modules
 .env
 .env.*
 !.env.example
@@ -16,3 +16,6 @@ dist/pdf/
 
 dist/board-embed.js
 dist/board-embed.js.LEGAL.txt
+
+# Local macOS build products
+desktop/macos/build/

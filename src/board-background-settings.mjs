@@ -1,0 +1,16 @@
+import {boardBackgrounds} from './board-reactions.mjs';
+import {escape as e,requestId} from '../dist/workspace-shared.js';
+export function mountBoardBackgroundSettings({root,route,userId,action,status}){
+ const form=root.querySelector('[data-board-settings]'),select=form.elements.background;
+ const saved=document.createElement('input');saved.type='hidden';saved.name='backgroundImageId';form.append(saved);
+ const picker=document.createElement('div');picker.className='board-background-picker';picker.innerHTML=`<details><summary>Browse images &amp; patterns</summary><div class="board-background-choices">${boardBackgrounds.map(b=>`<button type="button" data-background-choice="${b.id}" title="${e(b.label)}"><span style="${b.id==='plain'?'background:#f5f8fd':`background-image:url('/assets/board-backgrounds/${b.id}.png')`}"></span>${e(b.label)}</button>`).join('')}</div></details><label class="board-background-upload">Upload your own background<input type="file" name="backgroundUpload" accept="image/png,image/jpeg,image/webp,image/gif"><small>PNG, JPEG, WebP or GIF · up to 5 MB</small></label><div class="board-custom-background" hidden><img alt="Uploaded board background"><button type="button" data-remove-board-background>Use selected pattern instead</button></div><p data-background-status role="status"></p>`;
+ select.closest('label').after(picker);
+ const custom=picker.querySelector('.board-custom-background'),message=picker.querySelector('[data-background-status]'),file=form.elements.backgroundUpload;
+ function preview(){custom.hidden=!saved.value;if(saved.value)custom.querySelector('img').src=route+'/images/'+saved.value;else custom.querySelector('img').removeAttribute('src');}
+ function changed(){form.dispatchEvent(new Event('input',{bubbles:true}));preview();}
+ select.addEventListener('change',()=>{saved.value='';changed();});
+ picker.addEventListener('click',event=>{const button=event.target.closest('[data-background-choice]');if(button){select.value=button.dataset.backgroundChoice;saved.value='';changed();}if(event.target.closest('[data-remove-board-background]')){saved.value='';changed();}});
+ file.onchange=()=>{const selected=file.files?.[0];if(!selected)return;if(!['image/png','image/jpeg','image/webp','image/gif'].includes(selected.type)||selected.size>5*1024*1024){message.textContent='Choose a PNG, JPEG, WebP or GIF up to 5 MB.';file.value='';return;}action(async()=>{file.disabled=true;message.textContent='Uploading background…';try{const response=await fetch(route+'/images/'+requestId(),{method:'POST',headers:{'Content-Type':selected.type,'X-Expected-User':userId},credentials:'same-origin',body:selected,signal:AbortSignal.timeout(60000)}),value=await response.json();if(!response.ok)throw Error(value.message||'Background upload failed.');if(value.userId!==userId)throw Error('Your account changed. Reload this notebook.');saved.value=value.id;changed();message.textContent='Background uploaded. Save board details to share this appearance with the class.';}catch(error){message.textContent=error.message;status(error.message,true);}finally{file.disabled=false;file.value='';}});};
+ // Settings values are restored by the parent; refresh this small preview whenever the drawer opens.
+ root.querySelector('[data-board-cog]').addEventListener('click',preview);
+}

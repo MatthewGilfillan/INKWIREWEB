@@ -1,0 +1,60 @@
+/* Ink Note desktop: quiet chrome, opaque reading surfaces. */
+html.ink-note-desktop{color-scheme:light;--folio-ink:#172b49;--folio-muted:#6d7889;--folio-line:#dfe4e9;--folio-purple:#327c7b;--folio-teal:#327c7b}
+.ink-note-desktop body.folio-app{height:100dvh;overflow:hidden;background:#f1f3f5;color:#172b49;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.ink-note-desktop .folio-header{display:none}
+.ink-note-desktop body.folio-app>main{height:100%;display:flex;flex-direction:column;min-height:0}
+.ink-note-desktop .folio-heading{padding:13px 18px;gap:12px;min-height:54px;border-bottom:1px solid #dfe4e9;background:#f4f5f7}
+.ink-note-desktop .folio-heading h1{font-family:inherit;font-size:16px;letter-spacing:-.3px;margin:0;color:#172b49}
+.ink-note-desktop .folio-heading .eyebrow,.ink-note-desktop #scope-description,.ink-note-desktop .printout-hint{display:none}
+.ink-note-desktop .folio-heading-actions{flex-direction:row}
+.ink-note-desktop .folio-grid{flex:1;height:auto;min-height:0;border-top:0;grid-template-columns:180px 135px 160px minmax(300px,1fr)}
+.ink-note-desktop .folio-column{background:#f1f3f5;padding:16px 10px 10px}
+.ink-note-desktop .section-column{background:#f4f5f7}.ink-note-desktop .page-column{background:#f7f8fa}
+.ink-note-desktop .folio-row[aria-current=true]{background:#dceceb;color:#174d50;box-shadow:inset 0 0 0 1px #cadfdf}
+.ink-note-desktop .folio-row{border-radius:8px}.ink-note-desktop .column-heading{margin-bottom:12px}
+.ink-note-desktop .folio-content{background:#fff}
+.ink-note-desktop .page-heading{padding:17px 22px 8px;flex-direction:row}
+.ink-note-desktop .page-heading h2{font-size:23px;font-family:inherit;letter-spacing:-.5px;margin-bottom:5px}
+.ink-note-desktop #page-status{padding:0 22px 8px}.ink-note-desktop .page-actions{width:auto}
+.ink-note-desktop .note-toolbar{padding:8px 14px;background:#fafbfc;border-color:#e6e9ed;gap:4px}
+.ink-note-desktop button{font-family:inherit;border-radius:8px;box-shadow:none}
+.ink-note-desktop button:hover:not(:disabled){background:#eaf1f1}
+.ink-note-desktop button.primary{background:#327c7b;border-color:#327c7b;color:white}
+.ink-note-desktop button[aria-pressed=true]{background:#dceceb;color:#174d50}
+.ink-note-desktop :focus-visible{outline:2px solid #4b9797;outline-offset:2px}
+.ink-note-desktop .note-editor{background:white}
+.ink-note-desktop #worksheet-embed{min-height:0;overflow:hidden;display:flex;flex-direction:column;background:#f2f4f6}
+.ink-note-desktop #worksheet-embed .ws-content{height:auto;min-height:0;flex:1}
+.ink-note-desktop #worksheet-embed .ws-library{padding:16px}
+.ink-note-desktop #worksheet-embed #drawing-tools,.ink-note-desktop #worksheet-embed #style-tools{background:#fafbfc;border-color:#e2e6ea}
+.ink-note-desktop #worksheet-embed .ws-page-scroll{background:#eef1f4}
+.ink-note-desktop .worksheet-page-wrap{box-shadow:0 2px 9px #15243d0e}
+.ink-note-desktop.ink-note-focus .folio-grid{display:flex}
+.ink-note-desktop.ink-note-focus .folio-grid>.folio-column,.ink-note-desktop.ink-note-focus .folio-mobile-nav{display:none}
+.ink-note-desktop.ink-note-focus .folio-grid>.folio-content{display:flex;width:100%;height:100%}
+@media(max-width:850px){.ink-note-desktop .folio-grid{display:block}.ink-note-desktop .folio-mobile-nav{padding:7px 16px;background:#f4f5f7}.ink-note-desktop .folio-heading{padding:12px 16px}.ink-note-desktop .folio-column{height:100%;padding:16px}.ink-note-desktop .page-heading{flex-direction:column;padding:15px 18px 7px}.ink-note-desktop .page-actions{width:100%}.ink-note-desktop #worksheet-embed .ws-content{min-height:200px}.ink-note-desktop .column-foot{padding-top:10px}}
+@media(prefers-reduced-motion:reduce){.ink-note-desktop *{transition:none!important;scroll-behavior:auto!important}}
+@media(prefers-contrast:more){.ink-note-desktop{--folio-line:#8a94a1}.ink-note-desktop .folio-row[aria-current=true]{background:#c5dfdd;outline:1px solid #387270}}
+@media print{.ink-note-desktop .folio-heading,.ink-note-desktop .folio-mobile-nav{display:none}.ink-note-desktop body.folio-app{height:auto;overflow:visible}}
+
+/* A compact sign-in sheet for the Mac workspace. */
+.ink-note-desktop body[data-account-page]{background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+.ink-note-desktop .account-header{padding:20px 24px;border:0;min-height:0;height:auto;background:transparent}
+.ink-note-desktop .account-header img{width:180px;height:auto}
+.ink-note-desktop .account-shell{max-width:420px;margin:10px auto 16px;padding:24px;border:1px solid #dfe4e9;border-radius:14px;background:white;box-shadow:0 3px 12px #172b4906}
+.ink-note-desktop [data-account-root]{font-family:inherit;font-size:13px}
+.ink-note-desktop [data-account-root] h2{font-size:25px;margin-bottom:12px}
+.ink-note-desktop [data-account-root] p{font-size:13px;margin:10px 0}
+.ink-note-desktop .account-form{margin-top:16px}
+.ink-note-desktop .account-form label{font-size:12px;margin:12px 0 5px}
+.ink-note-desktop .account-form input,.ink-note-desktop .account-form select{font-family:inherit;font-size:14px;min-height:40px;padding:9px 11px;border-radius:7px}
+.ink-note-desktop .account-password button{height:29px;top:6px;font-size:11px}
+.ink-note-desktop .account-form .account-remember{margin-top:12px}
+.ink-note-desktop .account-hint{font-size:11px!important}
+.ink-note-desktop .account-tabs{margin-bottom:20px;padding:4px;background:#f0f3f5;border-radius:9px}
+.ink-note-desktop .account-tabs button{font-size:13px;padding:10px}
+.ink-note-desktop .account-submit{min-height:40px;margin-top:16px;padding:10px;font-size:13px;background:#d4e8e6}
+.ink-note-desktop .account-page-link{padding:10px}
+
+/* Match the compact web notebook header. */
+.ink-note-desktop #page-heading{padding:5px 12px;min-height:0;flex-direction:row}.ink-note-desktop #page-status{padding:0}.ink-note-desktop .page-actions{width:auto}

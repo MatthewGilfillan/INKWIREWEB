@@ -1,8 +1,10 @@
+const {openPlanner}=require('../helpers/browser-actions.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const first = '11111111-1111-4111-8111-111111111111', second = '22222222-2222-4222-8222-222222222222';
 test('teacher builds, pastes, saves, reopens and reuses a course overview on desktop and mobile', async () => {
+  const seed=await require('../helpers/browser-actions.cjs').courseSeed();
   const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROME_CHANNEL ? {channel: process.env.PLAYWRIGHT_CHROME_CHANNEL} : {}) });
   const context = await browser.newContext(); const page = await context.newPage(), errors = [], storage = new Map();
   let conflict = false;
@@ -18,15 +20,15 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
         if (conflict) return route.fulfill({ status: 409, json: { message: 'Another teacher saved changes. Your draft is still open.' } });
         const body = route.request().postDataJSON(); storage.set(id, { course: body.course, revision: body.revision + 1 });
       }
-      return route.fulfill({ json: storage.get(id) || { course: null, revision: 0 } });
+      return route.fulfill({ json: storage.get(id) || { course: seed, revision: 0 } });
     }
     return route.fulfill({ status: 404, json: {} });
   });
   try {
-    await page.goto('http://127.0.0.1:8788/teacher.html');
+    await page.goto('http://127.0.0.1:8788/teacher.html?view=classes');
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
+    await openPlanner(page);
     assert.equal(await page.locator('[data-plan-lesson]').count(), 15);
     assert.match(await page.locator('#course-summary').innerText(), /30 teaching hours/);
     await page.locator('#course-start').fill('2027-01-06');
@@ -43,7 +45,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     await page.reload();
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
+    await openPlanner(page);
     assert.equal(await page.locator('#lesson-0-reading').inputValue(), 'The Hobbit, chapter 1');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('#course-lessons').scrollIntoViewIfNeeded();
@@ -51,7 +53,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
     await page.getByRole('tab',{name:'Students',exact:true}).click();
     await page.locator('#selected-class').selectOption(second);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({ state: 'visible' });
+    await openPlanner(page);
     await page.getByText('Copy from another class', { exact: true }).click();
     await page.locator('#copy-course').selectOption(first);
     await page.getByRole('button', { name: 'Use this overview' }).click();
@@ -82,6 +84,7 @@ test('teacher builds, pastes, saves, reopens and reuses a course overview on des
 });
 
 test('custom timetable, primary sections and prepared course files retain their structure', async () => {
+  const seed=await require('../helpers/browser-actions.cjs').courseSeed();
   const { defaults, generateLessons } = await import('../../dist/course-model.mjs');
   const { useFormat } = await import('../../dist/course-formats.mjs');
   const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROME_CHANNEL ? {channel: process.env.PLAYWRIGHT_CHROME_CHANNEL} : {}) });
@@ -93,15 +96,15 @@ test('custom timetable, primary sections and prepared course files retain their 
     if (path.endsWith('/roster')) return route.fulfill({ json: {students:[]} });
     if (path.endsWith('/overview')) {
       if (route.request().method() === 'POST') { posts++; saved = route.request().postDataJSON().course; }
-      return route.fulfill({ json: {course:saved,revision:saved?1:0} });
+      return route.fulfill({ json: {course:saved||seed,revision:saved?1:0} });
     }
     return route.fulfill({ status:404,json:{} });
   });
   try {
-    await page.goto('http://127.0.0.1:8788/teacher.html');
+    await page.goto('http://127.0.0.1:8788/teacher.html?view=classes');
     await page.locator('#selected-class').selectOption(first);
     await page.getByRole('tab', {name:'Course overview',exact:true}).click();
-    await page.locator('[data-edit-unit-plan]').click();await page.locator('#course-form').waitFor({state:'visible'});
+    await openPlanner(page);
     await page.locator('#course-format').selectOption('custom');
     await page.locator('#course-weeks').fill('13'); await page.locator('#course-frequency').fill('3');
     await page.locator('#course-minutes').fill('45'); await page.locator('#course-start').fill('2027-01-04');
@@ -134,7 +137,7 @@ test('custom timetable, primary sections and prepared course files retain their 
     await page.getByRole('button',{name:'Save course overview',exact:true}).click();
     await page.getByText('Course overview saved.',{exact:true}).waitFor();
     assert.equal(saved.lessons[4].evidence,'A revised paragraph'); assert.equal(saved.themes,imported.themes);
-    await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();
+    await page.getByRole('button',{name:'Edit Unit Plan',exact:true}).click();await openPlanner(page);
     await page.locator('#course-format').selectOption('custom');
     await page.locator('#course-pacing').selectOption('weekly'); await page.locator('#course-frequency').fill('2');
     await page.locator('#course-start').fill('2027-01-04'); await page.getByRole('button',{name:'Update lesson dates'}).click();

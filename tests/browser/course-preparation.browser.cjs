@@ -1,6 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const {chromium}=require('playwright');
 const cid='11111111-1111-4111-8111-111111111111';
 test('a selected PDF prepares a private course, resumes a failed quiz step and attaches drafts only after saving',async()=>{
+ const seed=await require('../helpers/browser-actions.cjs').courseSeed();
  const {defaults,generateLessons,validateCourse}=await import('../../dist/course-model.mjs');let saved=null,revision=0,job=null,uploads=0,steps=0,attached=0,failQuiz=true;
  const course={...defaults('The Crucible'),weeks:2,lessonCount:2,format:'full'};course.lessons=generateLessons(course).map((l,i)=>({...l,id:'prepared-'+i,title:i?'Miller, McCarthyism and allegory':'Salem and Puritan society',activities:'Discuss the evidence, then write a supported paragraph.'}));
  const quiz={quiz:{title:'Reading check',questions:[{prompt:'What supports a convincing interpretation?',options:['Evidence','A guess'],correctIndex:0,explanation:'Support claims with evidence.'}],reflectionPrompt:''},sources:['Unit plan: learning goals'],reviewNotes:'Check before assigning.'};
@@ -19,11 +20,11 @@ test('a selected PDF prepares a private course, resumes a failed quiz step and a
   }
   if(path.startsWith('/api/quiz-assistant/'))return route.fulfill({json:{available:true,lessons:[]}});
   if(path.endsWith('/planning-assistant'))return route.fulfill({json:{available:true}});
-  if(path.endsWith('/overview')){if(post){saved=validateCourse(route.request().postDataJSON().course);revision++;}return route.fulfill({json:{course:saved,revision,serverNow:Date.now()}});}
+  if(path.endsWith('/overview')){if(post){saved=validateCourse(route.request().postDataJSON().course);revision++;}return route.fulfill({json:{course:saved||seed,revision,serverNow:Date.now()}});}
   return route.fulfill({status:404,json:{}});
  });
  try{
-  await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.getByRole('button',{name:'Prepare Course with AI',exact:true}).click();
+  await page.goto('http://127.0.0.1:8788/teacher.html?view=classes');await page.getByRole('tab',{name:'Course overview',exact:true}).click();await page.locator('[data-prepare-course]').click();
   await page.locator('[data-prep-start]:not([disabled])').waitFor();await page.locator('[data-prep-plan]').setInputFiles({name:'Crucible plan.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7 sample plan')});
   await page.locator('[data-prep-minutes]').fill('50');await page.getByRole('button',{name:'Prepare whole course',exact:true}).click();await page.locator('[data-prep-status]').getByText(/Temporary provider failure/).waitFor();assert.equal(saved,null);assert.equal(attached,0);assert.equal(uploads,1);assert.equal(steps,2);
   await page.getByRole('button',{name:'Resume preparation',exact:true}).click();await page.locator('[data-prep-status]').getByText(/preparation complete/).waitFor();assert.equal(steps,3);assert.equal(uploads,1);assert.equal(attached,0);

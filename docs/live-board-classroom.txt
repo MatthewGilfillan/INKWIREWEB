@@ -34,3 +34,69 @@ Validation: automated placement, retry, legacy migration, late enrolment,
 permissions, private-content isolation, layout persistence and existing board
 tests; fictional teacher/student browser walkthrough; desktop, tablet and
 dark-mode visual checks. No actual classroom records were changed for testing.
+
+Four flagship templates — implementation update
+
+The library now prioritizes Venn Diagram, Our Reading Wall, Cause & Effect,
+and Problem–Solution. Existing advanced templates retain their section data.
+
+Venn Diagram uses two overlapping circles. Contributions are stored once in
+left/shared/right regions; each region scrolls independently. A post can be
+moved with drag and drop or its Move to selector. The latter is available on
+touch and keyboard devices. Teachers may rename all three headings through
+Activity & standards; headings are saved with the board and its snapshots.
+The explicit List view remains available. Responses expand in a readable dialog.
+
+Our Reading Wall has nine response types: question, connection, evidence worth
+revisiting, prediction, inference, character thoughts/feelings/motivations,
+theme/message, author choices, and changed thinking. Add post starts with a
+response chooser. The editable subject is prefilled from the chosen type. The
+main response and optional Evidence are the only default writing areas. Sources
+belong in Evidence; Extensions & extras reveals the optional reasoning prompt. Typed evidence survives edits,
+draft recovery, shared reads and saved snapshots. Text, uploaded images and links
+use the existing authorization and upload checks. No camera/microphone capture
+was introduced.
+
+Cause & Effect and Problem–Solution keep each pair together in one contribution.
+Both sides are required. Evidence/source and the explanation remain attached.
+Each has its own layout with connected paper notes. The board title and both
+column headings remain pinned inside the scrolling response area.
+
+Ten independently generated quiet paper/material/painted backgrounds are
+available. Texturelabs originals are not included or used as AI inputs.
+Original stationery pieces are extracted from the generated sheet for paper,
+sticky-note and taped-note surfaces. Generated hand-drawn arrows connect paired
+responses. Nine-slice paper edges preserve their texture as posts grow. Paired notes stay
+within a 360-pixel column, with negative space on larger displays. Prediction
+paper is mirrored so its clip sits on the right. Reading Wall stationery is
+assigned by response type; names and avatars continue to identify contributors. Live Boards use their own paper appearance, independent of the site theme. Full sheets and seven design mockups remain
+in the separate design-round folder.
+
+Validation uses fictional students, isolated local browser sessions and in-memory
+API fixtures. No classroom records were edited. Production deployment is separate.
+
+The Reading Wall header groups the title, class state and response filter. Generic
+response-choice instructions are hidden; custom teacher instructions remain visible.
+Fullscreen and View in new window are available inside embedded and standalone
+boards. Fullscreen keeps composing and expanded responses available; new windows
+retain board/snapshot identity and open with no reference to the original window.
+
+Teachers can choose built-in images/patterns or upload a background from the
+settings cog (PNG, JPEG, WebP or GIF, up to 5 MB). Uploads use the board’s existing
+authenticated image storage; an image cannot be selected from another board.
+Students see the selected image only while they can access the board. Snapshots
+retain their background reference. Unused uploads are not exposed to students.
+Poppins Bold headings and Sofia Sans Condensed body text are self-hosted defaults.
+The separate view requests a resizable standard browser window. The operating
+system/browser owns the green macOS window control; no webpage can enable it.
+
+Background images fill the board as one centered image using cover sizing,
+without tiling. They stay fixed within the board viewport while posts scroll.
+
+Story Mountain uses five stable plot-stage columns: Exposition, Rising action,
+Climax, Falling action, and Resolution. A losslessly cropped version of the
+original generated landscape centers the summit under the third (Climax) column.
+The landscape stays still as responses scroll independently inside each column;
+headers stay visible. Narrow displays scroll all five columns and the landscape
+together horizontally to preserve alignment. Responses retain their saved stage
+and can be moved through drag and drop or the compact three-dot menu.

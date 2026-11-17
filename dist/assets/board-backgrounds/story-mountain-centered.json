@@ -1,0 +1,11 @@
+{
+  "source": "story-mountain.png",
+  "operation": "Lossless crop to center the existing summit",
+  "crop": {
+    "left": 626,
+    "top": 0,
+    "width": 1270,
+    "height": 830
+  },
+  "summitX": 0.5
+}

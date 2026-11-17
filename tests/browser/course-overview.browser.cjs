@@ -32,15 +32,15 @@ test('course overview defaults to a readable outline; editing, draft preview, sa
     return route.fulfill({status:404,json:{}});
   });
   try{
-    await page.goto('http://127.0.0.1:8788/teacher.html');await page.getByRole('tab',{name:'Course overview',exact:true}).click();
+    await page.goto((process.env.INKWIRE_TEST_ORIGIN||'http://127.0.0.1:8788')+'/teacher.html?view=classes&class='+cid);await page.getByRole('tab',{name:'Course overview',exact:true}).click();
     await page.locator('[data-course-overview]').waitFor({state:'visible'});
     assert.equal(await page.locator('#course-form').isVisible(),false);
     assert.equal(await page.locator('[data-overview-lesson]').count(),2);
     assert.equal(await page.locator('.overview-number').first().innerText(),'01');
     await page.locator('[data-overview-quiz-status="lesson-0"]').getByText('Assigned',{exact:true}).waitFor();
-    const firstFeedback=page.locator('[data-overview-lesson="0"] [data-feedback-open]');
-    assert.equal(await firstFeedback.isEnabled(),false);await page.clock.runFor(1500);assert.equal(await firstFeedback.isEnabled(),true);
-    assert.equal(await page.locator('[data-overview-lesson="1"] [data-feedback-open]').isEnabled(),false);
+    const firstFeedback=page.locator('[data-overview-lesson="0"] [data-feedback-open]:not([data-feedback-mode])');
+    assert.equal(await firstFeedback.isEnabled(),true);const recap=page.locator('[data-overview-lesson="0"] [data-feedback-mode=transcript]');assert.equal(await recap.isEnabled(),false);await page.clock.runFor(1500);assert.equal(await recap.isEnabled(),true);
+    assert.equal(await page.locator('[data-overview-lesson="1"] [data-feedback-open]:not([data-feedback-mode])').isEnabled(),false);
     await page.locator('.course-planner').screenshot({path:'/tmp/inkwire-course-overview-desktop.png'});
     await page.locator('[data-overview-quiz="lesson-0"]').click();await page.locator('dialog.lesson-quiz').waitFor({state:'visible'});assert.equal(quizOpens,1);
     await page.getByRole('button',{name:'Close pre-lesson quiz',exact:true}).click();
@@ -60,8 +60,7 @@ test('course overview defaults to a readable outline; editing, draft preview, sa
     assert.equal(await firstFeedback.isEnabled(),false);assert.equal(await page.locator('[data-overview-quiz="lesson-0"]').isEnabled(),false);
     await page.getByRole('button',{name:'Continue editing unit plan',exact:true}).click();assert.match(await page.locator('#lesson-0-title').inputValue(),/Draft title/);
     page.once('dialog',d=>d.accept());await page.locator('#selected-class').selectOption(empty);await page.getByRole('tab',{name:'Course overview',exact:true}).click();
-    await page.getByRole('button',{name:'Create Unit Plan',exact:true}).waitFor();assert.equal(await page.locator('[data-overview-lesson]').count(),0);assert.equal(await page.locator('#course-form').isVisible(),false);
-    await page.getByRole('button',{name:'Create Unit Plan',exact:true}).click();assert.equal(await page.locator('#course-form').isVisible(),true);assert.equal(saves,1);
+    await page.locator('[data-schedule-screen]').waitFor({state:'visible'});assert.equal(await page.locator('[data-overview-lesson]').count(),0);assert.equal(await page.locator('#course-form').isVisible(),false);assert.equal(saves,1);
     await page.locator('#selected-class').selectOption(cid);await page.locator('[data-course-overview]').waitFor({state:'visible'});
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.locator('.course-planner').screenshot({path:'/tmp/inkwire-course-overview-mobile.png'});

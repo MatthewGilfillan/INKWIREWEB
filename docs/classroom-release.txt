@@ -1,0 +1,68 @@
+Ink Wire LMS classroom release release — 17 November 2026
+
+Scope
+Website first; Zoom is the next milestone before Mac packaging. An existing Mac
+candidate remains available for checks. Windows explicitly deferred. Consolidates approved
+Live Board appearance/composer work, independent lesson assessment, the native
+Mac wrapper, and explicit Start lesson / End lesson controls.
+
+Release boundary
+The consolidated release is deployed to the existing inkwire-education Worker
+and production domain on 17 November 2026. Zoom migrations 0019 and 0020 are
+applied. Weekly meeting links work without OAuth; connected meeting controls and
+automatic transcripts still await Zoom Marketplace configuration and real-account
+acceptance. The main website was verified through the signed-in teacher UI.
+
+Lesson lifecycle
+Start and End controls are on the teacher class Timeline. Actual running/ended
+state and timestamps are separate from timetable dates, published feedback and
+Zoom state. Starting again preserves previous final versions. Cancelling a
+scheduled class does not fabricate teaching history. Lessons with actual session
+records cannot be removed or replaced through the course editor.
+
+End closes linked, published class boards and saves their final versions. Boards
+link through their explicit lesson selection or matching notebook lesson section.
+Other lessons' boards, teacher drafts, archived boards and staff planning boards
+are excluded. Each student receives a separate final reference page in the same
+section; the live page and the student's notes are never overwritten. Final pages
+refer to immutable snapshots, and timeline previews link to saved activities.
+Already-open student board windows follow the saved result after polling. An
+explicit historical snapshot window always stays on that version.
+
+Partial notebook delivery leaves the lesson in Saving final work, with a Retry
+control. Stable operation/snapshot/page IDs make retries safe. The lesson becomes
+Taught only after all included board deliveries succeed. Closing posting directly
+also saves a final version and distributes it. Protected/deleted notebook content,
+storage limits and current class membership remain respected.
+
+Storage and publication
+Session state uses the existing private R2 store under lesson-sessions/{class}/.
+Conditional writes reject concurrent teacher changes. Teacher role, class access,
+origin, current account and request IDs are checked. Timeline projections contain
+public session status and snapshot references, not private operation/history data.
+Existing R2/D1 bindings are reused; this candidate needs no new database migration.
+Ending a lesson does not publish assessment grades or call Zoom/transcript AI.
+
+Verification
+The unit/API suite and complete browser suite are run against fictional fixtures.
+The browser runner now owns its local server; tests use the current navigation,
+timetable-first setup, collapsed planner options and time-wheel interactions.
+Dedicated lifecycle tests cover authorization, actual timestamps, concurrency,
+retries, preservation of student writing, immutable snapshots, final-page repair,
+timeline privacy, and two separate student windows following lesson closure.
+The Cloudflare worker is checked with a dry run; that command does not deploy.
+
+macOS
+Authoritative source: desktop/macos. Product name: Ink Wire LMS. Persistent app
+identity remains unchanged. Native checks confirmed generated-image selection,
+audio playback, a native download saved and read back, separate board windows,
+native fullscreen, and child closure leaving the main workspace open. The existing
+production sign-in form loaded, but no production credentials were entered. Live
+teacher sign-in and notarized distribution are still acceptance/release steps.
+
+Review
+Loopback-only classroom harness: npm run preview:classroom (port 57161).
+The earlier native review harness at port 57160 remains separate.
+It uses fictional teacher/student identities and in-memory API fixtures. Its
+purpose is lesson and board review, not a replacement for production sign-in.
+The previous Live Board preview at port 57159 remains separate and preserved.

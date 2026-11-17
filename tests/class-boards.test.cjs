@@ -60,3 +60,20 @@ test('author styles stay stable across posts and boards, and teacher overrides a
 test('only class teachers can assign validated author colours and note types',async()=>{
  const f=await fixture(),id=await create(f);await open(f,id);const p=(await call(f,'student','/'+id,{action:'post',text:'My post'})).board.posts[0];const style={action:'author-style',postId:p.id,styleVersion:0,color:'rose',note:'lined'};await call(f,'student','/'+id,style,403);await call(f,'otherTeacher','/'+id,style,404);await call(f,'teacher','/'+id,{...style,color:'url(https://evil.invalid)'},400);await call(f,'teacher','/'+id,{...style,note:'html'},400);await settings(f,id,{open:false});const r=await call(f,'teacher','/'+id,style);assert.equal(r.board.posts[0].appearance.color,'rose');assert.equal(r.board.posts[0].appearance.note,'lined');f.db.close();
 });
+test('teacher background uploads stay scoped to their board and remain visible in saved snapshots',async()=>{
+ const f=await fixture(),id=await create(f),other=await create(f),imageId=randomUUID(),{handleClassBoards}=await import('../cloudflare/class-boards.mjs');
+ const bytes=new Uint8Array([137,80,78,71,13,10,26,10,0]);
+ const uploaded=await handleClassBoards(new Request(origin+`/api/class-boards/classes/${f.classId}/${id}/images/${imageId}`,{method:'POST',headers:{Origin:origin,'Content-Type':'image/png','X-Expected-User':'teacher'},body:bytes}),f.env,f.users.teacher);assert.equal(uploaded.status,201);
+ await settings(f,id,{backgroundImageId:imageId});assert.equal((await call(f,'teacher','/'+id)).board.backgroundImageId,imageId);
+ await call(f,'student',`/${id}/images/${imageId}`,undefined,404);
+ await settings(f,id,{published:true,open:true});assert.equal((await f.boards('student',`/${id}/images/${imageId}`)).status,200);
+ await settings(f,other,{backgroundImageId:imageId}).then(()=>assert.fail(),err=>assert.match(err.message,/Upload a background/));
+ await settings(f,id,{backgroundImageId:'https://other.invalid/file.png'}).then(()=>assert.fail(),err=>assert.match(err.message,/Upload a background/));
+ await call(f,'student','/'+id,{action:'settings',backgroundImageId:''},403);
+ await settings(f,id,{backgroundImageId:''});await call(f,'student',`/${id}/images/${imageId}`,undefined,404);
+ // A structured activity snapshot retains its own background reference.
+ const structured=(await call(f,'teacher','',{action:'create',template:'reading-wall'},201)).id,asset=randomUUID();
+ await handleClassBoards(new Request(origin+`/api/class-boards/classes/${f.classId}/${structured}/images/${asset}`,{method:'POST',headers:{Origin:origin,'Content-Type':'image/png','X-Expected-User':'teacher'},body:bytes}),f.env,f.users.teacher);
+ await settings(f,structured,{backgroundImageId:asset,published:true,open:true});const saved=await call(f,'teacher','/'+structured,{action:'snapshot'}),sid=saved.board.snapshots[0].id;
+ await settings(f,structured,{backgroundImageId:''});assert.equal((await call(f,'student',`/${structured}/snapshots/${sid}`)).snapshot.backgroundImageId,asset);assert.equal((await f.boards('student',`/${structured}/images/${asset}`)).status,200);f.db.close();
+});

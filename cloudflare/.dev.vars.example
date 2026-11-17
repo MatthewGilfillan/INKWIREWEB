@@ -7,3 +7,10 @@ BETTER_AUTH_SECRET=
 OPENAI_API_KEY=
 OPENAI_PLANNING_ENABLED=true
 OPENAI_PLANNING_MODEL=gpt-6-sol
+# Enable only after migration 0019 and Zoom app setup. Secrets stay server-side.
+ZOOM_ENABLED=false
+ZOOM_CLIENT_ID=
+ZOOM_CLIENT_SECRET=
+# 32 random bytes encoded as 64 hexadecimal characters; encrypts OAuth tokens.
+ZOOM_TOKEN_KEY=
+ZOOM_WEBHOOK_SECRET=

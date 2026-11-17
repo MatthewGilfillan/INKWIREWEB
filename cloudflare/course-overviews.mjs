@@ -1,3 +1,5 @@
+import {readLessonSession} from './lesson-session-state.mjs';
+import {zoomEnabled} from './zoom-connection.mjs';
 import {lessonTiming} from '../dist/schedule-model.mjs';
 import { lessonKey } from '../dist/lesson-feedback-model.mjs';
 import { validateCourse } from '../dist/course-model.mjs';
@@ -22,6 +24,8 @@ export async function handleCourseOverview(request, env, user, classId, { json, 
   const quizzes=(await env.DB.prepare('SELECT lesson_id FROM lesson_quizzes WHERE class_id=?').bind(classId).all()).results;
   if ([...reports,...quizzes].some(row => !ids.has(row.lesson_id))) return fail('Lessons with saved feedback or quizzes cannot be removed or replaced. Edit those lessons in place, or copy the plan into a new class.', 409, 'LESSON_HAS_FEEDBACK');
   const previous = await read(), priorCourse = previous ? JSON.parse(previous.content) : null;
+  for(const [i,lesson] of (priorCourse?.lessons||[]).entries())if(!ids.has(lessonKey(lesson,i))&&(await readLessonSession(env,classId,lessonKey(lesson,i)))?.value)return fail('A lesson that has started cannot be removed or replaced. Keep it in the plan and create a new lesson instead.',409,'LESSON_HAS_SESSION');
+  if(zoomEnabled(env)){const linked=(await env.DB.prepare('SELECT lesson_id FROM zoom_lessons WHERE class_id=?').bind(classId).all()).results;if(linked.some(row=>!ids.has(row.lesson_id)))return fail('Remove the Zoom meeting link before removing or replacing its lesson.',409,'LESSON_HAS_ZOOM');}
   for (const report of reports.filter(r=>r.published)) {
     const before=priorCourse?.lessons.find((l,i)=>lessonKey(l,i)===report.lesson_id), after=course.lessons.find((l,i)=>lessonKey(l,i)===report.lesson_id);
     if (before && (after.status==='cancelled' || JSON.stringify(lessonTiming(priorCourse,before))!==JSON.stringify(lessonTiming(course,after)))) return fail('This lesson already has published feedback. Keep its recorded date and time; schedule a new lesson for a make-up class.',409,'LESSON_ALREADY_REPORTED');

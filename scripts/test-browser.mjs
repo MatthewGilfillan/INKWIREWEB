@@ -1,0 +1,13 @@
+import http from 'node:http';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+const root=path.resolve('dist');
+const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.woff2':'font/woff2','.mp3':'audio/mpeg','.pdf':'application/pdf','.json':'application/json'};
+const server=http.createServer(async(req,res)=>{try{const file=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://local').pathname));if(!file.startsWith(root+path.sep))throw Error('Path');const data=await readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(data);}catch{res.writeHead(404);res.end();}});
+await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8788,'127.0.0.1',resolve);});
+const supplied=process.argv.slice(2),args=['--test','--test-concurrency=2',...(supplied.length?supplied:['tests/browser/*.browser.cjs'])];
+const child=spawn(process.execPath,args,{stdio:'inherit',env:process.env});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));
+const code=await new Promise(resolve=>child.on('exit',(code)=>resolve(code??1)));
+await new Promise(resolve=>server.close(resolve));process.exitCode=code;
