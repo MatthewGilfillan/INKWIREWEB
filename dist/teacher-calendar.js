@@ -1,3 +1,4 @@
+import {classPaletteStyle} from './class-palettes.mjs';
 import {api,escape} from './workspace-shared.js';
 import {shiftMonth,zonedClock} from './calendar-model.mjs';
 import {calendarRequestRange,followingMonths,monthTitle,monthEvents,calendarMonthHTML} from './calendar-view.js?v=20261103-scroll-calendar';
@@ -17,9 +18,10 @@ export function createTeacherCalendar({root,getClasses,openCourse,problem,getCla
   $('zone-label').textContent='Times · '+displayTimeZoneLabel(zone);$('zone-label').title='Change display time zone in account settings';
   $('more').disabled=loading;$('more').textContent=loading?'Loading months…':'Show next month';$('more').closest('div').hidden=visible.at(-1)>='2100-12';
  }
+ function paintClassColours(){for(const el of root.querySelectorAll('[data-calendar-class]')){let palette;try{palette=JSON.parse(el.dataset.calendarPalette);}catch{}el.style.cssText=classPaletteStyle(palette,el.dataset.calendarClass);}}
  function render(){
   controls();$('events').innerHTML=visible.filter(value=>data.has(value)).map((value,index)=>calendarMonthHTML({month:value,events:data.get(value).events,mode,zone,classId:filter(),first:index===0})).join('');
-  const current=data.get(month);if(current){const events=monthEvents(current.events,month,filter()),count=events.filter(event=>event.status!=='cancelled').length;$('status').textContent=`${count} scheduled lesson${count===1?'':'s'} in ${monthTitle(month)}.`;}
+  paintClassColours();const current=data.get(month);if(current){const events=monthEvents(current.events,month,filter()),count=events.filter(event=>event.status!=='cancelled').length;$('status').textContent=`${count} scheduled lesson${count===1?'':'s'} in ${monthTitle(month)}.`;}
   const currentFilter=filter(),missing=(current?.unscheduled||[]).filter(row=>!currentFilter||row.classId===currentFilter);issues=(current?.issues||[]).filter(row=>!currentFilter||row.classId===currentFilter);
   $('unscheduled').innerHTML=missing.length?`<section class="calendar-unscheduled"><h3>Classes to schedule</h3>${missing.map(row=>`<div><span><strong>${escape(row.className)}</strong><small>${row.count===null?'No course plan saved yet':row.count+' lesson dates to set'}</small></span><button type="button" class="teacher-button secondary" data-schedule="${escape(row.classId)}">Schedule lessons</button></div>`).join('')}</section>`:'';
   $('issues').innerHTML=issues.length?`<section class="calendar-issues"><h3>Lesson times to check</h3>${issues.map((issue,index)=>`<p><strong>${escape(issue.className+' · '+issue.title)}</strong><br>${escape(issue.message)} <button type="button" class="text-button" data-issue="${index}">Open lesson</button></p>`).join('')}</section>`:'';
@@ -39,7 +41,7 @@ export function createTeacherCalendar({root,getClasses,openCourse,problem,getCla
   const token=generation,next=shiftMonth(visible.at(-1),1);loading=true;controls();
   try{await requestMonth(next,token);if(token!==generation||root.hidden)return;visible.push(next);loading=false;
    // Append only the new month, keeping focus, scroll, and existing day controls.
-   $('events').insertAdjacentHTML('beforeend',calendarMonthHTML({month:next,events:data.get(next).events,mode,zone,classId:filter()}));controls();
+   $('events').insertAdjacentHTML('beforeend',calendarMonthHTML({month:next,events:data.get(next).events,mode,zone,classId:filter()}));paintClassColours();controls();
   }catch(error){if(token!==generation)return;loading=false;controls();$('status').textContent=error.message;$('more').textContent='Try loading next month again';}
  }
  function refresh(){

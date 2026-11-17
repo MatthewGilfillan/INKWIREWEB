@@ -66,3 +66,25 @@ The earlier native review harness at port 57160 remains separate.
 It uses fictional teacher/student identities and in-memory API fixtures. Its
 purpose is lesson and board review, not a replacement for production sign-in.
 The previous Live Board preview at port 57159 remains separate and preserved.
+
+17 November follow-up — Live Board placement and calendar identity
+
+Live boards now match the originating teacher section AND page, create missing
+items, and append to existing student pages without replacing student writing.
+The board header exposes End live board and Redeploy; closing freezes student
+views against the saved final version. Venn creation asks for title, category
+names and background, with optional instructions/posting options collapsed.
+Wall/grid/other layouts are omitted from Venn creation.
+
+Class colours are selectable in new-class setup and from the Class colours button
+beside the class selector. Presets or dominant colours extracted locally from a
+book-cover image persist with the course; the original cover image is not stored.
+Calendar month/agenda cards and class selection share those colours, including
+an accessible dark appearance. A Zoom video link on calendar cards opens the
+participant meeting separately. Weekly links and lesson overrides use the same
+resolution as the timeline; cancelled lessons omit the join action.
+
+No database migration is required for this follow-up. Unit/API validation: 315
+checks. Browser validation: all 23 workflows passed (the course-planner image
+safety assertion was updated to allow the empty book-cover preview and rerun).
+Worker production build/dry run passed; current bindings retained.

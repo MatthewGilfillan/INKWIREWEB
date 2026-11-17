@@ -13,6 +13,21 @@ const schema=getSchema([StarterKit.configure({link:false,heading:{levels:[2,3]}}
 export function encodeState(bytes) {let text='';for(let i=0;i<bytes.length;i+=8192)text+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(text);}
 export function decodeState(text) {if(typeof text!=='string'||text.length>1200000||!/^[A-Za-z0-9+/]*={0,2}$/.test(text))throw Error('Invalid notebook update.');return Uint8Array.from(atob(text),c=>c.charCodeAt(0));}
 export function seedState(document) {const d=prosemirrorJSONToYDoc(schema,cleanDocument(document),'document');try{return Y.encodeStateAsUpdate(d);}finally{d.destroy();}}
+// Append to the existing CRDT rather than reseeding the page: offline student
+// edits must still merge with the exact same Yjs text and drawing identities.
+export function appendState(previous,nodes) {
+  const d=new Y.Doc(),addition=prosemirrorJSONToYDoc(schema,cleanDocument({type:'doc',content:nodes}),'document');
+  try{
+    if(previous)Y.applyUpdate(d,new Uint8Array(previous));
+    // Y.XmlElement.clone() drops non-string attributes; ProseMirror uses numbers
+    // for canvas positions and sizes, so copy all schema-validated attributes.
+    const clone=node=>{if(!(node instanceof Y.XmlElement))return node.clone();const copy=new Y.XmlElement(node.nodeName);for(const [key,value]of Object.entries(node.getAttributes()))copy.setAttribute(key,structuredClone(value));copy.insert(0,node.toArray().map(clone));return copy;};
+    d.getXmlFragment('document').push(addition.getXmlFragment('document').toArray().map(clone));
+    const original=yDocToProsemirrorJSON(d,'document');schema.nodeFromJSON(original).check();
+    const state=Y.encodeStateAsUpdate(d);if(state.length>800000)throw Error('This notebook page is full. Start a new page.');
+    return {state,document:cleanDocument(original)};
+  }finally{d.destroy();addition.destroy();}
+}
 export function mergeState(previous,update) {
   const d=new Y.Doc();try{
     if(previous)Y.applyUpdate(d,new Uint8Array(previous));Y.applyUpdate(d,decodeState(update));

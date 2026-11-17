@@ -133,7 +133,7 @@ test('custom timetable, primary sections and prepared course files retain their 
     assert.equal(posts,0,'opening a file does not upload or save it');
     assert.match(await page.locator('#course-summary').textContent(),/10 lessons · dates to arrange · 90 min · 15 teaching hours/);
     assert.equal(await page.locator('#lesson-4-activities').inputValue(),'First part. Continued on next page.');
-    assert.equal(await page.locator('.course-planner img').count(),0);
+    assert.equal(await page.locator('.course-planner img[src]').count(),0);
     await page.getByRole('button',{name:'Save course overview',exact:true}).click();
     await page.getByText('Course overview saved.',{exact:true}).waitFor();
     assert.equal(saved.lessons[4].evidence,'A revised paragraph'); assert.equal(saved.themes,imported.themes);

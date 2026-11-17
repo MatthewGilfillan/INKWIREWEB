@@ -1,3 +1,5 @@
+import {classPaletteStyle} from './class-palettes.mjs';
+import {editClassPalette} from './class-palette-dialog.js';
 import {createTranscriptSummary} from './transcript-summary.js';
 import {createAssignments} from './assignments-workspace.js?v=20261110-gradebook';
 import {createAssessmentWorkspace} from './assessment-workspace.js?v=20261111-unified';
@@ -27,12 +29,12 @@ document.querySelectorAll('dialog').forEach(dialog=>{
 });
 const tabs=[['overview','Course overview'],['students','Students'],['calendar','Calendar'],['timeline','Timeline'],['assignments','Assignments'],['assessment','Assessment'],['notebooks','Notebooks'],['files','Class files']];
 list.innerHTML=`<div id="class-empty" class="empty-classes" hidden><h2>No classes yet</h2><p>Create your first class, or join one with an invite code.</p></div><div id="class-workspace" hidden>
-  <h1 class="visually-hidden">Class workspace</h1><div class="class-workspace-heading"><div class="class-selection"><label for="selected-class">Class</label><select id="selected-class"></select><div class="class-selection-detail"><p id="selected-class-detail"></p><span class="class-badge" id="class-membership"></span></div></div><div id="selected-class-progress" aria-live="polite"></div><div class="class-header-actions"></div></div>
+  <h1 class="visually-hidden">Class workspace</h1><div class="class-workspace-heading"><div class="class-selection"><label for="selected-class">Class</label><select id="selected-class"></select><div class="class-selection-detail"><p id="selected-class-detail"></p><span class="class-badge" id="class-membership"></span><button type="button" class="class-colour-button" id="class-colours" title="Change class colours"><span aria-hidden="true">●</span> Class colours</button></div></div><div id="selected-class-progress" aria-live="polite"></div><div class="class-header-actions"></div></div>
   <div class="class-tab-list" role="tablist" aria-label="Class workspace">${tabs.map(([id,label])=>`<button type="button" role="tab" id="class-tab-${id}" aria-controls="class-panel-${id}" aria-selected="${id==='overview'}" tabindex="${id==='overview'?0:-1}" data-class-tab="${id}">${label}</button>`).join('')}</div>
   ${tabs.map(([id,label])=>`<section id="class-panel-${id}" role="tabpanel" aria-labelledby="class-tab-${id}" ${id==='overview'?'':'hidden'}>${id==='students'?`<div class="roster-heading"><div><h2>Students</h2><p id="roster-count"></p></div><div class="teacher-actions"><button type="button" class="teacher-button" id="class-add-student">+ Add student</button><button type="button" class="teacher-button secondary" id="class-invite-students">Invite students</button></div></div><label class="roster-search" for="student-search">Find a student<input id="student-search" type="search" placeholder="Search by name" autocomplete="off"></label><p class="roster-key">Attendance is based on published lesson assessments. Unrecorded lessons are excluded. Submission and marking queues are available in Assignments.</p><div id="selected-roster" aria-live="polite"></div><div class="teacher-actions roster-footer"><button type="button" class="text-button" id="class-demo-parents">Set up demo parent profiles</button><button type="button" class="text-button" id="class-refresh-roster">Refresh students</button></div>`:''}</section>`).join('')}
   <details class="invite-settings" id="selected-class-settings"><summary>Class settings</summary><p>Invite another teacher to manage this class.</p><button class="teacher-button secondary" type="button" id="class-teacher-invite">Create teacher invite</button><button type="button" class="text-button danger-text" id="class-delete">Delete class</button></details>
 </div>`;
-function renderClassProgress({classId,course,now,error}){if(classId!==activeClassId)return;progressVersion++;$('#selected-class-progress').innerHTML=error?'<p class="class-progress-message">Progress unavailable. Open Course overview to retry.</p>':course?unitMeter(course,now):'<p class="class-progress-message">Save a timetable to see course progress.</p>';}
+function renderClassProgress({classId,course,now,error}){if(classId!==activeClassId)return;if(course){const row=classrooms.find(c=>c.id===classId);if(row)row.classPalette=course.classPalette||null;renderClassHeading();}progressVersion++;$('#selected-class-progress').innerHTML=error?'<p class="class-progress-message">Progress unavailable. Open Course overview to retry.</p>':course?unitMeter(course,now):'<p class="class-progress-message">Save a timetable to see course progress.</p>';}
 async function loadClassProgress(classId){const version=++progressVersion;try{const data=await api('/api/classes/'+encodeURIComponent(classId)+'/overview');if(version===progressVersion)renderClassProgress({classId,course:data.course,now:data.serverNow});}catch(error){if(version===progressVersion)renderClassProgress({classId,error});}}
 const coursePlanner=createCoursePlanner({list,root:$('#class-panel-overview'),getClasses:()=>classrooms,status,problem,onCourseLoaded:renderClassProgress,onSaved:progress=>{renderClassProgress(progress);calendar.refresh();classCalendar.refresh();today.refresh();}});
 const classFiles=createClassFiles({root:$('#class-panel-files'),teacher:true,onPlan:async id=>{await openCourseTab(id);coursePlanner.prepare();}});
@@ -54,7 +56,7 @@ function renderClasses(){
 }
 function renderClassHeading(){
   const c=classrooms.find(c=>c.id===activeClassId);if(!c)return;
-  $('#selected-class').value=c.id;$('#selected-class-detail').textContent=c.subject || 'Class workspace';
+  $('.class-selection').style.cssText=classPaletteStyle(c.classPalette,c.id);$('#selected-class').value=c.id;$('#selected-class-detail').textContent=c.subject || 'Class workspace';
   $('#class-membership').textContent=c.membership==='owner'?'Class owner':'Teacher';
   $('#class-add-student').dataset.addStudent=c.id;
   Object.assign($('#class-invite-students').dataset,{shareKind:'class',class:c.id});
@@ -62,6 +64,7 @@ function renderClassHeading(){
   $('#class-teacher-invite').dataset.invite=c.id;$('#class-delete').dataset.deleteClass=c.id;
   $('#selected-class-settings').hidden=c.membership!=='owner';
 }
+$('#class-colours').onclick=async event=>{const button=event.currentTarget,cid=activeClassId;if(!coursePlanner.canLeave())return;button.disabled=true;try{const result=await editClassPalette(cid,button);if(result){const row=classrooms.find(c=>c.id===cid);if(row)row.classPalette=result.classPalette;if(cid===activeClassId){renderClassHeading();coursePlanner.reset();if(activeTab==='overview')await showClassTab('overview');}calendar.refresh();classCalendar.refresh();}}catch(error){problem(error);}finally{button.disabled=false;}};
 async function selectClass(id){
   if(id===activeClassId)return true;
   if(classFiles.isBusy()){status.textContent='Wait for the file upload or sharing change to finish.';return false;}

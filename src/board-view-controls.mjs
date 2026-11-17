@@ -15,6 +15,7 @@ export function mountBoardViewControls({root,classId,boardId,getSnapshotId=()=>'
  newWindow.onclick=()=>{
   const url=new URL(location.pathname==='/board-embed.html'?'/board-embed.html':'/board-embed',location.origin);url.searchParams.set('classId',classId);url.searchParams.set('boardId',boardId);
   const snapshot=getSnapshotId();if(snapshot)url.searchParams.set('snapshotId',snapshot);
+  const sourcePageId=new URLSearchParams(location.search).get('sourcePageId');if(sourcePageId)url.searchParams.set('sourcePageId',sourcePageId);
   // Preserve the fictional identity only when using the local review harness.
   const role=new URLSearchParams(location.search).get('reviewRole');if(['teacher','student','otherStudent'].includes(role)&&['localhost','127.0.0.1'].includes(location.hostname))url.searchParams.set('reviewRole',role);
   const popup=window.open('about:blank','_blank','popup=no,toolbar=yes,menubar=yes,location=yes,status=yes,width=1280,height=900,resizable=yes,scrollbars=yes');

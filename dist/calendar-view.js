@@ -1,3 +1,4 @@
+import {zoomURL} from './zoom-model.mjs';
 import {escape} from './workspace-shared.js';
 import {calendarGrid,zonedClock,shiftMonth} from './calendar-model.mjs';
 export const monthTitle=month=>new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month+'-01T12:00:00Z'));
@@ -16,8 +17,9 @@ function eventLabel(event,zone,day){
  return `${start.time}–${end.time}${end.date!==start.date?' (ends '+end.date+')':''}`;
 }
 function eventButton(event,zone,day){
- const label=eventLabel(event,zone,day);
- return `<button type="button" class="calendar-event ${event.status==='cancelled'?'is-cancelled':''}" data-event="${escape(event.id)}" aria-label="${escape(label+' · '+event.className+' · '+event.title+(event.status==='cancelled'?' · Cancelled':''))}"><time datetime="${escape(event.startsAt)}">${escape(label)}</time><strong>${escape(event.className)}</strong><span>${escape(event.title)}</span>${event.status==='cancelled'?'<span>Cancelled</span>':''}${event.billing?`<small>${escape(event.billing)}</small>`:''}</button>`;
+ const label=eventLabel(event,zone,day);let join='';try{join=event.status!=='cancelled'?zoomURL(event.zoom?.joinURL):'';}catch{}
+ const zoom=join?`<a class="calendar-zoom" href="${escape(join)}" target="_blank" rel="noopener noreferrer" aria-label="${escape('Join Zoom lesson · '+event.className+' · '+event.title)}" title="${escape('Join Zoom'+(event.zoom.meetingId?' · '+event.zoom.meetingId:'')+(event.zoom.passcode?' · Passcode: '+event.zoom.passcode:''))}"><svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M3 5h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V6a1 1 0 0 1 1-1Zm15 4 4-3v12l-4-3Z"/></svg><span>Join Zoom</span></a>`:'';
+ return `<article class="calendar-lesson ${event.status==='cancelled'?'is-cancelled':''}" data-calendar-class="${escape(event.classId)}" data-calendar-palette="${escape(JSON.stringify(event.classPalette||null))}"><button type="button" class="calendar-event ${event.status==='cancelled'?'is-cancelled':''}" data-event="${escape(event.id)}" aria-label="${escape(label+' · '+event.className+' · '+event.title+(event.status==='cancelled'?' · Cancelled':''))}"><time datetime="${escape(event.startsAt)}">${escape(label)}</time><strong>${escape(event.className)}</strong><span>${escape(event.title)}</span>${event.status==='cancelled'?'<span>Cancelled</span>':''}${event.billing?`<small>${escape(event.billing)}</small>`:''}</button>${zoom}</article>`;
 }
 export function calendarMonthHTML({month,events,mode,zone,classId='',first=false,now=Date.now()}){
  const selected=monthEvents(events,month,classId),today=zonedClock(now,zone).date;

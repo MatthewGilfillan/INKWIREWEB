@@ -1,4 +1,4 @@
-Live Board classroom flow — 12 November 2026
+Live Board classroom flow — updated 17 November 2026
 
 Insert live board opens the activity library, followed by a setup screen for the
 title, instructions, visual layout, background, replies and reactions. The board
@@ -6,14 +6,18 @@ is created as a teacher draft. Supported shared layouts are Wall, Grid, Rows and
 Timeline; structured activities also offer Columns and their graphic organizer.
 Ranking activities retain their individual student columns.
 
-Open to class publishes one shared board and places a reference page in each
-enrolled student's notebook, in the matching section of the teacher notebook.
-Custom sections are created if needed. A standalone board without a notebook
+Open to class publishes one shared board into the corresponding section AND
+page of every enrolled student notebook. It uses the originating teacher page
+title, not the board title. Section/page names match after case and whitespace
+normalization; missing sections/pages are created. Existing matching pages receive
+only the board reference through an additive Yjs update. Concurrent student edits
+retain their original CRDT identities and merge safely. A standalone board without a notebook
 placement or lesson link goes into Notes. Teacher notes, files and assessments
 on the source page are not copied. Existing student writing is never replaced.
 
-Already-distributed references count as placed. Deterministic page IDs prevent
-duplicates during retries or reopening. Deleted copies are not resurrected.
+A reference already in the corresponding page counts as placed. Older copies
+on differently named pages are retained while the matching page is added.
+Deterministic page IDs prevent duplicates during retries or reopening. Deleted copies are not resurrected.
 Protected sections are respected; a separate shared section is used if needed.
 Students joining later receive published activities when their notebook opens
 or polls. Legacy published boards gain placements when a teacher opens them.
@@ -44,7 +48,9 @@ Venn Diagram uses two overlapping circles. Contributions are stored once in
 left/shared/right regions; each region scrolls independently. A post can be
 moved with drag and drop or its Move to selector. The latter is available on
 touch and keyboard devices. Teachers may rename all three headings through
-Activity & standards; headings are saved with the board and its snapshots.
+the creation screen or Board settings; headings are saved with the board and
+its snapshots. The new Venn defaults are Category A, Both and Category B. The
+creation screen omits layout choices and folds instructions/posting options.
 The explicit List view remains available. Responses expand in a readable dialog.
 
 Our Reading Wall has nine response types: question, connection, evidence worth
@@ -100,3 +106,9 @@ The landscape stays still as responses scroll independently inside each column;
 headers stay visible. Narrow displays scroll all five columns and the landscape
 together horizontally to preserve alignment. Responses retain their saved stage
 and can be moved through drag and drop or the compact three-dot menu.
+
+The teacher board header now shows Open to class, End live board, or Redeploy
+live board. Ending captures the immutable final result, closes student writes,
+and makes existing student windows follow that saved result. Redeploy resumes
+the shared live reference; previous Final pages keep their immutable versions.
+An explicitly ended lesson must be started again before its boards can reopen.

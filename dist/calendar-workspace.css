@@ -46,3 +46,30 @@
  .calendar-workspace .calendar-agenda .calendar-event{grid-template-columns:1fr;gap:4px}.calendar-workspace .calendar-agenda .calendar-event :is(time,strong,span){font-size:11px}
  #teacher-calendar .calendar-section-heading h2,#class-panel-calendar .calendar-section-heading h2{font-size:22px}
 }
+/* Class identity stays consistent across months and agenda view. */
+.calendar-workspace .calendar-lesson{position:relative;min-width:0;margin:0 0 8px;border:1px solid var(--class-border);border-left:4px solid var(--class-accent);border-radius:9px;background:var(--class-surface);color:var(--class-ink);box-shadow:0 2px 4px #1026400a;transition:box-shadow .18s,transform .18s}
+.calendar-workspace .calendar-lesson:hover{box-shadow:0 4px 12px #10264019;transform:translateY(-1px)}
+.calendar-workspace .calendar-lesson .calendar-event{display:block;margin:0;border:0;border-radius:7px;padding:9px;background:transparent;color:inherit;box-shadow:none;width:100%}
+.calendar-workspace .calendar-lesson .calendar-event:hover{background:#ffffff40}
+.calendar-workspace .calendar-lesson .calendar-event :is(time,small){color:var(--class-accent)}
+.calendar-workspace .calendar-lesson .calendar-event strong{color:inherit}
+.calendar-workspace .calendar-zoom{display:flex;align-items:center;justify-content:center;gap:6px;width:max-content;max-width:calc(100% - 16px);margin:0 8px 8px;padding:5px 8px;border-radius:7px;border:1px solid #6aacf05c;background:#f7fbff;color:#1761bd;text-decoration:none;font:600 10px/1.3 Poppins,Arial,sans-serif;transition:background .18s,box-shadow .18s,transform .18s}
+.calendar-workspace .calendar-zoom svg{flex:none}
+.calendar-workspace .calendar-zoom:hover{background:#1769d0;color:#fff;box-shadow:0 3px 8px #1769d033;transform:translateY(-1px)}
+.calendar-workspace .calendar-zoom:focus-visible{outline:3px solid #277edc;outline-offset:3px}
+.calendar-workspace .calendar-agenda .calendar-lesson{display:flex;align-items:center;gap:10px}
+.calendar-workspace .calendar-agenda .calendar-lesson .calendar-event{display:grid;grid-template-columns:135px 1fr 1.5fr;gap:12px;padding:14px}
+.calendar-workspace .calendar-agenda .calendar-zoom{flex:none;margin:8px 12px 8px 0;min-height:34px}
+html[data-lms-theme=dark] .calendar-workspace .calendar-lesson{background:var(--class-dark);color:var(--class-dark-ink);border-color:var(--class-accent)}
+html[data-lms-theme=dark] .calendar-workspace .calendar-lesson .calendar-event{background:transparent;color:var(--class-dark-ink);border:0}
+html[data-lms-theme=dark] .calendar-workspace .calendar-lesson .calendar-event :is(time,small){color:var(--class-dark-ink)}
+html[data-lms-theme=dark] .calendar-workspace .calendar-zoom{background:#182e4a;color:#b9d9ff;border-color:#356598}
+html[data-lms-theme=dark] .calendar-workspace .calendar-zoom:hover{background:#256fca;color:white}
+.calendar-workspace .calendar-lesson.is-cancelled{opacity:.65;border-style:dashed}
+@media(max-width:650px){.calendar-workspace .calendar-lesson .calendar-event{padding:5px 3px}.calendar-workspace .calendar-month .calendar-zoom{width:28px;height:28px;padding:4px;margin:0 3px 5px;max-width:100%}.calendar-workspace .calendar-month .calendar-zoom span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.calendar-workspace .calendar-agenda .calendar-lesson{align-items:end}.calendar-workspace .calendar-agenda .calendar-lesson .calendar-event{display:block;padding:10px}}
+@media(prefers-reduced-motion:reduce){.calendar-workspace :is(.calendar-lesson,.calendar-zoom){transition:none;transform:none}}
+/* Override the shared button finish so class palettes colour the whole card. */
+[data-lms-skin] .calendar-workspace .calendar-lesson .calendar-event:not(.is-cancelled){background:transparent;border:0;box-shadow:none;color:inherit}
+[data-lms-skin] .calendar-workspace .calendar-lesson .calendar-event:not(.is-cancelled):hover{background:#ffffff38}
+html[data-lms-theme=dark] [data-lms-skin] .calendar-workspace .calendar-lesson .calendar-event:not(.is-cancelled){background:transparent;color:inherit;border:0;box-shadow:none}
+html[data-lms-theme=dark] [data-lms-skin] .calendar-workspace .calendar-lesson .calendar-event:not(.is-cancelled):hover{background:#ffffff0b}

@@ -1,3 +1,4 @@
+import {zoomLessonMap} from './zoom-meetings.mjs';
 import { projectCalendar, zonedClock } from '../dist/calendar-model.mjs';
 
 export async function handleCalendar(request, env, user, { json, fail }) {
@@ -9,5 +10,8 @@ export async function handleCalendar(request, env, user, { json, fail }) {
   const rows = (await env.DB.prepare(`SELECT c.id, c.name, o.content FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
     WHERE c.deleted_at IS NULL AND (c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers t WHERE t.class_id = c.id AND t.user_id = ?))
     ORDER BY c.name, c.id`).bind(user.id, user.id).all()).results;
-  return json(projectCalendar(rows.map(c => ({ ...c, course: c.content ? JSON.parse(c.content) : null })), from, to, timeZone));
+  const classrooms=rows.map(c=>({...c,course:c.content?JSON.parse(c.content):null})),result=projectCalendar(classrooms,from,to,timeZone);
+  const meetings=new Map(await Promise.all(classrooms.map(async c=>[c.id,await zoomLessonMap(env,c.id,false,c.course?.lessons||[])])));
+  for(const event of result.events){const classroom=classrooms.find(c=>c.id===event.classId),lesson=classroom.course.lessons[event.lessonIndex],meeting=meetings.get(event.classId)?.get(lesson.id||'legacy-'+(event.lessonIndex+1));if(event.status!=='cancelled'&&meeting?.joinURL)event.zoom={joinURL:meeting.joinURL,meetingId:meeting.meetingId,passcode:meeting.passcode};}
+  return json(result);
 }

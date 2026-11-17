@@ -62,7 +62,7 @@ export function projectCalendar(classes, from, to, displayZone) {
         const lastDay = zonedClock(end - 1, displayZone).date, dates = [];
         for (const date = new Date(day + 'T12:00:00Z'); date.toISOString().slice(0, 10) <= lastDay; date.setUTCDate(date.getUTCDate() + 1)) dates.push(date.toISOString().slice(0, 10));
         if (!dates.some(date => date >= from && date < to)) return;
-        events.push({ id: `${classroom.id}:${index}`, classId: classroom.id, className: classroom.name, courseTitle: course.title, title: lesson.title, lessonIndex: index, sourceZone: course.timeZone, status:lesson.status || 'scheduled', billing:billing.get(lesson.id || `legacy-${index+1}`)?.label || '', startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString(), date: day, dates });
+        events.push({ id: `${classroom.id}:${index}`, classId: classroom.id, className: classroom.name, classPalette:course.classPalette||null, courseTitle: course.title, title: lesson.title, lessonIndex: index, sourceZone: course.timeZone, status:lesson.status || 'scheduled', billing:billing.get(lesson.id || `legacy-${index+1}`)?.label || '', startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString(), date: day, dates });
       } catch (error) { issues.push({ classId: classroom.id, className: classroom.name, title: lesson.title, lessonIndex: index, message: error.message }); }
     });
     if (withoutDate) unscheduled.push({ classId: classroom.id, className: classroom.name, count: withoutDate });

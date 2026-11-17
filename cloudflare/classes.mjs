@@ -1,3 +1,4 @@
+import {handleClassPalette} from './class-appearance.mjs';
 import {installEducadeDemo,demoKey} from './educade-demo.mjs';
 import {validateCourse} from '../dist/course-model.mjs';
 import { digest } from './auth.mjs';
@@ -31,6 +32,7 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
     if(!await limitClassAction(env,user.id,'install-educade-demo',3))return fail('Please wait before retrying the demo setup.',429,'RATE_LIMITED');
     return json({classes:await installEducadeDemo(env,user)},201);
   }
+  const paletteMatch=path.match(/^\/api\/classes\/([a-f0-9-]{36})\/palette$/);if(paletteMatch)return handleClassPalette(request,env,user,paletteMatch[1],{json,fail,readJSON});
   const planningMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/planning-assistant$/);
   if (planningMatch) return handlePlanningAssistant(request, env, user, planningMatch[1], { json, fail, readJSON });
   if (path === '/api/classes/calendar') return handleCalendar(request, env, user, { json, fail });
@@ -42,11 +44,11 @@ export async function handleClasses(request, env, user, { json, fail, readJSON }
   if (overviewMatch) return handleCourseOverview(request, env, user, overviewMatch[1], { json, fail, readJSON });
   if (path === '/api/classes' && request.method === 'GET') {
     const rows = await env.DB.prepare(`SELECT ${classFields}, o.revision AS overviewRevision,
-      c.request_id AS demoRequestId, json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
+      json_extract(o.content, '$.classPalette') AS paletteJSON,c.request_id AS demoRequestId, json_extract(o.content, '$.weeks') AS courseWeeks, json_extract(o.content, '$.lessonsPerWeek') AS courseFrequency,
       json_extract(o.content, '$.lessonMinutes') AS courseMinutes, json_extract(o.content, '$.pacing') AS coursePacing, json_extract(o.content, '$.lessonCount') AS courseLessonCount FROM classes c LEFT JOIN course_overviews o ON o.class_id = c.id
       WHERE c.deleted_at IS NULL AND (c.owner_id = ? OR EXISTS (SELECT 1 FROM class_teachers m WHERE m.class_id = c.id AND m.user_id = ?))
       ORDER BY c.created_at DESC, c.id`).bind(user.id, user.id, user.id).all();
-    return json({ classes: rows.results.map(({demoRequestId,...row})=>({...row,...(demoKey(demoRequestId)?{demoKey:demoKey(demoRequestId)}:{})})) });
+    return json({ classes: rows.results.map(({demoRequestId,paletteJSON,...row})=>({...row,classPalette:paletteJSON?JSON.parse(paletteJSON):null,...(demoKey(demoRequestId)?{demoKey:demoKey(demoRequestId)}:{})})) });
   }
   const inviteMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/invite$/);
   const lifecycleMatch = path.match(/^\/api\/classes\/([a-f0-9-]{36})\/(delete|restore)$/);
